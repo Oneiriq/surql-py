@@ -366,14 +366,14 @@ class TestCLIDryRunOption:
     result = self.runner.invoke(migrate_app, ['up', '--help'])
 
     assert result.exit_code == 0
-    assert '--dry-run' in result.stdout
+    assert '--dry-run' in strip_ansi(result.stdout)
 
   def test_dry_run_option_available_down(self) -> None:
     """Test that dry-run option is available for down command."""
     result = self.runner.invoke(migrate_app, ['down', '--help'])
 
     assert result.exit_code == 0
-    assert '--dry-run' in result.stdout
+    assert '--dry-run' in strip_ansi(result.stdout)
 
 
 class TestCLIDirectoryOption:
