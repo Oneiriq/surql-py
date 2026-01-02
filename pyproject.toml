@@ -4,32 +4,32 @@ name = "reverie"
 version = "0.1.0"
 description = "Code-first schema, validation, generation, and serialization for Python and SurrealDB."
 authors = [
-    { name = "Shon Thomas", email = "shon@oneiriq.com" }
+  { name = "Shon Thomas", email = "shon@oneiriq.com" }
 ]
 requires-python = ">=3.12"
 readme = "README.md"
 license = { file = "LICENSE" }
 classifiers = [
-    "Development Status :: 3 - Alpha",
-    "Intended Audience :: Developers",
-    "Topic :: Software Development :: Libraries",
-    "Operating System :: POSIX :: Linux",
-    "Operating System :: MacOS :: MacOS X",
-    "Operating System :: Microsoft :: Windows",
-    "License :: OSI Approved :: Apache Software License",
+  "Development Status :: 3 - Alpha",
+  "Intended Audience :: Developers",
+  "Topic :: Software Development :: Libraries",
+  "Operating System :: POSIX :: Linux",
+  "Operating System :: MacOS :: MacOS X",
+  "Operating System :: Microsoft :: Windows",
+  "License :: OSI Approved :: Apache Software License",
 ]
 
 dependencies = [
-    "fastapi>=0.128.0,<1.0.0",
-    "httpx>=0.28.1,<1.0.0",
-    "pydantic-settings>=2.12.0",
-    "pydantic>=2.12.0",
-    "python-dateutil>=2.9.0.post0",
-    "python-ulid>=3.1.0,<4.0.0",
-    "structlog>=25.5.0,<26",
-    "surrealdb>=1.0.7,<2.0.0",
-    "tenacity>=9.1.2,<10.0.0",
-    "typer>=0.21.0,<1.0.0",
+  "fastapi>=0.128.0,<1.0.0",
+  "httpx>=0.28.1,<1.0.0",
+  "pydantic-settings>=2.12.0",
+  "pydantic>=2.12.0",
+  "python-dateutil>=2.9.0.post0",
+  "python-ulid>=3.1.0,<4.0.0",
+  "structlog>=25.5.0,<26",
+  "surrealdb>=1.0.7,<2.0.0",
+  "tenacity>=9.1.2,<10.0.0",
+  "typer>=0.21.0,<1.0.0",
 ]
 
 
@@ -50,18 +50,18 @@ indent-width = 2
 
 [tool.ruff.lint]
 select = [
-    "E",    # pycodestyle errors
-    "W",    # pycodestyle warnings
-    "F",    # pyflakes
-    "I",    # isort
-    "B",    # flake8-bugbear
-    "C4",   # flake8-comprehensions
-    "UP",   # pyupgrade
-    "ARG",  # flake8-unused-arguments
-    "SIM",  # flake8-simplify
+  "E",    # pycodestyle errors
+  "W",    # pycodestyle warnings
+  "F",    # pyflakes
+  "I",    # isort
+  "B",    # flake8-bugbear
+  "C4",   # flake8-comprehensions
+  "UP",   # pyupgrade
+  "ARG",  # flake8-unused-arguments
+  "SIM",  # flake8-simplify
 ]
 ignore = [
-    "E501",  # line too long, handled by black
+  "E501",  # line too long
 ]
 
 [tool.ruff.lint.per-file-ignores]
@@ -74,43 +74,37 @@ known-first-party = ["src"]
 quote-style = "single"
 indent-style = "space"
 
-[tool.black]
-line-length = 100
-target-version = ["py312"]
-skip-string-normalization = true
-include = '\.pyi?$'
-
 [tool.pytest.ini_options]
 testpaths = ["tests"]
 python_files = ["test_*.py"]
 python_classes = ["Test*"]
 python_functions = ["test_*"]
 addopts = [
-    "--strict-markers",
-    "--strict-config",
-    "--showlocals",
+  "--strict-markers",
+  "--strict-config",
+  "--showlocals",
 ]
 markers = [
-    "asyncio: mark test as async",
+  "asyncio: mark test as async",
 ]
 
 [tool.coverage.run]
 source = ["src"]
 omit = [
-    "*/tests/*",
-    "*/__pycache__/*",
-    "*/.venv/*",
+  "*/tests/*",
+  "*/__pycache__/*",
+  "*/.venv/*",
 ]
 
 [tool.coverage.report]
 exclude_lines = [
-    "pragma: no cover",
-    "def __repr__",
-    "raise AssertionError",
-    "raise NotImplementedError",
-    "if __name__ == .__main__.:",
-    "if TYPE_CHECKING:",
-    "@abstractmethod",
+  "pragma: no cover",
+  "def __repr__",
+  "raise AssertionError",
+  "raise NotImplementedError",
+  "if __name__ == .__main__.:",
+  "if TYPE_CHECKING:",
+  "@abstractmethod",
 ]
 
 [tool.mypy]
@@ -128,7 +122,7 @@ warn_no_return = true
 follow_imports = "normal"
 ignore_missing_imports = true
 exclude = [
-    "scripts/",
+  "scripts/",
 ]
 
 [tool.pylint.format]
@@ -137,14 +131,14 @@ indent-string = '  '  # 2 spaces
 
 [tool.pylint.messages_control]
 disable = [
-    'C0103',  # invalid-name (ruff handles this)
-    'C0114',  # missing-module-docstring (ruff handles this)
-    'C0115',  # missing-class-docstring (ruff handles this)
-    'C0116',  # missing-function-docstring (ruff handles this)
-    'R0903',  # too-few-public-methods (too opinionated)
-    'W0212',  # protected-access (sometimes necessary)
-    'C0330',  # bad-continuation (conflicts with black/ruff)
-    'C0326',  # bad-whitespace (conflicts with black/ruff)
+  'C0103',  # invalid-name (ruff handles this)
+  'C0114',  # missing-module-docstring (ruff handles this)
+  'C0115',  # missing-class-docstring (ruff handles this)
+  'C0116',  # missing-function-docstring (ruff handles this)
+  'R0903',  # too-few-public-methods (too opinionated)
+  'W0212',  # protected-access (sometimes necessary)
+  'C0330',  # bad-continuation (conflicts with black/ruff)
+  'C0326',  # bad-whitespace (conflicts with black/ruff)
 ]
 
 [tool.pylint.basic]
@@ -152,11 +146,11 @@ good-names = ['i', 'j', 'k', 'ex', 'id', 'db', '_']
 
 [dependency-groups]
 dev = [
-    "mypy>=1.19.1",
-    "pytest>=9.0.2",
-    "pytest-cov>=7.0.0",
-    "pytest-watch>=4.2.0",
-    "ruff>=0.14.10",
-    "pympler>=1.1,<2.0.0",
-    "types-python-dateutil>=2.9.0.20251115",
+  "mypy>=1.19.1",
+  "pytest>=9.0.2",
+  "pytest-cov>=7.0.0",
+  "pytest-watch>=4.2.0",
+  "ruff>=0.14.10",
+  "pympler>=1.1,<2.0.0",
+  "types-python-dateutil>=2.9.0.20251115",
 ]
