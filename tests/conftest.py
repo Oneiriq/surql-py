@@ -37,6 +37,7 @@ def configure_structlog():
     cache_logger_on_first_use=False,
   )
 
+
 # Test data models
 
 
