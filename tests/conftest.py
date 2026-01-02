@@ -6,7 +6,7 @@ mock database clients, sample schemas, and test utilities.
 
 import asyncio
 from typing import Any
-from unittest.mock import AsyncMock, Mock, MagicMock
+from unittest.mock import AsyncMock, Mock
 
 import pytest
 from pydantic import BaseModel
@@ -14,14 +14,15 @@ from pydantic import BaseModel
 from src.connection.client import DatabaseClient
 from src.connection.config import ConnectionConfig
 from src.schema.fields import FieldDefinition, FieldType
-from src.schema.table import TableDefinition, TableMode, IndexDefinition, IndexType
+from src.schema.table import IndexDefinition, IndexType, TableDefinition, TableMode
 from src.types.record_id import RecordID
-
 
 # Test data models
 
+
 class User(BaseModel):
   """Test user model."""
+
   name: str
   email: str
   age: int | None = None
@@ -29,6 +30,7 @@ class User(BaseModel):
 
 class Post(BaseModel):
   """Test post model."""
+
   title: str
   content: str
   author_id: str
@@ -36,12 +38,14 @@ class Post(BaseModel):
 
 class Product(BaseModel):
   """Test product model."""
+
   name: str
   price: float
   stock: int
 
 
 # Database configuration fixtures
+
 
 @pytest.fixture
 def db_config() -> ConnectionConfig:
@@ -65,6 +69,7 @@ def minimal_db_config() -> ConnectionConfig:
 
 
 # Mock database client fixtures
+
 
 @pytest.fixture
 def mock_surreal_client() -> Mock:
@@ -101,6 +106,7 @@ async def connected_mock_client(mock_db_client: DatabaseClient) -> DatabaseClien
 
 # Schema fixtures
 
+
 @pytest.fixture
 def sample_field() -> FieldDefinition:
   """Provide sample field definition."""
@@ -118,7 +124,9 @@ def sample_fields() -> list[FieldDefinition]:
     FieldDefinition(name='name', type=FieldType.STRING),
     FieldDefinition(name='email', type=FieldType.STRING, assertion='string::is::email($value)'),
     FieldDefinition(name='age', type=FieldType.INT, assertion='$value >= 0 AND $value <= 150'),
-    FieldDefinition(name='created_at', type=FieldType.DATETIME, default='time::now()', readonly=True),
+    FieldDefinition(
+      name='created_at', type=FieldType.DATETIME, default='time::now()', readonly=True
+    ),
   ]
 
 
@@ -133,7 +141,9 @@ def sample_index() -> IndexDefinition:
 
 
 @pytest.fixture
-def sample_table(sample_fields: list[FieldDefinition], sample_index: IndexDefinition) -> TableDefinition:
+def sample_table(
+  sample_fields: list[FieldDefinition], sample_index: IndexDefinition
+) -> TableDefinition:
   """Provide sample table definition."""
   return TableDefinition(
     name='user',
@@ -144,6 +154,7 @@ def sample_table(sample_fields: list[FieldDefinition], sample_index: IndexDefini
 
 
 # RecordID fixtures
+
 
 @pytest.fixture
 def sample_record_id() -> RecordID[User]:
@@ -163,6 +174,7 @@ def sample_record_ids() -> list[RecordID[Any]]:
 
 # Temporary directory fixtures
 
+
 @pytest.fixture
 def temp_migration_dir(tmp_path):
   """Provide temporary directory for migration files."""
@@ -181,6 +193,7 @@ def temp_schema_dir(tmp_path):
 
 # Test utilities
 
+
 @pytest.fixture
 def mock_query_result():
   """Provide mock query result."""
@@ -198,27 +211,18 @@ def mock_query_result():
 def mock_single_result():
   """Provide mock single record result."""
   return [
-    {
-      'result': [
-        {'id': 'user:alice', 'name': 'Alice', 'email': 'alice@example.com', 'age': 30}
-      ]
-    }
+    {'result': [{'id': 'user:alice', 'name': 'Alice', 'email': 'alice@example.com', 'age': 30}]}
   ]
 
 
 @pytest.fixture
 def mock_count_result():
   """Provide mock count query result."""
-  return [
-    {
-      'result': [
-        {'count': 42}
-      ]
-    }
-  ]
+  return [{'result': [{'count': 42}]}]
 
 
 # Async test helpers
+
 
 @pytest.fixture(scope='session')
 def event_loop():
@@ -230,23 +234,26 @@ def event_loop():
 
 # Mock CLI runner
 
+
 @pytest.fixture
 def mock_cli_runner():
   """Provide mock CLI runner for testing commands."""
   from typer.testing import CliRunner
+
   return CliRunner()
 
 
 # Helper functions for tests
 
+
 def assert_immutable(obj: Any, attr: str, new_value: Any) -> None:
   """Assert that object attribute is immutable.
-  
+
   Args:
     obj: Object to test
     attr: Attribute name
     new_value: Value to attempt to set
-    
+
   Raises:
     AssertionError: If object is mutable
   """
@@ -260,12 +267,12 @@ def assert_immutable(obj: Any, attr: str, new_value: Any) -> None:
 
 def create_mock_migration_file(directory, name: str, content: str):
   """Create a mock migration file.
-  
+
   Args:
     directory: Directory path
     name: Migration filename
     content: File content
-    
+
   Returns:
     Path to created file
   """

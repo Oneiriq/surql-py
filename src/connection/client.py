@@ -90,10 +90,12 @@ class DatabaseClient:
           await self._client.connect()
 
           if self._config.username and self._config.password:
-            await self._client.signin({
-              'username': self._config.username,
-              'password': self._config.password,
-            })
+            await self._client.signin(
+              {
+                'username': self._config.username,
+                'password': self._config.password,
+              }
+            )
             self._log.debug('authenticated_successfully')
 
           await self._client.use(self._config.namespace, self._config.database)

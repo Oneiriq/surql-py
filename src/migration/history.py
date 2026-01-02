@@ -5,7 +5,7 @@ including creating the migration history table and recording applied migrations.
 """
 
 from datetime import datetime
-from typing import Any, Optional
+from typing import Any
 
 import structlog
 
@@ -17,7 +17,7 @@ logger = structlog.get_logger(__name__)
 
 class MigrationHistoryError(Exception):
   """Raised when migration history operations fail."""
-  
+
   pass
 
 
@@ -26,24 +26,24 @@ MIGRATION_TABLE_NAME = '_migration_history'
 
 async def create_migration_table(client: DatabaseClient) -> None:
   """Create the migration history table if it doesn't exist.
-  
+
   This table tracks all applied migrations with their metadata.
-  
+
   Args:
     client: Database client
-    
+
   Raises:
     MigrationHistoryError: If table creation fails
-    
+
   Examples:
     >>> async with get_client(config) as client:
     ...   await create_migration_table(client)
   """
   log = logger.bind(table=MIGRATION_TABLE_NAME)
-  
+
   try:
     log.info('creating_migration_history_table')
-    
+
     # Define the migration history table
     statements = [
       f'DEFINE TABLE {MIGRATION_TABLE_NAME} SCHEMAFULL;',
@@ -54,12 +54,12 @@ async def create_migration_table(client: DatabaseClient) -> None:
       f'DEFINE FIELD execution_time_ms ON TABLE {MIGRATION_TABLE_NAME} TYPE int;',
       f'DEFINE INDEX version_idx ON TABLE {MIGRATION_TABLE_NAME} COLUMNS version UNIQUE;',
     ]
-    
+
     for statement in statements:
       await client.execute(statement)
-    
+
     log.info('migration_history_table_created')
-    
+
   except QueryError as e:
     log.error('failed_to_create_migration_table', error=str(e))
     raise MigrationHistoryError(f'Failed to create migration history table: {e}') from e
@@ -70,10 +70,10 @@ async def create_migration_table(client: DatabaseClient) -> None:
 
 async def ensure_migration_table(client: DatabaseClient) -> None:
   """Ensure migration history table exists, creating it if needed.
-  
+
   Args:
     client: Database client
-    
+
   Raises:
     MigrationHistoryError: If operation fails
   """
@@ -90,20 +90,20 @@ async def record_migration(
   version: str,
   description: str,
   checksum: str,
-  execution_time_ms: Optional[int] = None,
+  execution_time_ms: int | None = None,
 ) -> None:
   """Record a migration as applied in the history table.
-  
+
   Args:
     client: Database client
     version: Migration version
     description: Migration description
     checksum: Migration content checksum
     execution_time_ms: Optional execution time in milliseconds
-    
+
   Raises:
     MigrationHistoryError: If recording fails
-    
+
   Examples:
     >>> await record_migration(
     ...   client,
@@ -114,13 +114,13 @@ async def record_migration(
     ... )
   """
   log = logger.bind(version=version)
-  
+
   try:
     log.info('recording_migration', description=description)
-    
+
     # Ensure table exists
     await ensure_migration_table(client)
-    
+
     # Create migration history record
     data = {
       'version': version,
@@ -128,14 +128,14 @@ async def record_migration(
       'applied_at': datetime.utcnow().isoformat(),
       'checksum': checksum,
     }
-    
+
     if execution_time_ms is not None:
       data['execution_time_ms'] = execution_time_ms
-    
+
     await client.create(MIGRATION_TABLE_NAME, data)
-    
+
     log.info('migration_recorded', version=version)
-    
+
   except QueryError as e:
     log.error('failed_to_record_migration', error=str(e))
     raise MigrationHistoryError(f'Failed to record migration {version}: {e}') from e
@@ -149,39 +149,39 @@ async def remove_migration_record(
   version: str,
 ) -> None:
   """Remove a migration record from history (used during rollback).
-  
+
   Args:
     client: Database client
     version: Migration version to remove
-    
+
   Raises:
     MigrationHistoryError: If removal fails
-    
+
   Examples:
     >>> await remove_migration_record(client, '20260102_120000')
   """
   log = logger.bind(version=version)
-  
+
   try:
     log.info('removing_migration_record')
-    
+
     # Query to find the record
     query = f'SELECT * FROM {MIGRATION_TABLE_NAME} WHERE version = $version'
     result = await client.execute(query, {'version': version})
-    
+
     # Extract records from result
     records = _extract_records(result)
-    
+
     if not records:
       log.warning('migration_record_not_found')
       return
-    
+
     # Delete the record
     record_id = records[0].get('id')
     if record_id:
       await client.delete(record_id)
       log.info('migration_record_removed')
-    
+
   except QueryError as e:
     log.error('failed_to_remove_migration_record', error=str(e))
     raise MigrationHistoryError(f'Failed to remove migration record {version}: {e}') from e
@@ -192,36 +192,36 @@ async def remove_migration_record(
 
 async def get_applied_migrations(client: DatabaseClient) -> list[MigrationHistory]:
   """Get all applied migrations from history.
-  
+
   Args:
     client: Database client
-    
+
   Returns:
     List of MigrationHistory objects, sorted by applied_at
-    
+
   Raises:
     MigrationHistoryError: If query fails
-    
+
   Examples:
     >>> applied = await get_applied_migrations(client)
     >>> for migration in applied:
     ...   print(migration.version, migration.applied_at)
   """
   log = logger.bind(table=MIGRATION_TABLE_NAME)
-  
+
   try:
     log.debug('fetching_applied_migrations')
-    
+
     # Ensure table exists
     await ensure_migration_table(client)
-    
+
     # Query all migration records
     query = f'SELECT * FROM {MIGRATION_TABLE_NAME} ORDER BY applied_at ASC'
     result = await client.execute(query)
-    
+
     # Extract records from result
     records = _extract_records(result)
-    
+
     # Convert to MigrationHistory objects
     migrations = []
     for record in records:
@@ -236,10 +236,10 @@ async def get_applied_migrations(client: DatabaseClient) -> list[MigrationHistor
         migrations.append(history)
       except Exception as e:
         log.warning('skipping_invalid_migration_record', record=record, error=str(e))
-    
+
     log.debug('applied_migrations_fetched', count=len(migrations))
     return migrations
-    
+
   except QueryError as e:
     log.error('failed_to_fetch_applied_migrations', error=str(e))
     raise MigrationHistoryError(f'Failed to fetch applied migrations: {e}') from e
@@ -250,16 +250,16 @@ async def get_applied_migrations(client: DatabaseClient) -> list[MigrationHistor
 
 async def get_applied_versions(client: DatabaseClient) -> set[str]:
   """Get set of applied migration versions.
-  
+
   Args:
     client: Database client
-    
+
   Returns:
     Set of version strings
-    
+
   Raises:
     MigrationHistoryError: If query fails
-    
+
   Examples:
     >>> versions = await get_applied_versions(client)
     >>> '20260102_120000' in versions
@@ -274,17 +274,17 @@ async def is_migration_applied(
   version: str,
 ) -> bool:
   """Check if a migration has been applied.
-  
+
   Args:
     client: Database client
     version: Migration version to check
-    
+
   Returns:
     True if migration has been applied, False otherwise
-    
+
   Raises:
     MigrationHistoryError: If query fails
-    
+
   Examples:
     >>> await is_migration_applied(client, '20260102_120000')
     True
@@ -296,40 +296,40 @@ async def is_migration_applied(
 async def get_migration_history(
   client: DatabaseClient,
   version: str,
-) -> Optional[MigrationHistory]:
+) -> MigrationHistory | None:
   """Get history record for a specific migration.
-  
+
   Args:
     client: Database client
     version: Migration version
-    
+
   Returns:
     MigrationHistory object or None if not found
-    
+
   Raises:
     MigrationHistoryError: If query fails
-    
+
   Examples:
     >>> history = await get_migration_history(client, '20260102_120000')
     >>> if history:
     ...   print(f'Applied at: {history.applied_at}')
   """
   log = logger.bind(version=version)
-  
+
   try:
     # Ensure table exists
     await ensure_migration_table(client)
-    
+
     # Query for specific version
     query = f'SELECT * FROM {MIGRATION_TABLE_NAME} WHERE version = $version'
     result = await client.execute(query, {'version': version})
-    
+
     # Extract records from result
     records = _extract_records(result)
-    
+
     if not records:
       return None
-    
+
     record = records[0]
     return MigrationHistory(
       version=record['version'],
@@ -338,7 +338,7 @@ async def get_migration_history(
       checksum=record['checksum'],
       execution_time_ms=record.get('execution_time_ms'),
     )
-    
+
   except QueryError as e:
     log.error('failed_to_get_migration_history', error=str(e))
     raise MigrationHistoryError(f'Failed to get migration history for {version}: {e}') from e
@@ -349,10 +349,10 @@ async def get_migration_history(
 
 def _extract_records(result: Any) -> list[dict[str, Any]]:
   """Extract records from SurrealDB query result.
-  
+
   Args:
     result: Raw query result
-    
+
   Returns:
     List of record dictionaries
   """
@@ -368,16 +368,16 @@ def _extract_records(result: Any) -> list[dict[str, Any]]:
     if 'result' in result:
       return result['result'] or []
     return [result]
-  
+
   return []
 
 
 def _parse_datetime(value: Any) -> datetime:
   """Parse datetime from various formats.
-  
+
   Args:
     value: Datetime value (string, datetime, or other)
-    
+
   Returns:
     datetime object
   """

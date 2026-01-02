@@ -5,7 +5,7 @@ permissions, and events.
 """
 
 from enum import Enum
-from typing import Optional
+
 from pydantic import BaseModel
 
 from src.schema.fields import FieldDefinition
@@ -13,10 +13,10 @@ from src.schema.fields import FieldDefinition
 
 class TableMode(Enum):
   """Table schema modes.
-  
+
   Defines whether a table enforces strict schema validation.
   """
-  
+
   SCHEMAFULL = 'SCHEMAFULL'
   SCHEMALESS = 'SCHEMALESS'
   DROP = 'DROP'
@@ -24,10 +24,10 @@ class TableMode(Enum):
 
 class IndexType(Enum):
   """Index types for table fields.
-  
+
   Defines the type of index to create on table fields.
   """
-  
+
   UNIQUE = 'UNIQUE'
   SEARCH = 'SEARCH'
   STANDARD = 'INDEX'
@@ -35,27 +35,28 @@ class IndexType(Enum):
 
 class IndexDefinition(BaseModel):
   """Immutable index definition.
-  
+
   Represents an index on one or more fields in a table.
-  
+
   Examples:
     >>> idx = IndexDefinition(name='email_idx', columns=['email'], type=IndexType.UNIQUE)
   """
-  
+
   name: str
   columns: list[str]
   type: IndexType = IndexType.STANDARD
-  
+
   class Config:
     """Pydantic configuration."""
+
     frozen = True
 
 
 class EventDefinition(BaseModel):
   """Immutable event/trigger definition.
-  
+
   Represents a database event that executes when a condition is met.
-  
+
   Examples:
     >>> event = EventDefinition(
     ...   name='email_changed',
@@ -63,21 +64,22 @@ class EventDefinition(BaseModel):
     ...   action='CREATE audit_log SET ...'
     ... )
   """
-  
+
   name: str
   condition: str
   action: str
-  
+
   class Config:
     """Pydantic configuration."""
+
     frozen = True
 
 
 class TableDefinition(BaseModel):
   """Immutable table schema definition.
-  
+
   Represents a complete table schema with fields, indexes, permissions, and events.
-  
+
   Examples:
     >>> table = TableDefinition(
     ...   name='user',
@@ -90,36 +92,38 @@ class TableDefinition(BaseModel):
     ...   ]
     ... )
   """
-  
+
   name: str
   mode: TableMode = TableMode.SCHEMAFULL
   fields: list[FieldDefinition] = []
   indexes: list[IndexDefinition] = []
   events: list[EventDefinition] = []
-  permissions: Optional[dict[str, str]] = None
+  permissions: dict[str, str] | None = None
   drop: bool = False
-  
+
   class Config:
     """Pydantic configuration."""
+
     frozen = True
 
 
 # Table builder functions
 
+
 def table_schema(
   name: str,
   *,
   mode: TableMode = TableMode.SCHEMAFULL,
-  fields: Optional[list[FieldDefinition]] = None,
-  indexes: Optional[list[IndexDefinition]] = None,
-  events: Optional[list[EventDefinition]] = None,
-  permissions: Optional[dict[str, str]] = None,
+  fields: list[FieldDefinition] | None = None,
+  indexes: list[IndexDefinition] | None = None,
+  events: list[EventDefinition] | None = None,
+  permissions: dict[str, str] | None = None,
   drop: bool = False,
 ) -> TableDefinition:
   """Create a table schema definition.
-  
+
   Pure function to create an immutable table definition.
-  
+
   Args:
     name: Table name
     mode: Schema mode (SCHEMAFULL, SCHEMALESS, or DROP)
@@ -128,14 +132,14 @@ def table_schema(
     events: List of event definitions
     permissions: Dict of permission rules (select, create, update, delete)
     drop: If True, marks table for deletion
-    
+
   Returns:
     Immutable TableDefinition instance
-    
+
   Examples:
     Basic table:
     >>> table = table_schema('user')
-    
+
     Table with fields and indexes:
     >>> table = table_schema(
     ...   'user',
@@ -166,21 +170,21 @@ def index(
   index_type: IndexType = IndexType.STANDARD,
 ) -> IndexDefinition:
   """Create an index definition.
-  
+
   Pure function to create an immutable index definition.
-  
+
   Args:
     name: Index name
     columns: List of column names to index
     index_type: Type of index (UNIQUE, SEARCH, or STANDARD)
-    
+
   Returns:
     Immutable IndexDefinition instance
-    
+
   Examples:
     >>> index('email_idx', ['email'], IndexType.UNIQUE)
     IndexDefinition(name='email_idx', columns=['email'], type=IndexType.UNIQUE)
-    
+
     >>> index('name_search', ['name.first', 'name.last'], IndexType.SEARCH)
     IndexDefinition(name='name_search', columns=['name.first', 'name.last'], type=IndexType.SEARCH)
   """
@@ -196,16 +200,16 @@ def unique_index(
   columns: list[str],
 ) -> IndexDefinition:
   """Create a unique index definition.
-  
+
   Convenience function for creating unique indexes.
-  
+
   Args:
     name: Index name
     columns: List of column names to index
-    
+
   Returns:
     Immutable IndexDefinition with UNIQUE type
-    
+
   Examples:
     >>> unique_index('email_idx', ['email'])
     IndexDefinition(name='email_idx', columns=['email'], type=IndexType.UNIQUE)
@@ -218,16 +222,16 @@ def search_index(
   columns: list[str],
 ) -> IndexDefinition:
   """Create a search index definition.
-  
+
   Convenience function for creating full-text search indexes.
-  
+
   Args:
     name: Index name
     columns: List of column names to index
-    
+
   Returns:
     Immutable IndexDefinition with SEARCH type
-    
+
   Examples:
     >>> search_index('content_search', ['title', 'content'])
     IndexDefinition(name='content_search', columns=['title', 'content'], type=IndexType.SEARCH)
@@ -241,17 +245,17 @@ def event(
   action: str,
 ) -> EventDefinition:
   """Create an event/trigger definition.
-  
+
   Pure function to create an immutable event definition.
-  
+
   Args:
     name: Event name
     condition: SurrealQL condition expression that triggers the event
     action: SurrealQL statements to execute when triggered
-    
+
   Returns:
     Immutable EventDefinition instance
-    
+
   Examples:
     >>> event(
     ...   'email_changed',
@@ -269,21 +273,22 @@ def event(
 
 # Functional composition helpers
 
+
 def with_fields(
   table: TableDefinition,
   *fields: FieldDefinition,
 ) -> TableDefinition:
   """Add fields to a table definition.
-  
+
   Pure function that returns a new table with additional fields.
-  
+
   Args:
     table: Existing table definition
     fields: Field definitions to add
-    
+
   Returns:
     New TableDefinition with added fields
-    
+
   Examples:
     >>> table = table_schema('user')
     >>> table = with_fields(
@@ -292,9 +297,7 @@ def with_fields(
     ...   int_field('age'),
     ... )
   """
-  return table.model_copy(
-    update={'fields': [*table.fields, *fields]}
-  )
+  return table.model_copy(update={'fields': [*table.fields, *fields]})
 
 
 def with_indexes(
@@ -302,16 +305,16 @@ def with_indexes(
   *indexes: IndexDefinition,
 ) -> TableDefinition:
   """Add indexes to a table definition.
-  
+
   Pure function that returns a new table with additional indexes.
-  
+
   Args:
     table: Existing table definition
     indexes: Index definitions to add
-    
+
   Returns:
     New TableDefinition with added indexes
-    
+
   Examples:
     >>> table = table_schema('user', fields=[string_field('email')])
     >>> table = with_indexes(
@@ -319,9 +322,7 @@ def with_indexes(
     ...   unique_index('email_idx', ['email']),
     ... )
   """
-  return table.model_copy(
-    update={'indexes': [*table.indexes, *indexes]}
-  )
+  return table.model_copy(update={'indexes': [*table.indexes, *indexes]})
 
 
 def with_events(
@@ -329,16 +330,16 @@ def with_events(
   *events: EventDefinition,
 ) -> TableDefinition:
   """Add events to a table definition.
-  
+
   Pure function that returns a new table with additional events.
-  
+
   Args:
     table: Existing table definition
     events: Event definitions to add
-    
+
   Returns:
     New TableDefinition with added events
-    
+
   Examples:
     >>> table = table_schema('user')
     >>> table = with_events(
@@ -346,9 +347,7 @@ def with_events(
     ...   event('email_changed', '$before.email != $after.email', '...'),
     ... )
   """
-  return table.model_copy(
-    update={'events': [*table.events, *events]}
-  )
+  return table.model_copy(update={'events': [*table.events, *events]})
 
 
 def with_permissions(
@@ -356,16 +355,16 @@ def with_permissions(
   permissions: dict[str, str],
 ) -> TableDefinition:
   """Add permissions to a table definition.
-  
+
   Pure function that returns a new table with permissions.
-  
+
   Args:
     table: Existing table definition
     permissions: Dict of permission rules (select, create, update, delete)
-    
+
   Returns:
     New TableDefinition with permissions
-    
+
   Examples:
     >>> table = table_schema('user')
     >>> table = with_permissions(
@@ -385,16 +384,16 @@ def set_mode(
   mode: TableMode,
 ) -> TableDefinition:
   """Set the schema mode for a table.
-  
+
   Pure function that returns a new table with the specified mode.
-  
+
   Args:
     table: Existing table definition
     mode: Schema mode to set
-    
+
   Returns:
     New TableDefinition with updated mode
-    
+
   Examples:
     >>> table = table_schema('user')
     >>> table = set_mode(table, TableMode.SCHEMALESS)

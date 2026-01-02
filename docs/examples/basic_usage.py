@@ -9,29 +9,30 @@ This example demonstrates:
 """
 
 import asyncio
+
 from pydantic import BaseModel, EmailStr, Field
-from typing import Optional
 
 from src.connection.client import get_client
 from src.connection.config import ConnectionConfig
 from src.query.crud import (
+  count_records,
   create_record,
+  delete_record,
   get_record,
+  merge_record,
   query_records,
   update_record,
-  merge_record,
-  delete_record,
-  count_records,
 )
 
 
 # Define data models
 class User(BaseModel):
   """User data model."""
+
   username: str = Field(min_length=3, max_length=20)
   email: EmailStr
   age: int = Field(ge=0, le=150)
-  bio: Optional[str] = None
+  bio: str | None = None
 
 
 # Database configuration
@@ -46,12 +47,12 @@ config = ConnectionConfig(
 
 async def main():
   """Main example function."""
-  
+
   async with get_client(config) as client:
-    print("Connected to SurrealDB\n")
-    
+    print('Connected to SurrealDB\n')
+
     # CREATE: Insert new records
-    print("=== Creating Users ===")
+    print('=== Creating Users ===')
     alice = await create_record(
       'user',
       User(
@@ -62,8 +63,8 @@ async def main():
       ),
       client=client,
     )
-    print(f"Created user: {alice['id']}")
-    
+    print(f'Created user: {alice["id"]}')
+
     bob = await create_record(
       'user',
       User(
@@ -74,8 +75,8 @@ async def main():
       ),
       client=client,
     )
-    print(f"Created user: {bob['id']}")
-    
+    print(f'Created user: {bob["id"]}')
+
     charlie = await create_record(
       'user',
       User(
@@ -85,31 +86,31 @@ async def main():
       ),
       client=client,
     )
-    print(f"Created user: {charlie['id']}\n")
-    
+    print(f'Created user: {charlie["id"]}\n')
+
     # READ: Get single record
-    print("=== Reading Single User ===")
+    print('=== Reading Single User ===')
     user = await get_record('user', 'alice', User, client=client)
     if user:
-      print(f"Found user: {user.username} ({user.email})")
-      print(f"Age: {user.age}")
-      print(f"Bio: {user.bio}\n")
-    
+      print(f'Found user: {user.username} ({user.email})')
+      print(f'Age: {user.age}')
+      print(f'Bio: {user.bio}\n')
+
     # QUERY: Get multiple records
-    print("=== Querying Users ===")
+    print('=== Querying Users ===')
     users = await query_records(
       'user',
       User,
       order_by=('age', 'ASC'),
       client=client,
     )
-    print(f"Found {len(users)} users:")
+    print(f'Found {len(users)} users:')
     for u in users:
-      print(f"  - {u.username}: {u.age} years old")
+      print(f'  - {u.username}: {u.age} years old')
     print()
-    
+
     # QUERY with conditions
-    print("=== Querying with Conditions ===")
+    print('=== Querying with Conditions ===')
     adults = await query_records(
       'user',
       User,
@@ -117,18 +118,18 @@ async def main():
       order_by=('age', 'DESC'),
       client=client,
     )
-    print(f"Users 30 and over: {len(adults)}")
+    print(f'Users 30 and over: {len(adults)}')
     for u in adults:
-      print(f"  - {u.username}: {u.age}")
+      print(f'  - {u.username}: {u.age}')
     print()
-    
+
     # COUNT
-    print("=== Counting Records ===")
+    print('=== Counting Records ===')
     total = await count_records('user', client=client)
-    print(f"Total users: {total}\n")
-    
+    print(f'Total users: {total}\n')
+
     # UPDATE: Replace entire record
-    print("=== Updating User (Full) ===")
+    print('=== Updating User (Full) ===')
     updated_alice = await update_record(
       'user',
       'alice',
@@ -140,11 +141,11 @@ async def main():
       ),
       client=client,
     )
-    print(f"Updated user: {updated_alice['id']}")
-    print(f"New email: {updated_alice['email']}\n")
-    
+    print(f'Updated user: {updated_alice["id"]}')
+    print(f'New email: {updated_alice["email"]}\n')
+
     # MERGE: Partial update
-    print("=== Updating User (Partial) ===")
+    print('=== Updating User (Partial) ===')
     merged_bob = await merge_record(
       'user',
       'bob',
@@ -153,9 +154,9 @@ async def main():
     )
     print(f"Updated Bob's age to: {merged_bob['age']}")
     print(f"Updated Bob's bio to: {merged_bob['bio']}\n")
-    
+
     # Final query
-    print("=== Final User List ===")
+    print('=== Final User List ===')
     final_users = await query_records(
       'user',
       User,
@@ -163,32 +164,33 @@ async def main():
       client=client,
     )
     for u in final_users:
-      print(f"{u.username}:")
-      print(f"  Email: {u.email}")
-      print(f"  Age: {u.age}")
-      print(f"  Bio: {u.bio or 'N/A'}")
+      print(f'{u.username}:')
+      print(f'  Email: {u.email}')
+      print(f'  Age: {u.age}')
+      print(f'  Bio: {u.bio or "N/A"}')
     print()
-    
+
     # DELETE
-    print("=== Deleting User ===")
+    print('=== Deleting User ===')
     await delete_record('user', 'charlie', client=client)
-    print("Deleted charlie\n")
-    
+    print('Deleted charlie\n')
+
     # Verify deletion
     remaining = await count_records('user', client=client)
-    print(f"Remaining users: {remaining}")
+    print(f'Remaining users: {remaining}')
 
 
 if __name__ == '__main__':
-  print("Ethereal Basic Usage Example")
-  print("=" * 40)
+  print('Ethereal Basic Usage Example')
+  print('=' * 40)
   print()
-  
+
   try:
     asyncio.run(main())
-    print("\nExample completed successfully!")
-    
+    print('\nExample completed successfully!')
+
   except Exception as e:
-    print(f"\nError: {e}")
+    print(f'\nError: {e}')
     import traceback
+
     traceback.print_exc()

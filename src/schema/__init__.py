@@ -4,50 +4,48 @@ This package provides functions and types for defining table and edge schemas
 in a functional, composable way.
 """
 
-from src.schema.fields import (
-  FieldType,
-  FieldDefinition,
-  field,
-  string_field,
-  int_field,
-  float_field,
-  bool_field,
-  datetime_field,
-  record_field,
-  array_field,
-  object_field,
-  computed_field,
-)
-
-from src.schema.table import (
-  TableMode,
-  IndexType,
-  IndexDefinition,
-  EventDefinition,
-  TableDefinition,
-  table_schema,
-  index,
-  unique_index,
-  search_index,
-  event,
-  with_fields,
-  with_indexes,
-  with_events,
-  with_permissions,
-  set_mode,
-)
-
 from src.schema.edge import (
   EdgeDefinition,
+  bidirectional_edge,
   edge_schema,
-  with_from_table,
-  with_to_table,
+  typed_edge,
+  with_edge_events,
   with_edge_fields,
   with_edge_indexes,
-  with_edge_events,
   with_edge_permissions,
-  bidirectional_edge,
-  typed_edge,
+  with_from_table,
+  with_to_table,
+)
+from src.schema.fields import (
+  FieldDefinition,
+  FieldType,
+  array_field,
+  bool_field,
+  computed_field,
+  datetime_field,
+  field,
+  float_field,
+  int_field,
+  object_field,
+  record_field,
+  string_field,
+)
+from src.schema.table import (
+  EventDefinition,
+  IndexDefinition,
+  IndexType,
+  TableDefinition,
+  TableMode,
+  event,
+  index,
+  search_index,
+  set_mode,
+  table_schema,
+  unique_index,
+  with_events,
+  with_fields,
+  with_indexes,
+  with_permissions,
 )
 
 __all__ = [

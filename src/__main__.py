@@ -50,21 +50,21 @@ def main(
   ),
 ) -> None:
   """Ethereal - Code-first database toolkit for SurrealDB.
-  
+
   Ethereal provides a modern, type-safe way to work with SurrealDB through:
-  
+
   • Code-first schema definitions
   • Automatic migration generation
   • Type-safe query building
   • Async-first operations
-  
+
   Use --help with any command to see detailed usage information.
   """
   # Configure logging based on verbose flag
   if verbose:
     settings = get_settings()
     settings.log_level = 'DEBUG'
-    
+
     # Configure structlog for verbose output
     structlog.configure(
       processors=[
@@ -96,7 +96,7 @@ def main(
 
 def cli() -> None:
   """CLI entry point wrapper.
-  
+
   This function is called when the package is run as a module or
   via the installed console script.
   """

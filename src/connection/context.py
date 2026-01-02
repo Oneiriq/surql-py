@@ -41,9 +41,7 @@ def get_db() -> DatabaseClient:
   """
   client = _current_client.get()
   if client is None:
-    raise ContextError(
-      'No active database connection. Use connection_scope() or set_db() first.'
-    )
+    raise ContextError('No active database connection. Use connection_scope() or set_db() first.')
   return client
 
 

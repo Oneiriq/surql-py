@@ -8,15 +8,15 @@ import json
 import sys
 from enum import Enum
 from pathlib import Path
-from typing import Any, Optional
+from typing import Any
 
 import structlog
 import typer
 from rich.console import Console
-from rich.table import Table
 from rich.panel import Panel
 from rich.progress import Progress, SpinnerColumn, TextColumn
 from rich.syntax import Syntax
+from rich.table import Table
 
 logger = structlog.get_logger(__name__)
 console = Console()
@@ -25,7 +25,7 @@ err_console = Console(stderr=True, style='bold red')
 
 class OutputFormat(Enum):
   """Output format options."""
-  
+
   TABLE = 'table'
   JSON = 'json'
   TEXT = 'text'
@@ -34,10 +34,10 @@ class OutputFormat(Enum):
 def format_output(
   data: Any,
   format: OutputFormat = OutputFormat.TABLE,
-  title: Optional[str] = None,
+  title: str | None = None,
 ) -> None:
   """Format and display output to console.
-  
+
   Args:
     data: Data to display
     format: Output format (table, json, or text)
@@ -51,9 +51,9 @@ def format_output(
     console.print(data)
 
 
-def _display_table(data: list[dict[str, Any]], title: Optional[str] = None) -> None:
+def _display_table(data: list[dict[str, Any]], title: str | None = None) -> None:
   """Display data as a rich table.
-  
+
   Args:
     data: List of dictionaries to display
     title: Optional table title
@@ -61,25 +61,25 @@ def _display_table(data: list[dict[str, Any]], title: Optional[str] = None) -> N
   if not data:
     console.print('[yellow]No data to display[/yellow]')
     return
-  
+
   # Create table
   table = Table(title=title, show_header=True, header_style='bold cyan')
-  
+
   # Add columns from first row
   first_row = data[0]
-  for key in first_row.keys():
+  for key in first_row:
     table.add_column(str(key).replace('_', ' ').title())
-  
+
   # Add rows
   for row in data:
     table.add_row(*[str(v) for v in row.values()])
-  
+
   console.print(table)
 
 
 def display_success(message: str) -> None:
   """Display success message.
-  
+
   Args:
     message: Success message to display
   """
@@ -88,7 +88,7 @@ def display_success(message: str) -> None:
 
 def display_info(message: str) -> None:
   """Display info message.
-  
+
   Args:
     message: Info message to display
   """
@@ -97,16 +97,16 @@ def display_info(message: str) -> None:
 
 def display_warning(message: str) -> None:
   """Display warning message.
-  
+
   Args:
     message: Warning message to display
   """
   console.print(f'[yellow]⚠[/yellow] {message}')
 
 
-def display_error(message: str, exit_code: Optional[int] = None) -> None:
+def display_error(message: str, exit_code: int | None = None) -> None:
   """Display error message and optionally exit.
-  
+
   Args:
     message: Error message to display
     exit_code: If provided, exit with this code
@@ -118,7 +118,7 @@ def display_error(message: str, exit_code: Optional[int] = None) -> None:
 
 def display_panel(content: str, title: str, style: str = 'cyan') -> None:
   """Display content in a panel.
-  
+
   Args:
     content: Content to display
     title: Panel title
@@ -127,9 +127,9 @@ def display_panel(content: str, title: str, style: str = 'cyan') -> None:
   console.print(Panel(content, title=title, border_style=style))
 
 
-def display_code(code: str, language: str = 'sql', title: Optional[str] = None) -> None:
+def display_code(code: str, language: str = 'sql', title: str | None = None) -> None:
   """Display syntax-highlighted code.
-  
+
   Args:
     code: Code to display
     language: Programming language for syntax highlighting
@@ -144,11 +144,11 @@ def display_code(code: str, language: str = 'sql', title: Optional[str] = None) 
 
 def confirm(message: str, default: bool = False) -> bool:
   """Prompt user for confirmation.
-  
+
   Args:
     message: Confirmation message
     default: Default value if user just presses Enter
-    
+
   Returns:
     True if confirmed, False otherwise
   """
@@ -157,51 +157,51 @@ def confirm(message: str, default: bool = False) -> bool:
 
 def confirm_destructive(message: str) -> bool:
   """Prompt user for confirmation of destructive operation.
-  
+
   Requires explicit 'yes' response.
-  
+
   Args:
     message: Confirmation message
-    
+
   Returns:
     True if confirmed, False otherwise
   """
   display_warning(f'{message}')
   display_warning('This action cannot be undone!')
-  
+
   response = typer.prompt(
     'Type "yes" to confirm',
     default='',
   )
-  
+
   return response.lower() == 'yes'
 
 
-def get_migrations_directory(directory: Optional[Path] = None) -> Path:
+def get_migrations_directory(directory: Path | None = None) -> Path:
   """Get migrations directory path, ensuring it exists.
-  
+
   Args:
     directory: Optional custom directory path
-    
+
   Returns:
     Path to migrations directory
   """
   if directory is None:
     directory = Path.cwd() / 'migrations'
-  
+
   if not directory.exists():
     display_info(f'Creating migrations directory: {directory}')
     directory.mkdir(parents=True, exist_ok=True)
-  
+
   return directory
 
 
 def spinner(text: str = 'Working...'):
   """Create a progress spinner context manager.
-  
+
   Args:
     text: Text to display with spinner
-    
+
   Returns:
     Progress context manager
   """
@@ -215,51 +215,51 @@ def spinner(text: str = 'Working...'):
 
 def handle_error(error: Exception, verbose: bool = False) -> None:
   """Handle and display error appropriately.
-  
+
   Args:
     error: Exception to handle
     verbose: Whether to show full traceback
   """
   error_type = type(error).__name__
-  
+
   if verbose:
     console.print_exception()
   else:
     display_error(f'{error_type}: {str(error)}')
-  
+
   logger.error('command_error', error_type=error_type, error=str(error))
 
 
 def validate_file_exists(path: Path, file_type: str = 'File') -> None:
   """Validate that a file exists.
-  
+
   Args:
     path: Path to validate
     file_type: Type of file (for error message)
-    
+
   Raises:
     typer.BadParameter: If file doesn't exist
   """
   if not path.exists():
     raise typer.BadParameter(f'{file_type} not found: {path}')
-  
+
   if not path.is_file():
     raise typer.BadParameter(f'Path is not a file: {path}')
 
 
 def validate_directory_exists(path: Path, dir_type: str = 'Directory') -> None:
   """Validate that a directory exists.
-  
+
   Args:
     path: Path to validate
     dir_type: Type of directory (for error message)
-    
+
   Raises:
     typer.BadParameter: If directory doesn't exist
   """
   if not path.exists():
     raise typer.BadParameter(f'{dir_type} not found: {path}')
-  
+
   if not path.is_dir():
     raise typer.BadParameter(f'Path is not a directory: {path}')
 

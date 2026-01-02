@@ -2,20 +2,29 @@
 
 from datetime import datetime
 from pathlib import Path
-from unittest.mock import Mock, patch
 
 import pytest
 
-from src.migration.models import (
-  MigrationState, MigrationDirection, DiffOperation,
-  Migration, MigrationHistory, MigrationPlan, MigrationMetadata,
-  MigrationStatus, SchemaDiff,
-)
 from src.migration.discovery import (
-  MigrationDiscoveryError, MigrationLoadError,
-  discover_migrations, load_migration, validate_migration_name,
-  get_version_from_filename, get_description_from_filename,
+  MigrationDiscoveryError,
+  MigrationLoadError,
   _calculate_checksum,
+  discover_migrations,
+  get_description_from_filename,
+  get_version_from_filename,
+  load_migration,
+  validate_migration_name,
+)
+from src.migration.models import (
+  DiffOperation,
+  Migration,
+  MigrationDirection,
+  MigrationHistory,
+  MigrationMetadata,
+  MigrationPlan,
+  MigrationState,
+  MigrationStatus,
+  SchemaDiff,
 )
 
 
@@ -62,13 +71,13 @@ class TestMigration:
     """Test Migration model creation."""
     path = tmp_path / 'test_migration.py'
     path.write_text('# test')
-    
+
     def up() -> list[str]:
       return ['CREATE TABLE user;']
-    
+
     def down() -> list[str]:
       return ['DROP TABLE user;']
-    
+
     migration = Migration(
       version='20260102_120000',
       description='Create user table',
@@ -77,7 +86,7 @@ class TestMigration:
       down=down,
       checksum='abc123',
     )
-    
+
     assert migration.version == '20260102_120000'
     assert migration.description == 'Create user table'
     assert migration.path == path
@@ -90,7 +99,7 @@ class TestMigration:
     """Test Migration with dependencies."""
     path = tmp_path / 'test_migration.py'
     path.write_text('# test')
-    
+
     migration = Migration(
       version='20260102_120000',
       description='Test',
@@ -99,14 +108,14 @@ class TestMigration:
       down=lambda: [],
       depends_on=['20260101_120000'],
     )
-    
+
     assert migration.depends_on == ['20260101_120000']
 
   def test_migration_immutability(self, tmp_path: Path) -> None:
     """Test that Migration is immutable."""
     path = tmp_path / 'test_migration.py'
     path.write_text('# test')
-    
+
     migration = Migration(
       version='20260102_120000',
       description='Test',
@@ -114,7 +123,7 @@ class TestMigration:
       up=lambda: [],
       down=lambda: [],
     )
-    
+
     with pytest.raises(Exception):
       migration.version = '20260103_120000'  # type: ignore[misc]
 
@@ -132,7 +141,7 @@ class TestMigrationHistory:
       checksum='abc123',
       execution_time_ms=150,
     )
-    
+
     assert history.version == '20260102_120000'
     assert history.description == 'Create user table'
     assert history.applied_at == now
@@ -147,7 +156,7 @@ class TestMigrationHistory:
       applied_at=datetime.now(),
       checksum='abc123',
     )
-    
+
     with pytest.raises(Exception):
       history.version = '20260103_120000'  # type: ignore[misc]
 
@@ -159,7 +168,7 @@ class TestMigrationPlan:
     """Test MigrationPlan creation."""
     path = tmp_path / 'test_migration.py'
     path.write_text('# test')
-    
+
     migration = Migration(
       version='20260102_120000',
       description='Test',
@@ -167,12 +176,12 @@ class TestMigrationPlan:
       up=lambda: [],
       down=lambda: [],
     )
-    
+
     plan = MigrationPlan(
       migrations=[migration],
       direction=MigrationDirection.UP,
     )
-    
+
     assert len(plan.migrations) == 1
     assert plan.direction == MigrationDirection.UP
     assert plan.count == 1
@@ -184,7 +193,7 @@ class TestMigrationPlan:
       migrations=[],
       direction=MigrationDirection.UP,
     )
-    
+
     assert plan.count == 0
     assert plan.is_empty() is True
 
@@ -192,7 +201,7 @@ class TestMigrationPlan:
     """Test that MigrationPlan is immutable."""
     path = tmp_path / 'test_migration.py'
     path.write_text('# test')
-    
+
     migration = Migration(
       version='20260102_120000',
       description='Test',
@@ -200,12 +209,12 @@ class TestMigrationPlan:
       up=lambda: [],
       down=lambda: [],
     )
-    
+
     plan = MigrationPlan(
       migrations=[migration],
       direction=MigrationDirection.UP,
     )
-    
+
     with pytest.raises(Exception):
       plan.direction = MigrationDirection.DOWN  # type: ignore[misc]
 
@@ -221,7 +230,7 @@ class TestMigrationMetadata:
       author='dev',
       depends_on=['20260101_120000'],
     )
-    
+
     assert metadata.version == '20260102_120000'
     assert metadata.description == 'Create user table'
     assert metadata.author == 'dev'
@@ -233,7 +242,7 @@ class TestMigrationMetadata:
       version='20260102_120000',
       description='Test',
     )
-    
+
     assert metadata.author == 'ethereal'
     assert metadata.depends_on == []
 
@@ -245,7 +254,7 @@ class TestMigrationStatus:
     """Test MigrationStatus for pending migration."""
     path = tmp_path / 'test_migration.py'
     path.write_text('# test')
-    
+
     migration = Migration(
       version='20260102_120000',
       description='Test',
@@ -253,12 +262,12 @@ class TestMigrationStatus:
       up=lambda: [],
       down=lambda: [],
     )
-    
+
     status = MigrationStatus(
       migration=migration,
       state=MigrationState.PENDING,
     )
-    
+
     assert status.state == MigrationState.PENDING
     assert status.applied_at is None
     assert status.error is None
@@ -267,7 +276,7 @@ class TestMigrationStatus:
     """Test MigrationStatus for applied migration."""
     path = tmp_path / 'test_migration.py'
     path.write_text('# test')
-    
+
     migration = Migration(
       version='20260102_120000',
       description='Test',
@@ -275,14 +284,14 @@ class TestMigrationStatus:
       up=lambda: [],
       down=lambda: [],
     )
-    
+
     now = datetime.now()
     status = MigrationStatus(
       migration=migration,
       state=MigrationState.APPLIED,
       applied_at=now,
     )
-    
+
     assert status.state == MigrationState.APPLIED
     assert status.applied_at == now
 
@@ -290,7 +299,7 @@ class TestMigrationStatus:
     """Test MigrationStatus for failed migration."""
     path = tmp_path / 'test_migration.py'
     path.write_text('# test')
-    
+
     migration = Migration(
       version='20260102_120000',
       description='Test',
@@ -298,13 +307,13 @@ class TestMigrationStatus:
       up=lambda: [],
       down=lambda: [],
     )
-    
+
     status = MigrationStatus(
       migration=migration,
       state=MigrationState.FAILED,
       error='Syntax error',
     )
-    
+
     assert status.state == MigrationState.FAILED
     assert status.error == 'Syntax error'
 
@@ -321,7 +330,7 @@ class TestSchemaDiff:
       forward_sql='DEFINE TABLE user SCHEMAFULL;',
       backward_sql='REMOVE TABLE user;',
     )
-    
+
     assert diff.operation == DiffOperation.ADD_TABLE
     assert diff.table == 'user'
     assert diff.field is None
@@ -337,7 +346,7 @@ class TestSchemaDiff:
       forward_sql='DEFINE FIELD email ON TABLE user TYPE string;',
       backward_sql='REMOVE FIELD email ON TABLE user;',
     )
-    
+
     assert diff.operation == DiffOperation.ADD_FIELD
     assert diff.table == 'user'
     assert diff.field == 'email'
@@ -353,7 +362,7 @@ class TestSchemaDiff:
       backward_sql='DEFINE FIELD age ON TABLE user TYPE string;',
       details={'old_type': 'string', 'new_type': 'int'},
     )
-    
+
     assert diff.details['old_type'] == 'string'
     assert diff.details['new_type'] == 'int'
 
@@ -438,9 +447,9 @@ class TestCalculateChecksum:
     """Test calculating checksum of a file."""
     test_file = tmp_path / 'test.txt'
     test_file.write_text('Hello, world!')
-    
+
     checksum = _calculate_checksum(test_file)
-    
+
     assert isinstance(checksum, str)
     assert len(checksum) == 64  # SHA256 hex length
 
@@ -448,23 +457,23 @@ class TestCalculateChecksum:
     """Test that checksum is consistent for same content."""
     test_file = tmp_path / 'test.txt'
     test_file.write_text('Test content')
-    
+
     checksum1 = _calculate_checksum(test_file)
     checksum2 = _calculate_checksum(test_file)
-    
+
     assert checksum1 == checksum2
 
   def test_calculate_checksum_different_content(self, tmp_path: Path) -> None:
     """Test that different content produces different checksums."""
     file1 = tmp_path / 'file1.txt'
     file2 = tmp_path / 'file2.txt'
-    
+
     file1.write_text('Content 1')
     file2.write_text('Content 2')
-    
+
     checksum1 = _calculate_checksum(file1)
     checksum2 = _calculate_checksum(file2)
-    
+
     assert checksum1 != checksum2
 
 
@@ -489,9 +498,9 @@ def down():
   return ['DROP TABLE test;']
 """
     migration_file.write_text(migration_content)
-    
+
     migration = load_migration(migration_file)
-    
+
     assert migration.version == '20260102_120000'
     assert migration.description == 'Test migration'
     assert migration.up() == ['CREATE TABLE test;']
@@ -511,10 +520,10 @@ def down():
   return []
 """
     migration_file.write_text(migration_content)
-    
+
     with pytest.raises(MigrationLoadError) as exc_info:
       load_migration(migration_file)
-    
+
     assert 'missing up()' in str(exc_info.value)
 
   def test_load_migration_missing_down(self, temp_migration_dir: Path) -> None:
@@ -530,10 +539,10 @@ def up():
   return []
 """
     migration_file.write_text(migration_content)
-    
+
     with pytest.raises(MigrationLoadError) as exc_info:
       load_migration(migration_file)
-    
+
     assert 'missing down()' in str(exc_info.value)
 
   def test_load_migration_missing_metadata(self, temp_migration_dir: Path) -> None:
@@ -547,19 +556,19 @@ def down():
   return []
 """
     migration_file.write_text(migration_content)
-    
+
     with pytest.raises(MigrationLoadError) as exc_info:
       load_migration(migration_file)
-    
+
     assert 'missing metadata' in str(exc_info.value)
 
   def test_load_migration_file_not_found(self, temp_migration_dir: Path) -> None:
     """Test loading non-existent migration file."""
     missing_file = temp_migration_dir / 'nonexistent.py'
-    
+
     with pytest.raises(MigrationLoadError) as exc_info:
       load_migration(missing_file)
-    
+
     assert 'not found' in str(exc_info.value)
 
   def test_load_migration_invalid_metadata(self, temp_migration_dir: Path) -> None:
@@ -578,10 +587,10 @@ def down():
   return []
 """
     migration_file.write_text(migration_content)
-    
+
     with pytest.raises(MigrationLoadError) as exc_info:
       load_migration(migration_file)
-    
+
     assert 'Invalid metadata' in str(exc_info.value)
 
 
@@ -591,7 +600,7 @@ class TestDiscoverMigrations:
   def test_discover_migrations_empty_directory(self, temp_migration_dir: Path) -> None:
     """Test discovering migrations in empty directory."""
     migrations = discover_migrations(temp_migration_dir)
-    
+
     assert len(migrations) == 0
 
   def test_discover_migrations_single_file(self, temp_migration_dir: Path) -> None:
@@ -610,9 +619,9 @@ def down():
   return []
 """
     migration_file.write_text(migration_content)
-    
+
     migrations = discover_migrations(temp_migration_dir)
-    
+
     assert len(migrations) == 1
     assert migrations[0].version == '20260102_120000'
 
@@ -634,9 +643,9 @@ def down():
   return []
 """
       migration_file.write_text(migration_content)
-    
+
     migrations = discover_migrations(temp_migration_dir)
-    
+
     assert len(migrations) == 3
     # Should be sorted by version
     assert migrations[0].version == '20260101_120000'
@@ -646,7 +655,7 @@ def down():
   def test_discover_migrations_ignores_init(self, temp_migration_dir: Path) -> None:
     """Test that __init__.py is ignored."""
     (temp_migration_dir / '__init__.py').write_text('# init')
-    
+
     migration_file = temp_migration_dir / '20260102_120000_test.py'
     migration_content = """
 metadata = {
@@ -661,25 +670,25 @@ def down():
   return []
 """
     migration_file.write_text(migration_content)
-    
+
     migrations = discover_migrations(temp_migration_dir)
-    
+
     assert len(migrations) == 1
 
   def test_discover_migrations_nonexistent_directory(self, tmp_path: Path) -> None:
     """Test discovering migrations in non-existent directory."""
     nonexistent = tmp_path / 'nonexistent'
-    
+
     migrations = discover_migrations(nonexistent)
-    
+
     assert len(migrations) == 0
 
   def test_discover_migrations_not_a_directory(self, tmp_path: Path) -> None:
     """Test discovering migrations when path is not a directory."""
     file_path = tmp_path / 'file.txt'
     file_path.write_text('test')
-    
+
     with pytest.raises(MigrationDiscoveryError) as exc_info:
       discover_migrations(file_path)
-    
+
     assert 'not a directory' in str(exc_info.value)

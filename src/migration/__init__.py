@@ -9,16 +9,14 @@ This module provides code-first migration capabilities including:
 """
 
 # Models
-from src.migration.models import (
-  DiffOperation,
-  Migration,
-  MigrationDirection,
-  MigrationHistory,
-  MigrationMetadata,
-  MigrationPlan,
-  MigrationState,
-  MigrationStatus,
-  SchemaDiff,
+# Diff
+from src.migration.diff import (
+  diff_edges,
+  diff_events,
+  diff_fields,
+  diff_indexes,
+  diff_permissions,
+  diff_tables,
 )
 
 # Discovery
@@ -30,19 +28,6 @@ from src.migration.discovery import (
   get_version_from_filename,
   load_migration,
   validate_migration_name,
-)
-
-# History
-from src.migration.history import (
-  MigrationHistoryError,
-  create_migration_table,
-  ensure_migration_table,
-  get_applied_migrations,
-  get_applied_versions,
-  get_migration_history,
-  is_migration_applied,
-  record_migration,
-  remove_migration_record,
 )
 
 # Executor
@@ -68,14 +53,28 @@ from src.migration.generator import (
   generate_migration_from_diffs,
 )
 
-# Diff
-from src.migration.diff import (
-  diff_edges,
-  diff_events,
-  diff_fields,
-  diff_indexes,
-  diff_permissions,
-  diff_tables,
+# History
+from src.migration.history import (
+  MigrationHistoryError,
+  create_migration_table,
+  ensure_migration_table,
+  get_applied_migrations,
+  get_applied_versions,
+  get_migration_history,
+  is_migration_applied,
+  record_migration,
+  remove_migration_record,
+)
+from src.migration.models import (
+  DiffOperation,
+  Migration,
+  MigrationDirection,
+  MigrationHistory,
+  MigrationMetadata,
+  MigrationPlan,
+  MigrationState,
+  MigrationStatus,
+  SchemaDiff,
 )
 
 __all__ = [

@@ -3,47 +3,47 @@
 This package provides type-safe wrappers and operators for building SurrealDB queries.
 """
 
-from src.types.record_id import RecordID
 from src.types.operators import (
-  Operator,
-  # Comparison operators
-  Eq,
-  Ne,
-  Gt,
-  Gte,
-  Lt,
-  Lte,
-  Contains,
-  ContainsNot,
-  ContainsAll,
-  ContainsAny,
-  Inside,
-  NotInside,
-  IsNull,
-  IsNotNull,
   # Logical operators
   And,
-  Or,
+  Contains,
+  ContainsAll,
+  ContainsAny,
+  ContainsNot,
+  # Comparison operators
+  Eq,
+  Gt,
+  Gte,
+  Inside,
+  IsNotNull,
+  IsNull,
+  Lt,
+  Lte,
+  Ne,
   Not,
-  # Helper functions
-  eq,
-  ne,
-  gt,
-  gte,
-  lt,
-  lte,
+  NotInside,
+  Operator,
+  Or,
+  and_,
   contains,
-  contains_not,
   contains_all,
   contains_any,
+  contains_not,
+  # Helper functions
+  eq,
+  gt,
+  gte,
   inside,
-  not_inside,
-  is_null,
   is_not_null,
-  and_,
-  or_,
+  is_null,
+  lt,
+  lte,
+  ne,
   not_,
+  not_inside,
+  or_,
 )
+from src.types.record_id import RecordID
 
 __all__ = [
   # RecordID

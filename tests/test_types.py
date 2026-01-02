@@ -3,19 +3,45 @@
 import pytest
 from pydantic import ValidationError
 
-from src.types.record_id import RecordID
 from src.types.operators import (
+  And,
+  Contains,
+  ContainsAll,
+  ContainsAny,
+  ContainsNot,
+  Eq,
+  Gt,
+  Gte,
+  Inside,
+  IsNotNull,
+  IsNull,
+  Lt,
+  Lte,
+  Ne,
+  Not,
+  NotInside,
   Operator,
-  Eq, Ne, Gt, Gte, Lt, Lte,
-  Contains, ContainsNot, ContainsAll, ContainsAny,
-  Inside, NotInside, IsNull, IsNotNull,
-  And, Or, Not,
-  eq, ne, gt, gte, lt, lte,
-  contains, contains_not, contains_all, contains_any,
-  inside, not_inside, is_null, is_not_null,
-  and_, or_, not_,
+  Or,
   _quote_value,
+  and_,
+  contains,
+  contains_all,
+  contains_any,
+  contains_not,
+  eq,
+  gt,
+  gte,
+  inside,
+  is_not_null,
+  is_null,
+  lt,
+  lte,
+  ne,
+  not_,
+  not_inside,
+  or_,
 )
+from src.types.record_id import RecordID
 
 
 class TestRecordID:
@@ -24,40 +50,40 @@ class TestRecordID:
   def test_record_id_creation(self) -> None:
     """Test basic RecordID creation."""
     record_id = RecordID(table='user', id='alice')
-    
+
     assert record_id.table == 'user'
     assert record_id.id == 'alice'
 
   def test_record_id_with_int_id(self) -> None:
     """Test RecordID with integer ID."""
     record_id = RecordID(table='post', id=123)
-    
+
     assert record_id.table == 'post'
     assert record_id.id == 123
 
   def test_record_id_string_representation(self) -> None:
     """Test string representation of RecordID."""
     record_id = RecordID(table='user', id='alice')
-    
+
     assert str(record_id) == 'user:alice'
 
   def test_record_id_repr(self) -> None:
     """Test repr of RecordID."""
     record_id = RecordID(table='user', id='alice')
-    
+
     assert repr(record_id) == "RecordID(table='user', id='alice')"
 
   def test_record_id_parse_string_id(self) -> None:
     """Test parsing RecordID from string with string ID."""
     record_id = RecordID.parse('user:alice')
-    
+
     assert record_id.table == 'user'
     assert record_id.id == 'alice'
 
   def test_record_id_parse_int_id(self) -> None:
     """Test parsing RecordID from string with integer ID."""
     record_id = RecordID.parse('post:123')
-    
+
     assert record_id.table == 'post'
     assert record_id.id == 123
 
@@ -65,7 +91,7 @@ class TestRecordID:
     """Test parsing invalid RecordID format without colon."""
     with pytest.raises(ValueError) as exc_info:
       RecordID.parse('useralice')
-    
+
     assert 'Invalid record ID format' in str(exc_info.value)
     assert 'Expected format: table:id' in str(exc_info.value)
 
@@ -79,13 +105,13 @@ class TestRecordID:
   def test_record_id_to_surql(self) -> None:
     """Test converting RecordID to SurrealQL format."""
     record_id = RecordID(table='user', id='alice')
-    
+
     assert record_id.to_surql() == 'user:alice'
 
   def test_record_id_immutability(self) -> None:
     """Test that RecordID is immutable."""
     record_id = RecordID(table='user', id='alice')
-    
+
     with pytest.raises((ValidationError, AttributeError)):
       record_id.table = 'post'  # type: ignore[misc]
 
@@ -93,20 +119,20 @@ class TestRecordID:
     """Test validation of empty table name."""
     with pytest.raises(ValidationError) as exc_info:
       RecordID(table='', id='alice')
-    
+
     assert 'Table name cannot be empty' in str(exc_info.value)
 
   def test_record_id_validate_table_invalid_chars(self) -> None:
     """Test validation of table name with invalid characters."""
     with pytest.raises(ValidationError) as exc_info:
       RecordID(table='user-table', id='alice')
-    
+
     assert 'Invalid table name' in str(exc_info.value)
 
   def test_record_id_validate_table_valid_underscore(self) -> None:
     """Test that underscores are allowed in table names."""
     record_id = RecordID(table='user_profile', id='alice')
-    
+
     assert record_id.table == 'user_profile'
 
 
@@ -335,10 +361,7 @@ class TestLogicalOperators:
   def test_complex_nested_operators(self) -> None:
     """Test complex nested logical operators."""
     # (age > 18 AND status = 'active') OR type = 'admin'
-    op = Or(
-      And(Gt('age', 18), Eq('status', 'active')),
-      Eq('type', 'admin')
-    )
+    op = Or(And(Gt('age', 18), Eq('status', 'active')), Eq('type', 'admin'))
     expected = "((age > 18) AND (status = 'active')) OR (type = 'admin')"
     assert op.to_surql() == expected
 
@@ -349,21 +372,21 @@ class TestOperatorImmutability:
   def test_eq_immutability(self) -> None:
     """Test that Eq operator is immutable."""
     op = Eq('name', 'Alice')
-    
+
     with pytest.raises((AttributeError, TypeError)):
       op.field = 'email'  # type: ignore[misc]
 
   def test_and_immutability(self) -> None:
     """Test that And operator is immutable."""
     op = And(Gt('age', 18), Eq('status', 'active'))
-    
+
     with pytest.raises((AttributeError, TypeError)):
       op.left = Gt('age', 21)  # type: ignore[misc]
 
   def test_contains_all_immutability(self) -> None:
     """Test that ContainsAll operator is immutable."""
     op = ContainsAll('tags', ['python', 'database'])
-    
+
     with pytest.raises((AttributeError, TypeError)):
       op.values = ['java']  # type: ignore[misc]
 
@@ -374,7 +397,7 @@ class TestOperatorBaseClass:
   def test_operator_base_not_implemented(self) -> None:
     """Test that base Operator class raises NotImplementedError."""
     op = Operator()
-    
+
     with pytest.raises(NotImplementedError):
       op.to_surql()
 

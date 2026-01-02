@@ -5,15 +5,14 @@ including viewing, comparing, and exporting schema definitions.
 """
 
 import asyncio
-from typing import Annotated, Optional
+from typing import Annotated
 
 import structlog
 import typer
 
 from src.cli.common import (
-  confirm_destructive,
+  OutputFormat,
   display_code,
-  display_error,
   display_info,
   display_panel,
   display_success,
@@ -22,7 +21,6 @@ from src.cli.common import (
   handle_error,
   spinner,
   verbose_option,
-  OutputFormat,
 )
 from src.connection.client import get_client
 from src.settings import get_db_config
@@ -39,23 +37,22 @@ app = typer.Typer(
 @app.command('show')
 def show_schema(
   table: Annotated[
-    Optional[str],
-    typer.Argument(help='Specific table name to inspect (default: show all)')
+    str | None, typer.Argument(help='Specific table name to inspect (default: show all)')
   ] = None,
   output_format: Annotated[OutputFormat, typer.Option('--format', '-f')] = OutputFormat.TEXT,
   verbose: Annotated[bool, verbose_option] = False,
 ) -> None:
   """Show current database schema.
-  
+
   Displays schema information from the database using INFO statements.
-  
+
   Examples:
     Show all schema:
     $ ethereal schema show
-    
+
     Show specific table:
     $ ethereal schema show user
-    
+
     Show as JSON:
     $ ethereal schema show --format json
   """
@@ -67,21 +64,21 @@ def show_schema(
 
 
 async def _show_schema_async(
-  table: Optional[str],
+  table: str | None,
   output_format: OutputFormat,
   verbose: bool,
 ) -> None:
   """Async implementation of show schema."""
   config = get_db_config()
-  
+
   async with get_client(config) as client:
     if table:
       # Show specific table info
       display_info(f'Fetching schema for table: {table}')
-      
+
       query = f'INFO FOR TABLE {table};'
       result = await client.execute(query)
-      
+
       if output_format == OutputFormat.JSON:
         format_output(result, OutputFormat.JSON)
       else:
@@ -93,10 +90,10 @@ async def _show_schema_async(
     else:
       # Show database info
       display_info('Fetching database schema')
-      
+
       query = 'INFO FOR DB;'
       result = await client.execute(query)
-      
+
       if output_format == OutputFormat.JSON:
         format_output(result, OutputFormat.JSON)
       else:
@@ -112,10 +109,10 @@ def diff_schema(
   verbose: Annotated[bool, verbose_option] = False,
 ) -> None:
   """Compare code schema definitions with database schema.
-  
+
   NOTE: This requires schema registry implementation.
   Currently not available.
-  
+
   Examples:
     Compare schemas:
     $ ethereal schema diff
@@ -128,18 +125,17 @@ def diff_schema(
 @app.command('sync')
 def sync_schema(
   dry_run: Annotated[
-    bool,
-    typer.Option('--dry-run', help='Show what would be synced without making changes')
+    bool, typer.Option('--dry-run', help='Show what would be synced without making changes')
   ] = False,
   verbose: Annotated[bool, verbose_option] = False,
 ) -> None:
   """Synchronize code schema to database.
-  
+
   NOTE: This is a potentially destructive operation that requires
   schema registry implementation. Currently not available.
-  
+
   Use migrations instead for safe schema changes.
-  
+
   Examples:
     Preview sync:
     $ ethereal schema sync --dry-run
@@ -152,27 +148,22 @@ def sync_schema(
 @app.command('export')
 def export_schema(
   output: Annotated[
-    Optional[str],
-    typer.Option('--output', '-o', help='Output file path (default: stdout)')
+    str | None, typer.Option('--output', '-o', help='Output file path (default: stdout)')
   ] = None,
   table: Annotated[
-    Optional[str],
-    typer.Option('--table', '-t', help='Export specific table only')
+    str | None, typer.Option('--table', '-t', help='Export specific table only')
   ] = None,
-  format: Annotated[
-    str,
-    typer.Option('--format', '-f', help='Export format (sql, json)')
-  ] = 'sql',
+  format: Annotated[str, typer.Option('--format', '-f', help='Export format (sql, json)')] = 'sql',
   verbose: Annotated[bool, verbose_option] = False,
 ) -> None:
   """Export database schema to file.
-  
+
   Exports the current database schema as SQL or JSON.
-  
+
   Examples:
     Export all schema to SQL:
     $ ethereal schema export --output schema.sql
-    
+
     Export specific table as JSON:
     $ ethereal schema export --table user --format json --output user.json
   """
@@ -184,14 +175,14 @@ def export_schema(
 
 
 async def _export_schema_async(
-  output: Optional[str],
-  table: Optional[str],
+  output: str | None,
+  table: str | None,
   format: str,
   verbose: bool,
 ) -> None:
   """Async implementation of export schema."""
   config = get_db_config()
-  
+
   async with get_client(config) as client:
     # Get schema info
     if table:
@@ -200,25 +191,27 @@ async def _export_schema_async(
     else:
       query = 'INFO FOR DB;'
       title = 'Database schema'
-    
+
     display_info(f'Exporting {title}')
-    
+
     with spinner() as progress:
       task = progress.add_task('Fetching schema...', total=None)
       result = await client.execute(query)
       progress.update(task, completed=True)
-    
+
     # Format output
     if format.lower() == 'json':
       import json
+
       content = json.dumps(result, indent=2, default=str)
     else:
       # SQL format - just stringify
       content = str(result)
-    
+
     # Write to file or stdout
     if output:
       from pathlib import Path
+
       output_path = Path(output)
       output_path.write_text(content, encoding='utf-8')
       display_success(f'Schema exported to: {output}')
@@ -236,11 +229,11 @@ def list_tables(
   verbose: Annotated[bool, verbose_option] = False,
 ) -> None:
   """List all tables in the database.
-  
+
   Examples:
     List tables:
     $ ethereal schema tables
-    
+
     List as JSON:
     $ ethereal schema tables --format json
   """
@@ -257,28 +250,25 @@ async def _list_tables_async(
 ) -> None:
   """Async implementation of list tables."""
   config = get_db_config()
-  
+
   async with get_client(config) as client:
     display_info('Fetching tables...')
-    
+
     # Get database info which includes tables
     result = await client.execute('INFO FOR DB;')
-    
+
     # Extract table names from result
     # Note: Result format may vary, this is a simplified approach
     if isinstance(result, list) and len(result) > 0:
       if isinstance(result[0], dict) and 'result' in result[0]:
         db_info = result[0]['result']
-        
+
         # Try to extract tables
         if isinstance(db_info, dict) and 'tb' in db_info:
           tables = db_info['tb']
-          
+
           if tables:
-            data = [
-              {'name': name, 'definition': str(defn)}
-              for name, defn in tables.items()
-            ]
+            data = [{'name': name, 'definition': str(defn)} for name, defn in tables.items()]
             format_output(data, output_format, title='Database Tables')
           else:
             display_info('No tables found in database')
@@ -299,9 +289,9 @@ def inspect_table(
   verbose: Annotated[bool, verbose_option] = False,
 ) -> None:
   """Inspect detailed information about a table.
-  
+
   Shows fields, indexes, events, and permissions for a table.
-  
+
   Examples:
     Inspect table:
     $ ethereal schema inspect user
@@ -319,38 +309,38 @@ async def _inspect_table_async(
 ) -> None:
   """Async implementation of inspect table."""
   config = get_db_config()
-  
+
   async with get_client(config) as client:
     display_info(f'Inspecting table: {table}')
-    
+
     with spinner() as progress:
       task = progress.add_task('Fetching table info...', total=None)
-      
+
       # Get table info
       result = await client.execute(f'INFO FOR TABLE {table};')
-      
+
       progress.update(task, completed=True)
-    
+
     # Display result
     if isinstance(result, list) and len(result) > 0:
       if isinstance(result[0], dict) and 'result' in result[0]:
         table_info = result[0]['result']
-        
+
         # Display formatted info
         display_panel(
           str(table_info),
           title=f'Table: {table}',
           style='cyan',
         )
-        
+
         # Try to extract and display specific sections if available
         if isinstance(table_info, dict):
           if 'fd' in table_info and table_info['fd']:
             display_info(f'\nFields: {len(table_info["fd"])}')
-          
+
           if 'ix' in table_info and table_info['ix']:
             display_info(f'Indexes: {len(table_info["ix"])}')
-          
+
           if 'ev' in table_info and table_info['ev']:
             display_info(f'Events: {len(table_info["ev"])}')
       else:
