@@ -132,7 +132,7 @@ See the [Architecture Document](plans/architecture.md) for detailed design infor
 
 ## Project Structure
 
-```
+```shell
 reverie/
 ├── src/
 │   ├── schema/          # Schema definition layer

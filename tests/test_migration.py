@@ -366,6 +366,25 @@ class TestSchemaDiff:
     assert diff.details['old_type'] == 'string'
     assert diff.details['new_type'] == 'int'
 
+  def test_schema_diff_add_mtree_index(self) -> None:
+    """Test SchemaDiff for ADD_INDEX operation with MTREE index."""
+    diff = SchemaDiff(
+      operation=DiffOperation.ADD_INDEX,
+      table='documents',
+      index='embedding_idx',
+      description='Add MTREE index embedding_idx to documents',
+      forward_sql='DEFINE INDEX embedding_idx ON TABLE documents FIELDS embedding MTREE DIMENSION 1536 DIST COSINE TYPE F32;',
+      backward_sql='REMOVE INDEX embedding_idx ON TABLE documents;',
+    )
+
+    assert diff.operation == DiffOperation.ADD_INDEX
+    assert diff.table == 'documents'
+    assert diff.index == 'embedding_idx'
+    assert 'MTREE' in diff.forward_sql
+    assert 'DIMENSION 1536' in diff.forward_sql
+    assert 'DIST COSINE' in diff.forward_sql
+    assert 'TYPE F32' in diff.forward_sql
+
 
 class TestValidateMigrationName:
   """Test suite for validate_migration_name function."""

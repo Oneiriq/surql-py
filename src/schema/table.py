@@ -31,6 +31,32 @@ class IndexType(Enum):
   UNIQUE = 'UNIQUE'
   SEARCH = 'SEARCH'
   STANDARD = 'INDEX'
+  MTREE = 'MTREE'
+
+
+class MTreeDistanceType(Enum):
+  """Distance metric types for MTREE vector indexes.
+
+  Defines the distance metric used for vector similarity search.
+  """
+
+  COSINE = 'COSINE'
+  EUCLIDEAN = 'EUCLIDEAN'
+  MANHATTAN = 'MANHATTAN'
+  MINKOWSKI = 'MINKOWSKI'
+
+
+class MTreeVectorType(Enum):
+  """Vector data types for MTREE indexes.
+
+  Defines the numeric type used for vector components.
+  """
+
+  F64 = 'F64'
+  F32 = 'F32'
+  I64 = 'I64'
+  I32 = 'I32'
+  I16 = 'I16'
 
 
 class IndexDefinition(BaseModel):
@@ -39,12 +65,27 @@ class IndexDefinition(BaseModel):
   Represents an index on one or more fields in a table.
 
   Examples:
+    Standard index:
     >>> idx = IndexDefinition(name='email_idx', columns=['email'], type=IndexType.UNIQUE)
+
+    MTREE vector index:
+    >>> idx = IndexDefinition(
+    ...   name='embedding_idx',
+    ...   columns=['embedding'],
+    ...   type=IndexType.MTREE,
+    ...   dimension=1536,
+    ...   distance=MTreeDistanceType.COSINE,
+    ...   vector_type=MTreeVectorType.F32
+    ... )
   """
 
   name: str
   columns: list[str]
   type: IndexType = IndexType.STANDARD
+  # MTREE-specific parameters
+  dimension: int | None = None
+  distance: MTreeDistanceType | None = None
+  vector_type: MTreeVectorType | None = None
 
   model_config = ConfigDict(frozen=True)
 
@@ -228,6 +269,45 @@ def search_index(
     IndexDefinition(name='content_search', columns=['title', 'content'], type=IndexType.SEARCH)
   """
   return index(name, columns, IndexType.SEARCH)
+
+
+def mtree_index(
+  name: str,
+  column: str,
+  dimension: int,
+  *,
+  distance: MTreeDistanceType = MTreeDistanceType.EUCLIDEAN,
+  vector_type: MTreeVectorType = MTreeVectorType.F64,
+) -> IndexDefinition:
+  """Create an MTREE vector index definition.
+
+  Convenience function for creating MTREE vector similarity search indexes.
+
+  Args:
+    name: Index name
+    column: Column name containing the vector data
+    dimension: Number of dimensions in the vector
+    distance: Distance metric (COSINE, EUCLIDEAN, MANHATTAN, MINKOWSKI)
+    vector_type: Vector component data type (F64, F32, I64, I32, I16)
+
+  Returns:
+    Immutable IndexDefinition with MTREE type
+
+  Examples:
+    OpenAI embeddings with cosine similarity:
+    >>> mtree_index('embedding_idx', 'embedding', 1536, distance=MTreeDistanceType.COSINE, vector_type=MTreeVectorType.F32)
+
+    Custom vector with Euclidean distance:
+    >>> mtree_index('feature_idx', 'features', 128)
+  """
+  return IndexDefinition(
+    name=name,
+    columns=[column],
+    type=IndexType.MTREE,
+    dimension=dimension,
+    distance=distance,
+    vector_type=vector_type,
+  )
 
 
 def event(

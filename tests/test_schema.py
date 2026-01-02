@@ -33,6 +33,8 @@ from src.schema.table import (
   EventDefinition,
   IndexDefinition,
   IndexType,
+  MTreeDistanceType,
+  MTreeVectorType,
   TableDefinition,
   TableMode,
   event,
@@ -244,6 +246,30 @@ class TestIndexType:
     assert IndexType.UNIQUE.value == 'UNIQUE'
     assert IndexType.SEARCH.value == 'SEARCH'
     assert IndexType.STANDARD.value == 'INDEX'
+    assert IndexType.MTREE.value == 'MTREE'
+
+
+class TestMTreeDistanceType:
+  """Test suite for MTreeDistanceType enum."""
+
+  def test_mtree_distance_type_values(self) -> None:
+    """Test MTreeDistanceType enum values."""
+    assert MTreeDistanceType.COSINE.value == 'COSINE'
+    assert MTreeDistanceType.EUCLIDEAN.value == 'EUCLIDEAN'
+    assert MTreeDistanceType.MANHATTAN.value == 'MANHATTAN'
+    assert MTreeDistanceType.MINKOWSKI.value == 'MINKOWSKI'
+
+
+class TestMTreeVectorType:
+  """Test suite for MTreeVectorType enum."""
+
+  def test_mtree_vector_type_values(self) -> None:
+    """Test MTreeVectorType enum values."""
+    assert MTreeVectorType.F64.value == 'F64'
+    assert MTreeVectorType.F32.value == 'F32'
+    assert MTreeVectorType.I64.value == 'I64'
+    assert MTreeVectorType.I32.value == 'I32'
+    assert MTreeVectorType.I16.value == 'I16'
 
 
 class TestIndexDefinition:

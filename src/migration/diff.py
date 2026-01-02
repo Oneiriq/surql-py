@@ -327,13 +327,20 @@ def _generate_modify_field_diff(
 
 def _generate_add_index_diff(table_name: str, index: IndexDefinition) -> SchemaDiff:
   """Generate diff for adding an index."""
-  columns_str = ', '.join(index.columns)
-  forward_sql = f'DEFINE INDEX {index.name} ON TABLE {table_name} COLUMNS {columns_str}'
+  from src.schema.table import IndexType
 
-  if index.type.value != 'INDEX':
-    forward_sql += f' {index.type.value}'
+  # MTREE indexes use different syntax
+  if index.type == IndexType.MTREE:
+    forward_sql = _mtree_index_to_sql(table_name, index)
+  else:
+    columns_str = ', '.join(index.columns)
+    forward_sql = f'DEFINE INDEX {index.name} ON TABLE {table_name} COLUMNS {columns_str}'
 
-  forward_sql += ';'
+    if index.type.value != 'INDEX':
+      forward_sql += f' {index.type.value}'
+
+    forward_sql += ';'
+
   backward_sql = f'REMOVE INDEX {index.name} ON TABLE {table_name};'
 
   return SchemaDiff(
@@ -348,9 +355,16 @@ def _generate_add_index_diff(table_name: str, index: IndexDefinition) -> SchemaD
 
 def _generate_drop_index_diff(table_name: str, index: IndexDefinition) -> SchemaDiff:
   """Generate diff for dropping an index."""
-  columns_str = ', '.join(index.columns)
+  from src.schema.table import IndexType
+
   forward_sql = f'REMOVE INDEX {index.name} ON TABLE {table_name};'
-  backward_sql = f'DEFINE INDEX {index.name} ON TABLE {table_name} COLUMNS {columns_str};'
+
+  # MTREE indexes use different syntax for recreation
+  if index.type == IndexType.MTREE:
+    backward_sql = _mtree_index_to_sql(table_name, index)
+  else:
+    columns_str = ', '.join(index.columns)
+    backward_sql = f'DEFINE INDEX {index.name} ON TABLE {table_name} COLUMNS {columns_str};'
 
   return SchemaDiff(
     operation=DiffOperation.DROP_INDEX,
@@ -518,3 +532,39 @@ def _fields_equal(field1: FieldDefinition, field2: FieldDefinition) -> bool:
     and field1.readonly == field2.readonly
     and field1.flexible == field2.flexible
   )
+
+
+def _mtree_index_to_sql(table_name: str, index: IndexDefinition) -> str:
+  """Convert an MTREE index definition to SQL statement.
+
+  Args:
+    table_name: Name of the table
+    index: MTREE index definition
+
+  Returns:
+    SQL statement string for MTREE index
+
+  Examples:
+    >>> _mtree_index_to_sql('documents', mtree_index('emb_idx', 'embedding', 1536))
+    'DEFINE INDEX emb_idx ON TABLE documents FIELDS embedding MTREE DIMENSION 1536 DIST EUCLIDEAN TYPE F64;'
+  """
+  if not index.dimension:
+    msg = f'MTREE index {index.name} must have dimension specified'
+    raise ValueError(msg)
+
+  # MTREE indexes only support single column
+  field_name = index.columns[0] if index.columns else ''
+
+  sql = f'DEFINE INDEX {index.name} ON TABLE {table_name} FIELDS {field_name} MTREE DIMENSION {index.dimension}'
+
+  # Add optional distance metric
+  if index.distance:
+    sql += f' DIST {index.distance.value}'
+
+  # Add optional vector type
+  if index.vector_type:
+    sql += f' TYPE {index.vector_type.value}'
+
+  sql += ';'
+
+  return sql

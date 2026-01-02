@@ -495,7 +495,7 @@ function Invoke-ReverieTypeCheck {
 
   Write-ReverieMessage -Message 'Running mypy type checker...' -Type 'Info'
 
-  Invoke-ReverieCommand -Command 'uv run mypy --strict src' -PassThru
+  Invoke-ReverieCommand -Command 'uv run python -m mypy --strict src' -PassThru
 
   if ($LASTEXITCODE -eq 0) {
     Write-ReverieMessage -Message 'Type checking passed' -Type 'Success'
@@ -543,7 +543,7 @@ function Test-Reverie {
 
   Write-ReverieMessage -Message 'Running test suite...' -Type 'Info'
 
-  $pytestArgs = @('uv', 'run', 'pytest')
+  $pytestArgs = @('uv', 'run', 'python', '-m', 'pytest')
 
   if ($PSBoundParameters.ContainsKey('Verbose')) {
     $pytestArgs += '-v'
@@ -597,7 +597,7 @@ function Test-ReverieCoverage {
 
   Write-ReverieMessage -Message 'Running tests with coverage analysis...' -Type 'Info'
 
-  $command = 'uv run pytest --cov=src --cov-report=term-missing'
+  $command = 'uv run python -m pytest --cov=src --cov-report=term-missing'
 
   if ($Html) {
     $command += ' --cov-report=html'

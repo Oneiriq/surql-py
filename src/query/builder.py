@@ -6,6 +6,7 @@ through method chaining. All methods return new Query instances, ensuring immuta
 
 from __future__ import annotations
 
+from enum import Enum
 from typing import Any, TypeVar
 
 import structlog
@@ -17,6 +18,28 @@ from src.types.record_id import RecordID
 logger = structlog.get_logger(__name__)
 
 T = TypeVar('T', bound=BaseModel)
+
+
+class ReturnFormat(str, Enum):
+  """Return format for CREATE, UPDATE, and DELETE operations.
+
+  Controls what data is returned from mutation operations:
+  - NONE: Return nothing (useful for performance when results not needed)
+  - DIFF: Return only the fields that changed (UPDATE operations)
+  - FULL: Return the full record including all fields
+  - BEFORE: Return the record before the changes
+  - AFTER: Return the record after the changes (default)
+
+  Examples:
+    >>> query = Query().update('user:john', {'age': 30}).return_diff()
+    >>> # Generates: UPDATE user:john SET age = 30 RETURN DIFF
+  """
+
+  NONE = 'NONE'
+  DIFF = 'DIFF'
+  FULL = 'FULL'
+  BEFORE = 'BEFORE'
+  AFTER = 'AFTER'
 
 
 class Query[T: BaseModel](BaseModel):
@@ -55,6 +78,7 @@ class Query[T: BaseModel](BaseModel):
   relate_data: dict[str, Any] | None = None
   join_clauses: list[str] = Field(default_factory=list)
   graph_traversal: str | None = None
+  return_format: ReturnFormat | None = None
 
   model_config = ConfigDict(frozen=True, arbitrary_types_allowed=True)
 
@@ -306,6 +330,77 @@ class Query[T: BaseModel](BaseModel):
     """
     return self.model_copy(update={'join_clauses': [*self.join_clauses, join_clause]})
 
+  def return_none(self) -> Query[T]:
+    """Set RETURN NONE for the query.
+
+    Returns nothing from the operation. Useful for performance when
+    you don't need the result data.
+
+    Returns:
+      New Query instance with RETURN NONE set
+
+    Examples:
+      >>> Query().delete('user:alice').return_none()
+      >>> Query().update('user:bob', {'status': 'active'}).return_none()
+    """
+    return self.model_copy(update={'return_format': ReturnFormat.NONE})
+
+  def return_diff(self) -> Query[T]:
+    """Set RETURN DIFF for the query.
+
+    Returns only the fields that changed. Most useful for UPDATE operations.
+
+    Returns:
+      New Query instance with RETURN DIFF set
+
+    Examples:
+      >>> Query().update('user:alice', {'age': 30}).return_diff()
+    """
+    return self.model_copy(update={'return_format': ReturnFormat.DIFF})
+
+  def return_full(self) -> Query[T]:
+    """Set RETURN FULL for the query.
+
+    Returns the full record with all fields included.
+
+    Returns:
+      New Query instance with RETURN FULL set
+
+    Examples:
+      >>> Query().insert('user', {'name': 'Alice'}).return_full()
+      >>> Query().update('user:bob', {'status': 'active'}).return_full()
+    """
+    return self.model_copy(update={'return_format': ReturnFormat.FULL})
+
+  def return_before(self) -> Query[T]:
+    """Set RETURN BEFORE for the query.
+
+    Returns the record state before the operation was applied.
+
+    Returns:
+      New Query instance with RETURN BEFORE set
+
+    Examples:
+      >>> Query().update('user:alice', {'age': 31}).return_before()
+      >>> Query().delete('user:bob').return_before()
+    """
+    return self.model_copy(update={'return_format': ReturnFormat.BEFORE})
+
+  def return_after(self) -> Query[T]:
+    """Set RETURN AFTER for the query.
+
+    Returns the record state after the operation was applied.
+    This is the default behavior for UPDATE and DELETE.
+
+    Returns:
+      New Query instance with RETURN AFTER set
+
+    Examples:
+      >>> Query().update('user:alice', {'age': 31}).return_after()
+      >>> Query().delete('user:bob').return_after()
+    """
+    return self.model_copy(update={'return_format': ReturnFormat.AFTER})
+
   def to_surql(self) -> str:
     """Convert query to SurrealQL string.
 
@@ -396,7 +491,13 @@ class Query[T: BaseModel](BaseModel):
 
     data_str = '{' + ', '.join(data_parts) + '}'
 
-    return f'CREATE {self.table_name} CONTENT {data_str}'
+    parts = [f'CREATE {self.table_name} CONTENT {data_str}']
+
+    # Add RETURN clause if specified
+    if self.return_format:
+      parts.append(f'RETURN {self.return_format.value}')
+
+    return ' '.join(parts)
 
   def _build_update(self) -> str:
     """Build UPDATE query string."""
@@ -421,6 +522,10 @@ class Query[T: BaseModel](BaseModel):
       conditions_str = ' AND '.join(f'({c})' for c in self.conditions)
       parts.append(f'WHERE {conditions_str}')
 
+    # Add RETURN clause if specified
+    if self.return_format:
+      parts.append(f'RETURN {self.return_format.value}')
+
     return ' '.join(parts)
 
   def _build_delete(self) -> str:
@@ -434,6 +539,10 @@ class Query[T: BaseModel](BaseModel):
     if self.conditions:
       conditions_str = ' AND '.join(f'({c})' for c in self.conditions)
       parts.append(f'WHERE {conditions_str}')
+
+    # Add RETURN clause if specified
+    if self.return_format:
+      parts.append(f'RETURN {self.return_format.value}')
 
     return ' '.join(parts)
 
@@ -456,6 +565,10 @@ class Query[T: BaseModel](BaseModel):
 
       data_str = '{' + ', '.join(data_parts) + '}'
       parts.append(f'CONTENT {data_str}')
+
+    # Add RETURN clause if specified
+    if self.return_format:
+      parts.append(f'RETURN {self.return_format.value}')
 
     return ' '.join(parts)
 

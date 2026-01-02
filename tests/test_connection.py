@@ -1,5 +1,6 @@
 """Tests for the connection module (config, client, and transaction)."""
 
+import os
 from unittest.mock import AsyncMock, Mock, patch
 
 import pytest
@@ -26,19 +27,26 @@ class TestConnectionConfig:
 
   def test_connection_config_with_defaults(self) -> None:
     """Test connection config with default values."""
-    config = ConnectionConfig()
+    # Isolate test from .env file and environment variables
+    # Clear all DB_ prefixed environment variables to test true defaults
+    env_vars = {k: v for k, v in os.environ.items() if not k.startswith('DB_')}
 
-    assert config.url == 'ws://localhost:8000/rpc'
-    assert config.namespace == 'development'
-    assert config.database == 'main'
-    assert config.username is None
-    assert config.password is None
-    assert config.timeout == 30.0
-    assert config.max_connections == 10
-    assert config.retry_max_attempts == 3
-    assert config.retry_min_wait == 1.0
-    assert config.retry_max_wait == 10.0
-    assert config.retry_multiplier == 2.0
+    # Patch os.environ and prevent .env file loading
+    with patch.dict('os.environ', env_vars, clear=True):
+      # pydantic-settings allows overriding _env_file to disable .env loading
+      config = ConnectionConfig(_env_file=None)
+
+      assert config.url == 'ws://localhost:8000/rpc'
+      assert config.namespace == 'development'
+      assert config.database == 'main'
+      assert config.username is None
+      assert config.password is None
+      assert config.timeout == 30.0
+      assert config.max_connections == 10
+      assert config.retry_max_attempts == 3
+      assert config.retry_min_wait == 1.0
+      assert config.retry_max_wait == 10.0
+      assert config.retry_multiplier == 2.0
 
   def test_connection_config_with_custom_values(self) -> None:
     """Test connection config with custom values."""

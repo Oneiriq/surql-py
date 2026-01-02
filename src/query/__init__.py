@@ -12,6 +12,7 @@ This module provides a complete query building and ORM system with:
 # Query builder
 from src.query.builder import (
   Query,
+  ReturnFormat,
   delete,
   from_table,
   insert,
