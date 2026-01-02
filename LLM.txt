@@ -1,8 +1,8 @@
-# Ethereal - Code-First Database Toolkit for SurrealDB
+# Reverie - Code-First Database Toolkit for SurrealDB
 
 # Library Overview
 
-- Ethereal is a code-first database toolkit for building modern applications with SurrealDB
+- Reverie is a code-first database toolkit for building modern applications with SurrealDB
 - Provides type-safe schema definitions, code-first migrations, and async-first database operations
 - Built on functional composition patterns with immutable data structures
 - Integrates Pydantic for runtime validation and type safety
@@ -14,28 +14,28 @@
 # Installation
 
 ## Using pip
-- Install via pip: `pip install ethereal`
-- Verify installation: `ethereal --version`
+- Install via pip: `pip install reverie`
+- Verify installation: `reverie --version`
 
 ## Using uv (Recommended)
-- Install via uv: `uv add ethereal`
-- Install with dev dependencies: `uv add ethereal --dev`
+- Install via uv: `uv add reverie`
+- Install with dev dependencies: `uv add reverie --dev`
 - Sync dependencies: `uv sync`
 
 ## From Source
-- Clone repository: `git clone https://github.com/albedosehen/ethereal.git`
-- Navigate to directory: `cd ethereal`
+- Clone repository: `git clone https://github.com/albedosehen/reverie.git`
+- Navigate to directory: `cd reverie`
 - Install with uv: `uv sync`
 - Install in editable mode: `pip install -e .`
 
 ## From Source with pyproject.tom (Currently Recommended)
-- Update the other project's `pyproject.toml` to include ethereal as a dependency with:
+- Update the other project's `pyproject.toml` to include reverie as a dependency with:
     ```toml
     # Other project's pyproject.toml
     [project]
     dependencies = [
         #...
-        "ethereal @ git+https://github.com/albedosehen/ethereal.git@v0.1.0",
+        "reverie @ git+https://github.com/albedosehen/reverie.git@v0.1.0",
     ]
 - Then install with uv: `uv sync`
 
@@ -495,7 +495,7 @@ def downgrade():
 ## Creating Migrations
 
 ### Via CLI
-- Create migration: `ethereal migrate create "Add user table"`
+- Create migration: `reverie migrate create "Add user table"`
 - Creates file: `migrations/YYYYMMDD_HHMMSS_add_user_table.py`
 - Edit file to add schema definitions
 - Auto-generates timestamp
@@ -515,25 +515,25 @@ def downgrade():
 ## Applying Migrations
 
 ### Apply All Pending
-- Command: `ethereal migrate up`
+- Command: `reverie migrate up`
 - Applies all pending migrations in order
 - Tracks applied migrations in `_migration_history` table
 - Idempotent: Safe to run multiple times
 
 ### Apply Specific Number
-- Command: `ethereal migrate up --steps 1`
+- Command: `reverie migrate up --steps 1`
 - Apply next migration only: `--steps 1`
 - Apply next 3: `--steps 3`
 - Useful for gradual rollout
 
 ### Dry Run
-- Command: `ethereal migrate up --dry-run`
+- Command: `reverie migrate up --dry-run`
 - Preview what will be applied
 - No database changes
 - Shows SQL that would be executed
 
 ### With Custom Directory
-- Command: `ethereal migrate up --directory ./db/migrations`
+- Command: `reverie migrate up --directory ./db/migrations`
 - Specify migration directory location
 - Useful for multi-environment setups
 
