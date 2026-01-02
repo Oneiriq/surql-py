@@ -19,6 +19,10 @@ from src.query.results import (
   RecordResult,
   aggregate,
   count_result,
+  extract_one,
+  extract_result,
+  extract_scalar,
+  has_results,
   paginated,
   record,
   records,
@@ -705,3 +709,176 @@ class TestResultImmutability:
 
     with pytest.raises((Exception, ValueError)):
       result.total = 100  # type: ignore[misc]
+
+
+class TestResultExtraction:
+  """Test suite for result extraction utilities."""
+
+  def test_extract_result_none(self) -> None:
+    """Test extract_result with None."""
+    assert extract_result(None) == []
+
+  def test_extract_result_empty_list(self) -> None:
+    """Test extract_result with empty list."""
+    assert extract_result([]) == []
+
+  def test_extract_result_flat_format(self) -> None:
+    """Test extract_result with flat format (db.select)."""
+    result = [{'id': 'user:123', 'name': 'Alice'}]
+    extracted = extract_result(result)
+    assert extracted == [{'id': 'user:123', 'name': 'Alice'}]
+
+  def test_extract_result_flat_format_multiple(self) -> None:
+    """Test extract_result with multiple flat records."""
+    result = [
+      {'id': 'user:123', 'name': 'Alice'},
+      {'id': 'user:456', 'name': 'Bob'},
+    ]
+    extracted = extract_result(result)
+    assert extracted == result
+
+  def test_extract_result_nested_format(self) -> None:
+    """Test extract_result with nested format (db.query)."""
+    result = [{'result': [{'id': 'user:123', 'name': 'Alice'}]}]
+    extracted = extract_result(result)
+    assert extracted == [{'id': 'user:123', 'name': 'Alice'}]
+
+  def test_extract_result_nested_format_multiple_statements(self) -> None:
+    """Test extract_result with multiple nested results."""
+    result = [
+      {'result': [{'id': 'user:123', 'name': 'Alice'}]},
+      {'result': [{'id': 'user:456', 'name': 'Bob'}]},
+    ]
+    extracted = extract_result(result)
+    assert extracted == [
+      {'id': 'user:123', 'name': 'Alice'},
+      {'id': 'user:456', 'name': 'Bob'},
+    ]
+
+  def test_extract_result_nested_empty(self) -> None:
+    """Test extract_result with empty nested result."""
+    result = [{'result': []}]
+    extracted = extract_result(result)
+    assert extracted == []
+
+  def test_extract_result_dict_with_result_key(self) -> None:
+    """Test extract_result with dict containing 'result' key."""
+    result = {'result': [{'id': 'user:123', 'name': 'Alice'}]}
+    extracted = extract_result(result)
+    assert extracted == [{'id': 'user:123', 'name': 'Alice'}]
+
+  def test_extract_result_aggregate(self) -> None:
+    """Test extract_result with aggregate result (flat)."""
+    result = [{'count': 42}]
+    extracted = extract_result(result)
+    assert extracted == [{'count': 42}]
+
+  def test_extract_result_aggregate_nested(self) -> None:
+    """Test extract_result with aggregate result (nested)."""
+    result = [{'result': [{'count': 42}]}]
+    extracted = extract_result(result)
+    assert extracted == [{'count': 42}]
+
+  def test_extract_one_with_data(self) -> None:
+    """Test extract_one with data present."""
+    result = [{'result': [{'id': 'user:123', 'name': 'Alice'}]}]
+    extracted = extract_one(result)
+    assert extracted == {'id': 'user:123', 'name': 'Alice'}
+
+  def test_extract_one_with_flat_format(self) -> None:
+    """Test extract_one with flat format."""
+    result = [{'id': 'user:123', 'name': 'Alice'}]
+    extracted = extract_one(result)
+    assert extracted == {'id': 'user:123', 'name': 'Alice'}
+
+  def test_extract_one_empty(self) -> None:
+    """Test extract_one with empty result."""
+    assert extract_one([]) is None
+
+  def test_extract_one_none(self) -> None:
+    """Test extract_one with None."""
+    assert extract_one(None) is None
+
+  def test_extract_one_nested_empty(self) -> None:
+    """Test extract_one with empty nested result."""
+    result = [{'result': []}]
+    assert extract_one(result) is None
+
+  def test_extract_one_multiple_records(self) -> None:
+    """Test extract_one returns only first record."""
+    result = [
+      {'id': 'user:123', 'name': 'Alice'},
+      {'id': 'user:456', 'name': 'Bob'},
+    ]
+    extracted = extract_one(result)
+    assert extracted == {'id': 'user:123', 'name': 'Alice'}
+
+  def test_extract_scalar_with_data(self) -> None:
+    """Test extract_scalar with data present."""
+    result = [{'result': [{'count': 42}]}]
+    value = extract_scalar(result, 'count')
+    assert value == 42
+
+  def test_extract_scalar_with_flat_format(self) -> None:
+    """Test extract_scalar with flat format."""
+    result = [{'total': 100}]
+    value = extract_scalar(result, 'total')
+    assert value == 100
+
+  def test_extract_scalar_missing_key(self) -> None:
+    """Test extract_scalar with missing key returns default."""
+    result = [{'id': 'user:123'}]
+    value = extract_scalar(result, 'count', default=0)
+    assert value == 0
+
+  def test_extract_scalar_empty_result(self) -> None:
+    """Test extract_scalar with empty result returns default."""
+    value = extract_scalar([], 'count', default=0)
+    assert value == 0
+
+  def test_extract_scalar_none_result(self) -> None:
+    """Test extract_scalar with None returns default."""
+    value = extract_scalar(None, 'count', default=0)
+    assert value == 0
+
+  def test_extract_scalar_custom_default(self) -> None:
+    """Test extract_scalar with custom default."""
+    value = extract_scalar([], 'avg', default=-1)
+    assert value == -1
+
+  def test_extract_scalar_avg_query(self) -> None:
+    """Test extract_scalar with AVG aggregate."""
+    result = [{'result': [{'avg': 25.5}]}]
+    value = extract_scalar(result, 'avg')
+    assert value == 25.5
+
+  def test_has_results_with_data(self) -> None:
+    """Test has_results with data present."""
+    result = [{'result': [{'id': 'user:123'}]}]
+    assert has_results(result) is True
+
+  def test_has_results_with_flat_format(self) -> None:
+    """Test has_results with flat format."""
+    result = [{'id': 'user:123'}]
+    assert has_results(result) is True
+
+  def test_has_results_empty(self) -> None:
+    """Test has_results with empty result."""
+    assert has_results([]) is False
+
+  def test_has_results_none(self) -> None:
+    """Test has_results with None."""
+    assert has_results(None) is False
+
+  def test_has_results_empty_nested(self) -> None:
+    """Test has_results with empty nested result."""
+    result = [{'result': []}]
+    assert has_results(result) is False
+
+  def test_has_results_multiple_records(self) -> None:
+    """Test has_results with multiple records."""
+    result = [
+      {'id': 'user:123'},
+      {'id': 'user:456'},
+    ]
+    assert has_results(result) is True

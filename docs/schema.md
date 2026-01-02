@@ -269,28 +269,28 @@ user_table = table_schema(
     string_field('username', assertion='string::len($value) >= 3'),
     string_field('email', assertion='string::is::email($value)'),
     string_field('password_hash'),
-    
+
     # Nested fields
     string_field('name.first'),
     string_field('name.last'),
-    
+
     # Optional fields
     string_field('bio', default='""'),
     string_field('avatar_url', default='NONE'),
-    
+
     # Numbers
     int_field('age', assertion='$value >= 13'),
     int_field('follower_count', default='0'),
-    
+
     # Boolean
     bool_field('is_verified', default='false'),
     bool_field('is_active', default='true'),
-    
+
     # Timestamps
     datetime_field('created_at', default='time::now()', readonly=True),
     datetime_field('updated_at', default='time::now()'),
     datetime_field('last_login', default='NONE'),
-    
+
     # Collections
     array_field('roles', default='["user"]'),
     array_field('tags', default='[]'),
@@ -319,7 +319,14 @@ user_table = table_schema(
 
 Edges represent relationships between records in SurrealDB's graph model.
 
-### Basic Edge
+reverie supports two edge table modes:
+
+1. **TYPE RELATION (default)**: Modern SurrealDB graph edges with automatic in/out fields
+2. **SCHEMAFULL**: Traditional tables with explicit in/out fields (driftnet-compatible)
+
+### TYPE RELATION Edges (Default)
+
+The modern approach uses `TYPE RELATION` syntax where SurrealDB automatically manages in/out fields.
 
 ```python
 from src.schema.edge import edge_schema
@@ -335,6 +342,13 @@ follows_edge = edge_schema(
 )
 ```
 
+Generates:
+
+```surql
+DEFINE TABLE follows TYPE RELATION FROM user TO user;
+DEFINE FIELD followed_at ON TABLE follows TYPE datetime DEFAULT time::now() READONLY;
+```
+
 ### Edge with Properties
 
 ```python
@@ -345,6 +359,53 @@ likes_edge = edge_schema(
   fields=[
     datetime_field('liked_at', default='time::now()', readonly=True),
     string_field('reaction', default='"like"'),  # like, love, wow, etc.
+  ],
+)
+```
+
+### SCHEMAFULL Edges (Driftnet-Compatible)
+
+For compatibility with traditional schemas (like driftnet), use SCHEMAFULL mode with explicit in/out fields:
+
+```python
+from src.schema.edge import EdgeMode, schemafull_edge
+from src.schema.fields import record_field, string_field, float_field, array_field
+
+# Driftnet-compatible entity_relation edge
+entity_relation = schemafull_edge(
+  'entity_relation',
+  fields=[
+    record_field('in', table='entity'),
+    record_field('out', table='entity'),
+    string_field('relation_type'),
+    float_field('confidence'),
+    array_field('source_documents', default='[]'),
+  ],
+)
+```
+
+Generates:
+
+```surql
+DEFINE TABLE entity_relation SCHEMAFULL;
+DEFINE FIELD in ON TABLE entity_relation TYPE record<entity>;
+DEFINE FIELD out ON TABLE entity_relation TYPE record<entity>;
+DEFINE FIELD relation_type ON TABLE entity_relation TYPE string;
+DEFINE FIELD confidence ON TABLE entity_relation TYPE float;
+DEFINE FIELD source_documents ON TABLE entity_relation TYPE array DEFAULT [];
+```
+
+Alternative syntax using `edge_schema`:
+
+```python
+entity_relation = edge_schema(
+  'entity_relation',
+  mode=EdgeMode.SCHEMAFULL,
+  fields=[
+    record_field('in', table='entity'),
+    record_field('out', table='entity'),
+    string_field('relation_type'),
+    float_field('confidence'),
   ],
 )
 ```
@@ -378,6 +439,21 @@ tagged_edge = edge_schema(
   ],
 )
 ```
+
+### Choosing Edge Mode
+
+**Use TYPE RELATION (default) when:**
+
+- Building new applications with SurrealDB
+- You want SurrealDB to manage edge structure automatically
+- You need constrained edge endpoints (FROM/TO tables)
+
+**Use SCHEMAFULL when:**
+
+- Migrating from traditional graph databases
+- Compatibility with existing schemas (e.g., driftnet)
+- You need full control over edge field definitions
+- Working with legacy SurrealDB schemas
 
 ## Indexes
 
@@ -424,10 +500,10 @@ product_table = table_schema(
   indexes=[
     # Unique constraint
     unique_index('sku_idx', ['sku']),
-    
+
     # Full-text search
     search_index('product_search', ['name', 'description']),
-    
+
     # Filtering/sorting
     index('category_price_idx', ['category', 'price']),
     index('created_idx', ['created_at']),
@@ -537,13 +613,13 @@ user_table = table_schema(
 post_permissions = {
   # Anyone can read published posts, author can read drafts
   'select': 'published = true OR author = $auth.id',
-  
+
   # Only authenticated users can create
   'create': '$auth != NONE',
-  
+
   # Only author can update
   'update': 'author = $auth.id',
-  
+
   # Author or admin can delete
   'delete': 'author = $auth.id OR $auth.admin = true',
 }
@@ -705,12 +781,12 @@ fields = [
   # Identity
   string_field('username'),
   string_field('email'),
-  
+
   # Profile
   string_field('name.first'),
   string_field('name.last'),
   string_field('bio'),
-  
+
   # Metadata
   datetime_field('created_at', default='time::now()'),
   datetime_field('updated_at', default='time::now()'),
@@ -815,30 +891,30 @@ product_schema = table_schema(
     string_field('sku', assertion='string::len($value) > 0'),
     string_field('name', assertion='string::len($value) > 0'),
     string_field('slug', assertion='string::len($value) > 0'),
-    
+
     # Details
     string_field('description'),
     array_field('images', default='[]'),
     array_field('tags', default='[]'),
-    
+
     # Pricing
     decimal_field('price', assertion='$value > 0'),
     decimal_field('cost', assertion='$value >= 0'),
     string_field('currency', default='"USD"'),
-    
+
     # Inventory
     int_field('stock', default='0', assertion='$value >= 0'),
     bool_field('in_stock', default='true'),
     int_field('low_stock_threshold', default='10'),
-    
+
     # Organization
     record_field('category', table='category'),
     record_field('brand', table='brand'),
-    
+
     # Status
     bool_field('is_active', default='true'),
     bool_field('is_featured', default='false'),
-    
+
     # Timestamps
     datetime_field('created_at', default='time::now()', readonly=True),
     datetime_field('updated_at', default='time::now()'),

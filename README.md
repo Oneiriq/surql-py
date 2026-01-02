@@ -10,11 +10,14 @@ Reverie is a code-first database toolkit for building modern applications with S
 
 - **Code-First Migrations** - Define and manage database schema changes directly in code with automatic migration generation
 - **Type Safety** - Leverage Python's type hints with Pydantic for validation and reduced runtime errors
+- **Driftnet Compatible** - Full compatibility with driftnet patterns: angle bracket RecordIDs, MTREE vector indexes, SCHEMAFULL edge tables, and result extraction utilities
+- **Vector Search** - Complete MTREE index support with 1024 dimensions, COSINE similarity, and all distance metrics (EUCLIDEAN, MANHATTAN, MINKOWSKI, CHEBYSHEV, HAMMING)
+- **Result Utilities** - Built-in utilities for extracting data from SurrealDB responses ([`extract_result()`](src/query/results.py), [`extract_one()`](src/query/results.py), [`extract_scalar()`](src/query/results.py), [`has_results()`](src/query/results.py))
 - **Functional Composition** - Pure functions and immutable data structures for predictable, testable code
-- **Async-First** - Built with async/await for high-performance database operations
+- **Async-First** - Built with async/await for high-performance database operations with connection pooling and retry logic
 - **Schema Definition** - Declarative schema definitions with fields, indexes, events, and permissions
 - **Query Builder** - Composable, type-safe query building with Pydantic model integration
-- **Graph Traversal** - Native support for SurrealDB's graph features and edge relationships
+- **Graph Traversal** - Native support for SurrealDB's graph features and edge relationships with both TYPE RELATION and SCHEMAFULL modes
 - **CLI Tools** - Comprehensive command-line interface for migrations and database management
 - **Testing Utilities** - Tools to facilitate testing of database interactions
 
@@ -116,7 +119,12 @@ async with get_client(config) as client:
 - [Query Builder & ORM](docs/queries.md) - Querying and CRUD operations
 - [CLI Reference](docs/cli.md) - Command-line interface documentation
 - [API Reference](docs/api/README.md) - Module and function reference
+- [Driftnet Migration Guide](docs/driftnet_migration.md) - Migrating from surrealdb-py to reverie
+- [Compatibility Analysis](plans/compat.md) - Complete driftnet compatibility verification
 - [Examples](docs/examples/) - Working code examples
+  - [MTREE Vector Search](docs/examples/mtree_vector_search.py) - 1024-dim COSINE indexes (driftnet-compatible)
+  - [Driftnet Edge Tables](docs/examples/driftnet_edge_example.py) - SCHEMAFULL edge patterns
+  - [Advanced Queries](docs/examples/advanced_queries.py) - Complex query patterns
 
 ## Architecture
 

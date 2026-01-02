@@ -206,6 +206,57 @@ user = await create_record('user', user_data, client=client)
 users = await query_records('user', User, conditions=['age >= 18'], client=client)
 ```
 
+#### [`results.py`](../../src/query/results.py)
+
+Result wrapper classes and extraction utilities for SurrealDB responses.
+
+**Result Wrappers:**
+
+- `QueryResult[T]` - Generic result container with metadata
+- `RecordResult[T]` - Single record wrapper
+- `ListResult[T]` - Multiple records wrapper
+- `CountResult` - Aggregation result for count operations
+- `AggregateResult` - Generic aggregation result
+- `PaginatedResult[T]` - Paginated result with page metadata
+
+**Result Extraction Utilities (Driftnet-Compatible):**
+
+- `extract_result(result)` - Extract data from nested/flat SurrealDB response formats
+- `extract_one(result)` - Extract first record or None
+- `extract_scalar(result, key, default)` - Extract scalar value from aggregate queries
+- `has_results(result)` - Check if result contains any records
+
+**Example:**
+
+```python
+from src.query.results import extract_result, extract_one, extract_scalar, has_results
+
+# Handle nested format from db.query()
+result = await client.execute('SELECT * FROM user WHERE age > 18')
+records = extract_result(result)  # List of dicts
+
+# Get single record
+result = await client.execute('SELECT * FROM user:alice')
+user = extract_one(result)  # Dict or None
+
+# Extract aggregate values
+result = await client.execute('SELECT count() AS total FROM user')
+count = extract_scalar(result, 'total', 0)  # Scalar value
+
+# Check if results exist
+if has_results(result):
+    records = extract_result(result)
+```
+
+**Why Use Extract Utilities:**
+
+SurrealDB returns responses in different formats depending on the operation:
+
+- Nested format: `[{"result": [{"id": "...", ...}]}]` (from `db.query()`)
+- Flat format: `[{"id": "...", ...}]` (from `db.select()`)
+
+The extraction utilities handle both formats seamlessly, eliminating the need for custom workarounds and making code compatible with driftnet patterns.
+
 #### [`builder.py`](../../src/query/builder.py)
 
 Composable query builder.
@@ -350,25 +401,49 @@ Type definitions and utilities.
 
 #### [`record_id.py`](../../src/types/record_id.py)
 
-RecordID type for SurrealDB record identifiers.
+RecordID type for SurrealDB record identifiers with angle bracket support.
 
 **Key Classes:**
 
-- `RecordID` - Type-safe record ID wrapper
+- `RecordID` - Type-safe record ID wrapper with support for complex IDs
 
 **Key Methods:**
 
-- `parse()` - Parse from string
+- `parse()` - Parse from string (supports both standard and angle bracket formats)
 - `__str__()` - Convert to string
+
+**Supported Formats:**
+
+1. **Standard format**: `table:id` (alphanumeric + underscores)
+2. **Angle bracket format**: `table:⟨complex-id⟩` (driftnet-compatible)
 
 **Example:**
 
 ```python
 from src.types.record_id import RecordID
 
-record_id = RecordID(table='user', id='alice')
-print(record_id)  # user:alice
+# Standard format
+user_rid = RecordID(table='user', id='alice')
+print(user_rid)  # user:alice
+
+# Angle bracket format (driftnet-compatible)
+# Required for IDs with special characters (dots, hyphens, colons, etc.)
+outlet_rid = RecordID.parse('outlet:⟨alaskabeacon.com⟩')
+print(outlet_rid)  # outlet:⟨alaskabeacon.com⟩
+
+# Complex compound IDs
+doc_rid = RecordID.parse('document:⟨alaskabeacon.com:01HQXYZ...⟩')
+print(doc_rid)  # document:⟨alaskabeacon.com:01HQXYZ...⟩
+
+# Why use angle brackets:
+# - Domains: outlet:⟨alaskabeacon.com⟩ (dots in domain)
+# - URLs: page:⟨https://example.com/path⟩ (colons, slashes)
+# - Compound keys: doc:⟨domain:ulid⟩ (multiple parts)
 ```
+
+**Driftnet Compatibility:**
+
+The angle bracket format is valid SurrealDB syntax for escaping complex identifiers. This feature enables full compatibility with driftnet's data model which uses domain names and compound keys as record IDs.
 
 #### [`operators.py`](../../src/types/operators.py)
 

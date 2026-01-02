@@ -1,0 +1,131 @@
+# Changelog
+
+All notable changes to this project will be documented in this file.
+
+The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
+and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
+
+## [0.1.0] - 2026-01-02
+
+### Added
+
+- **Driftnet Compatibility**: Complete compatibility with driftnet patterns achieved
+  - Result extraction utilities for handling SurrealDB response formats
+    - `extract_result()` - Extract data from nested/flat result formats
+    - `extract_one()` - Get first record or None
+    - `extract_scalar()` - Extract aggregate values (COUNT, SUM, AVG, etc.)
+    - `has_results()` - Check if result contains records
+    - Location: [`src/query/results.py:356-514`](src/query/results.py)
+
+  - RecordID angle bracket support for complex IDs
+    - Support for `table:⟨complex-id⟩` format required by SurrealDB
+    - Compatible with domain-based IDs like `outlet:⟨alaskabeacon.com⟩`
+    - Compatible with compound IDs like `document:⟨domain:ulid⟩`
+    - Location: [`src/types/record_id.py:58-77`](src/types/record_id.py)
+
+  - SCHEMAFULL edge table support
+    - `EdgeMode.SCHEMAFULL` for traditional edge tables with explicit in/out fields
+    - `schemafull_edge()` helper function for driftnet-compatible edge definitions
+    - Compatible with entity_relation pattern
+    - Location: [`src/schema/edge.py:11-157`](src/schema/edge.py)
+
+  - Example implementations
+    - [`docs/examples/mtree_vector_search.py`](docs/examples/mtree_vector_search.py) - MTREE vector indexes (1024-dim, COSINE)
+    - [`docs/examples/driftnet_edge_example.py`](docs/examples/driftnet_edge_example.py) - SCHEMAFULL edge table patterns
+
+### Fixed
+
+- **MTREE Index SQL Generation**: Changed from incorrect `FIELDS` keyword to correct `COLUMNS` keyword
+  - Previous (incorrect): `DEFINE INDEX ... ON TABLE ... FIELDS embedding MTREE ...`
+  - Current (correct): `DEFINE INDEX ... ON TABLE ... COLUMNS embedding MTREE ...`
+  - Ensures compatibility with SurrealDB 1.0+ MTREE syntax
+  - Location: [`src/schema/table.py:393`](src/schema/table.py)
+  - Tests: [`tests/test_mtree_diff.py`](tests/test_mtree_diff.py)
+
+- **AsyncSurreal Client Implementation**: Verified correct usage of AsyncSurreal for async operations
+  - Ensures all database operations use proper async/await patterns
+  - Connection pooling and retry logic function correctly
+  - Location: [`src/connection/client.py:9, 89`](src/connection/client.py)
+
+### Changed
+
+- **RecordID Validation**: Enhanced to support both standard and angle bracket formats
+  - Standard format: `table:id` (alphanumeric + underscores)
+  - Angle bracket format: `table:⟨complex-id⟩` (any valid SurrealDB ID)
+  - Backward compatible with existing code
+  - Location: [`src/types/record_id.py`](src/types/record_id.py)
+
+### Documentation
+
+- **Compatibility Analysis**: Complete driftnet compatibility verification report
+  - Status changed from "MIGRATION BLOCKED" to "COMPLETE PARITY ACHIEVED"
+  - Documents all fixes applied and test coverage (447 tests passing)
+  - Migration strategy and benefits analysis
+  - Location: [`plans/compat.md`](plans/compat.md)
+
+- **README Updates**: Added driftnet compatibility highlights
+  - Vector search support (MTREE indexes)
+  - Result extraction utilities
+  - Angle bracket RecordID support
+  - Links to driftnet-compatible examples
+  - Location: [`README.md`](README.md)
+
+- **API Documentation**: Enhanced with result extraction utilities
+  - Documented new result helper functions
+  - Usage examples for SurrealDB response handling
+  - Location: [`docs/api/README.md`](docs/api/README.md)
+
+### Testing
+
+- **Test Coverage**: 447 tests passing
+  - Connection management (async operations, pooling, retry logic)
+  - Schema definition (tables, fields, indexes, edges)
+  - MTREE indexes (SQL generation, diff detection)
+  - RecordID validation (standard and angle bracket formats)
+  - Result extraction (nested/flat formats, aggregates)
+  - CRUD operations (create, read, update, delete)
+  - Query building (select, where, order, limit)
+  - Migration system (up/down, history tracking)
+  - Edge tables (TYPE RELATION and SCHEMAFULL modes)
+  - CLI commands (migrate, schema, db)
+
+### Technical Details
+
+**Files Modified:**
+
+- `src/connection/client.py` - AsyncSurreal client implementation
+- `src/types/record_id.py` - Angle bracket RecordID support
+- `src/schema/table.py` - MTREE SQL generation fix (FIELDS → COLUMNS)
+- `src/schema/edge.py` - SCHEMAFULL edge mode support
+- `src/query/results.py` - Result extraction utilities added
+
+**Files Added:**
+
+- `docs/examples/mtree_vector_search.py` - MTREE vector index examples
+- `docs/examples/driftnet_edge_example.py` - SCHEMAFULL edge table examples
+- `tests/test_mtree_diff.py` - MTREE index diff tests
+- `tests/test_return_format.py` - Result format extraction tests
+
+**Compatibility:**
+
+- SurrealDB 1.0+
+- Python 3.12+
+- Complete driftnet pattern support
+- Backward compatible with existing reverie code
+
+---
+
+## [Unreleased]
+
+### Planned Features
+
+- Auto-migration generation from schema changes
+- Schema validation against live database
+- Advanced vector search query helpers
+- Query result caching
+- Migration squashing
+- Schema visualization tools
+
+---
+
+[0.1.0]: https://github.com/yourusername/reverie/releases/tag/v0.1.0

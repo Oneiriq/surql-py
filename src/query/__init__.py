@@ -102,7 +102,7 @@ from src.query.graph import (
   unrelate as remove_relation,
 )
 
-# Result wrappers
+# Result wrappers and utilities
 from src.query.results import (
   AggregateResult,
   CountResult,
@@ -113,6 +113,10 @@ from src.query.results import (
   RecordResult,
   aggregate,
   count_result,
+  extract_one,
+  extract_result,
+  extract_scalar,
+  has_results,
   paginated,
   record,
   records,
@@ -207,4 +211,11 @@ __all__ = [
   'count_result',
   'aggregate',
   'paginated',
+  # Result extraction utilities
+  'extract_result',
+  'extract_one',
+  'extract_scalar',
+  'has_results',
+  # Return format
+  'ReturnFormat',
 ]

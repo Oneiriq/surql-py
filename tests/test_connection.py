@@ -192,7 +192,7 @@ class TestDatabaseClient:
     """Test successful database connection."""
     client = DatabaseClient(db_config)
 
-    with patch('src.connection.client.Surreal', return_value=mock_surreal_client):
+    with patch('src.connection.client.AsyncSurreal', return_value=mock_surreal_client):
       await client.connect()
 
       assert client.is_connected is True
@@ -209,7 +209,7 @@ class TestDatabaseClient:
     mock_surreal.connect = AsyncMock()
     mock_surreal.use = AsyncMock()
 
-    with patch('src.connection.client.Surreal', return_value=mock_surreal):
+    with patch('src.connection.client.AsyncSurreal', return_value=mock_surreal):
       await client.connect()
 
       assert client.is_connected is True
@@ -231,7 +231,7 @@ class TestDatabaseClient:
     mock_surreal = Mock()
     mock_surreal.connect = AsyncMock(side_effect=Exception('Connection failed'))
 
-    with patch('src.connection.client.Surreal', return_value=mock_surreal):
+    with patch('src.connection.client.AsyncSurreal', return_value=mock_surreal):
       with pytest.raises(ConnectionError) as exc_info:
         await client.connect()
 
@@ -363,7 +363,7 @@ class TestDatabaseClient:
     mock_surreal.use = AsyncMock()
     mock_surreal.close = AsyncMock()
 
-    with patch('src.connection.client.Surreal', return_value=mock_surreal):
+    with patch('src.connection.client.AsyncSurreal', return_value=mock_surreal):
       async with DatabaseClient(db_config) as client:
         assert client.is_connected is True
 
@@ -378,7 +378,7 @@ class TestDatabaseClient:
     mock_surreal.use = AsyncMock()
     mock_surreal.close = AsyncMock()
 
-    with patch('src.connection.client.Surreal', return_value=mock_surreal):
+    with patch('src.connection.client.AsyncSurreal', return_value=mock_surreal):
       async with get_client(db_config) as client:
         assert client.is_connected is True
 

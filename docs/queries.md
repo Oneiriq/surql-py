@@ -9,6 +9,7 @@ This guide covers querying and manipulating data using reverie's type-safe query
 - [Query Builder](#query-builder)
 - [Filtering and Conditions](#filtering-and-conditions)
 - [Graph Traversal](#graph-traversal)
+- [Result Handling](#result-handling)
 - [Transactions](#transactions)
 - [Type Safety](#type-safety)
 - [Advanced Queries](#advanced-queries)
@@ -547,6 +548,188 @@ async def delete_follow(follower_id: str, followed_id: str):
       f"DELETE {follower_id}->follows WHERE out = {followed_id}"
     )
     return result
+```
+
+## Result Handling
+
+### Understanding SurrealDB Result Formats
+
+SurrealDB returns results in two different formats depending on the method used:
+
+1. **Flat format** (from `db.select()`): `[{"id": "...", ...}]`
+2. **Nested format** (from `db.query()`): `[{"result": [{"id": "...", ...}]}]`
+
+Reverie automatically handles both formats in its high-level functions ([`fetch_one()`](src/query/executor.py:59), [`fetch_all()`](src/query/executor.py:107), etc.), but provides utilities for manual extraction when needed.
+
+### Automatic Result Extraction
+
+High-level query functions handle result extraction automatically:
+
+```python
+from src.query.executor import fetch_all, fetch_one
+
+async def query_users():
+  async with get_client(config) as client:
+    query = Query().select().from_table('user')
+    
+    # Automatically extracts and validates results
+    users = await fetch_all(query, User, client)
+    # Returns list[User] - no manual extraction needed
+    
+    return users
+```
+
+### Manual Result Extraction Utilities
+
+For raw queries or when you need manual control:
+
+#### Extract All Results
+
+```python
+from src.query.results import extract_result
+
+async def raw_query_example():
+  async with get_client(config) as client:
+    # db.query() returns nested format
+    result = await client.execute('SELECT * FROM user WHERE age > 18')
+    
+    # Extract to flat list of dicts
+    records = extract_result(result)
+    # [{"id": "user:123", "name": "Alice", ...}, ...]
+    
+    return records
+```
+
+#### Extract Single Record
+
+```python
+from src.query.results import extract_one
+
+async def get_user_raw(user_id: str):
+  async with get_client(config) as client:
+    result = await client.execute(f'SELECT * FROM {user_id}')
+    
+    # Get first record or None
+    user = extract_one(result)
+    # {"id": "user:123", "name": "Alice"} or None
+    
+    return user
+```
+
+#### Extract Scalar Values
+
+For aggregate queries (COUNT, SUM, AVG, etc.):
+
+```python
+from src.query.results import extract_scalar
+
+async def count_users():
+  async with get_client(config) as client:
+    result = await client.execute('SELECT count() as total FROM user GROUP ALL')
+    
+    # Extract scalar value with default
+    total = extract_scalar(result, 'total', default=0)
+    # Returns: 42 (or 0 if no results)
+    
+    return total
+
+async def get_stats():
+  async with get_client(config) as client:
+    result = await client.execute('''
+      SELECT
+        count() as total,
+        avg(age) as avg_age,
+        min(age) as min_age,
+        max(age) as max_age
+      FROM user
+      GROUP ALL
+    ''')
+    
+    # Extract multiple scalar values
+    return {
+      'total': extract_scalar(result, 'total', 0),
+      'avg_age': extract_scalar(result, 'avg_age', 0.0),
+      'min_age': extract_scalar(result, 'min_age', 0),
+      'max_age': extract_scalar(result, 'max_age', 0),
+    }
+```
+
+#### Check if Results Exist
+
+```python
+from src.query.results import has_results
+
+async def user_exists(email: str):
+  async with get_client(config) as client:
+    result = await client.execute(
+      'SELECT * FROM user WHERE email = $email LIMIT 1',
+      {'email': email}
+    )
+    
+    # Check if any records returned
+    return has_results(result)
+```
+
+### Complete Example
+
+```python
+from src.query.results import extract_result, extract_one, extract_scalar, has_results
+
+async def comprehensive_query_example():
+  async with get_client(config) as client:
+    # Check if users exist
+    check_result = await client.execute('SELECT * FROM user LIMIT 1')
+    if not has_results(check_result):
+      print("No users found")
+      return
+    
+    # Get all active users
+    users_result = await client.execute('''
+      SELECT * FROM user WHERE is_active = true
+    ''')
+    users = extract_result(users_result)
+    print(f"Found {len(users)} active users")
+    
+    # Get specific user
+    user_result = await client.execute('SELECT * FROM user:alice')
+    user = extract_one(user_result)
+    if user:
+      print(f"User: {user['name']}")
+    
+    # Get user count
+    count_result = await client.execute('''
+      SELECT count() as total FROM user GROUP ALL
+    ''')
+    total = extract_scalar(count_result, 'total', 0)
+    print(f"Total users: {total}")
+```
+
+### When to Use Each Utility
+
+| Utility | Use Case | Returns |
+|---------|----------|---------|
+| [`extract_result()`](src/query/results.py:363) | Get all records from any query | `list[dict]` |
+| [`extract_one()`](src/query/results.py:416) | Get single record or None | `dict \| None` |
+| [`extract_scalar()`](src/query/results.py:448) | Get single value from aggregate | `Any` |
+| [`has_results()`](src/query/results.py:490) | Check if results exist | `bool` |
+
+### Migration from Direct surrealdb-py
+
+If you're migrating from direct `surrealdb-py` usage:
+
+```python
+# Before (with manual format handling)
+result = await db.query('SELECT * FROM user')
+if result and isinstance(result[0], dict) and 'result' in result[0]:
+  users = result[0]['result']
+else:
+  users = result
+
+# After (with reverie utilities)
+from src.query.results import extract_result
+
+result = await db.query('SELECT * FROM user')
+users = extract_result(result)  # Handles both formats
 ```
 
 ## Transactions

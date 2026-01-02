@@ -373,7 +373,7 @@ class TestSchemaDiff:
       table='documents',
       index='embedding_idx',
       description='Add MTREE index embedding_idx to documents',
-      forward_sql='DEFINE INDEX embedding_idx ON TABLE documents FIELDS embedding MTREE DIMENSION 1536 DIST COSINE TYPE F32;',
+      forward_sql='DEFINE INDEX embedding_idx ON TABLE documents COLUMNS embedding MTREE DIMENSION 1536 DIST COSINE TYPE F32;',
       backward_sql='REMOVE INDEX embedding_idx ON TABLE documents;',
     )
 

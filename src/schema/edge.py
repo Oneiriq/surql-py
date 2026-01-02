@@ -2,7 +2,19 @@
 
 This module provides functions for defining edge schemas for graph relationships
 in SurrealDB.
+
+Two approaches are supported:
+
+1. TYPE RELATION (default): Modern SurrealDB graph edges with automatic in/out fields
+   Example: DEFINE TABLE likes TYPE RELATION FROM user TO post
+
+2. SCHEMAFULL with explicit in/out fields: Traditional approach (driftnet-compatible)
+   Example: DEFINE TABLE likes SCHEMAFULL;
+           DEFINE FIELD in ON TABLE likes TYPE record<user>;
+           DEFINE FIELD out ON TABLE likes TYPE record<post>;
 """
+
+import enum
 
 from pydantic import BaseModel, ConfigDict
 
@@ -10,12 +22,36 @@ from src.schema.fields import FieldDefinition
 from src.schema.table import EventDefinition, IndexDefinition
 
 
+class EdgeMode(str, enum.Enum):
+  """Edge table mode.
+
+  Defines how edge tables are created in SurrealDB.
+  """
+
+  RELATION = 'RELATION'  # TYPE RELATION (default, automatic in/out)
+  SCHEMAFULL = 'SCHEMAFULL'  # Explicit schema with in/out fields
+  SCHEMALESS = 'SCHEMALESS'  # Flexible schema
+
+
 class EdgeDefinition(BaseModel):
   """Immutable edge/relationship schema definition.
 
   Represents a graph edge between tables with optional constraints and fields.
 
+  Two modes are supported:
+
+  1. RELATION (default): Uses TYPE RELATION for automatic in/out fields
+     - from_table/to_table constrain the edge endpoints
+     - in/out fields are automatically created by SurrealDB
+     - Additional fields can be added for edge properties
+
+  2. SCHEMAFULL: Traditional table with explicit in/out field definitions
+     - Compatible with driftnet and traditional SurrealDB schemas
+     - Requires explicit in/out fields in the fields list
+     - Provides more control over field constraints
+
   Examples:
+    TYPE RELATION edge (default):
     >>> edge = EdgeDefinition(
     ...   name='likes',
     ...   from_table='user',
@@ -24,11 +60,24 @@ class EdgeDefinition(BaseModel):
     ...     datetime_field('created_at', default='time::now()'),
     ...   ]
     ... )
+
+    SCHEMAFULL edge (driftnet-compatible):
+    >>> edge = EdgeDefinition(
+    ...   name='entity_relation',
+    ...   mode=EdgeMode.SCHEMAFULL,
+    ...   fields=[
+    ...     record_field('in', table='entity'),
+    ...     record_field('out', table='entity'),
+    ...     string_field('relation_type'),
+    ...     float_field('confidence'),
+    ...   ]
+    ... )
   """
 
   name: str
-  from_table: str | None = None  # If None, allows edges from any table
-  to_table: str | None = None  # If None, allows edges to any table
+  mode: EdgeMode = EdgeMode.RELATION
+  from_table: str | None = None  # Used with RELATION mode
+  to_table: str | None = None  # Used with RELATION mode
   fields: list[FieldDefinition] = []
   indexes: list[IndexDefinition] = []
   events: list[EventDefinition] = []
@@ -43,6 +92,7 @@ class EdgeDefinition(BaseModel):
 def edge_schema(
   name: str,
   *,
+  mode: EdgeMode = EdgeMode.RELATION,
   from_table: str | None = None,
   to_table: str | None = None,
   fields: list[FieldDefinition] | None = None,
@@ -56,8 +106,9 @@ def edge_schema(
 
   Args:
     name: Edge table name
-    from_table: Optional constraint on source table (None allows any table)
-    to_table: Optional constraint on target table (None allows any table)
+    mode: Edge mode (RELATION, SCHEMAFULL, or SCHEMALESS)
+    from_table: Optional constraint on source table (used with RELATION mode)
+    to_table: Optional constraint on target table (used with RELATION mode)
     fields: List of field definitions for edge properties
     indexes: List of index definitions
     events: List of event definitions
@@ -67,14 +118,18 @@ def edge_schema(
     Immutable EdgeDefinition instance
 
   Examples:
-    Basic edge without constraints:
-    >>> edge = edge_schema('likes')
+    TYPE RELATION edge (default):
+    >>> edge = edge_schema('likes', from_table='user', to_table='post')
 
-    Edge with table constraints:
+    SCHEMAFULL edge (driftnet-compatible):
     >>> edge = edge_schema(
-    ...   'follows',
-    ...   from_table='user',
-    ...   to_table='user',
+    ...   'entity_relation',
+    ...   mode=EdgeMode.SCHEMAFULL,
+    ...   fields=[
+    ...     record_field('in', table='entity'),
+    ...     record_field('out', table='entity'),
+    ...     string_field('relation_type'),
+   ... ]
     ... )
 
     Edge with fields:
@@ -90,6 +145,7 @@ def edge_schema(
   """
   return EdgeDefinition(
     name=name,
+    mode=mode,
     from_table=from_table,
     to_table=to_table,
     fields=fields or [],
@@ -100,6 +156,28 @@ def edge_schema(
 
 
 # Functional composition helpers
+
+
+def with_edge_mode(
+  edge: EdgeDefinition,
+  mode: EdgeMode,
+) -> EdgeDefinition:
+  """Set the edge table mode.
+
+  Pure function that returns a new edge with the mode set.
+
+  Args:
+    edge: Existing edge definition
+    mode: Edge mode (RELATION, SCHEMAFULL, or SCHEMALESS)
+
+  Returns:
+    New EdgeDefinition with mode set
+
+  Examples:
+    >>> edge = edge_schema('likes')
+    >>> edge = with_edge_mode(edge, EdgeMode.SCHEMAFULL)
+  """
+  return edge.model_copy(update={'mode': mode})
 
 
 def with_from_table(

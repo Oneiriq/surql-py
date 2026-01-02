@@ -1,7 +1,8 @@
 """Result wrapper classes for query execution.
 
 This module provides generic result containers for different query types,
-with support for pagination and metadata.
+with support for pagination and metadata, plus utilities for extracting
+data from raw SurrealDB responses.
 """
 
 from typing import Any, TypeVar
@@ -347,3 +348,167 @@ def paginated[T: BaseModel](
   )
 
   return PaginatedResult(items=items, page_info=page_info)
+
+
+# Raw result extraction utilities
+
+
+def extract_result(result: Any) -> list[dict[str, Any]]:
+  """Extract result data from raw SurrealDB response.
+
+  Handles both flat and nested result formats returned by SurrealDB:
+  - Flat format (from db.select): [{"id": "...", ...}]
+  - Nested format (from db.query): [{"result": [{"id": "...", ...}]}]
+
+  This eliminates the need for custom workarounds when working with
+  different SurrealDB client methods.
+
+  Args:
+    result: Raw SurrealDB query/select response
+
+  Returns:
+    List of record dictionaries, empty list if no results
+
+  Examples:
+    >>> # Nested format from db.query()
+    >>> result = [{"result": [{"id": "user:123", "name": "Alice"}]}]
+    >>> extract_result(result)
+    [{"id": "user:123", "name": "Alice"}]
+
+    >>> # Flat format from db.select()
+    >>> result = [{"id": "user:123", "name": "Alice"}]
+    >>> extract_result(result)
+    [{"id": "user:123", "name": "Alice"}]
+
+    >>> # Empty result
+    >>> extract_result([])
+    []
+
+    >>> # Aggregate results (flat format)
+    >>> result = [{"count": 42}]
+    >>> extract_result(result)
+    [{"count": 42}]
+  """
+  if result is None:
+    return []
+
+  # Handle list results
+  if isinstance(result, list) and len(result) > 0:
+    # Check if it's nested format with 'result' key
+    if isinstance(result[0], dict) and 'result' in result[0]:
+      # Extract all results from nested format
+      extracted = []
+      for item in result:
+        if isinstance(item, dict) and 'result' in item:
+          res = item['result']
+          if isinstance(res, list):
+            extracted.extend(res)
+          elif res is not None:
+            extracted.append(res)
+      return extracted if extracted else []
+    else:
+      # Already flat format (includes records with 'id' and aggregate results)
+      return result
+
+  # Handle single result object with 'result' key
+  if isinstance(result, dict) and 'result' in result:
+    res = result['result']
+    if isinstance(res, list):
+      return res
+    return [res] if res is not None else []
+
+  # Empty or unrecognized format
+  return []
+
+
+def extract_one(result: Any) -> dict[str, Any] | None:
+  """Extract a single record from raw SurrealDB result.
+
+  Useful for queries expected to return a single record.
+
+  Args:
+    result: Raw SurrealDB query/select response
+
+  Returns:
+    First record dict if found, None otherwise
+
+  Examples:
+    >>> result = [{"result": [{"id": "user:123", "name": "Alice"}]}]
+    >>> extract_one(result)
+    {"id": "user:123", "name": "Alice"}
+
+    >>> extract_one([])
+    None
+
+    >>> # Works with flat format too
+    >>> result = [{"id": "user:123", "name": "Alice"}]
+    >>> extract_one(result)
+    {"id": "user:123", "name": "Alice"}
+  """
+  records = extract_result(result)
+  return records[0] if records else None
+
+
+def extract_scalar(result: Any, key: str, default: Any = 0) -> Any:
+  """Extract a scalar value from aggregate query result.
+
+  Useful for COUNT, SUM, AVG, MIN, MAX and other aggregate operations
+  that return a single value in a named field.
+
+  Args:
+    result: Raw SurrealDB query result
+    key: Key name to extract from first record
+    default: Default value if key not found or result is empty
+
+  Returns:
+    Scalar value from the specified key, or default if not found
+
+  Examples:
+    >>> # COUNT query
+    >>> result = [{"result": [{"count": 42}]}]
+    >>> extract_scalar(result, 'count')
+    42
+
+    >>> # AVG query
+    >>> result = [{"result": [{"avg": 25.5}]}]
+    >>> extract_scalar(result, 'avg')
+    25.5
+
+    >>> # Empty result
+    >>> extract_scalar([], 'count', default=0)
+    0
+
+    >>> # Missing key
+    >>> result = [{"id": "user:123"}]
+    >>> extract_scalar(result, 'total', default=0)
+    0
+  """
+  record = extract_one(result)
+  return record.get(key, default) if record else default
+
+
+def has_results(result: Any) -> bool:
+  """Check if SurrealDB result contains any records.
+
+  Args:
+    result: Raw SurrealDB query/select response
+
+  Returns:
+    True if result has one or more records, False otherwise
+
+  Examples:
+    >>> has_results([{"result": [{"id": "user:123"}]}])
+    True
+
+    >>> has_results([])
+    False
+
+    >>> # Works with flat format
+    >>> has_results([{"id": "user:123"}])
+    True
+
+    >>> # Empty nested result
+    >>> has_results([{"result": []}])
+    False
+  """
+  return len(extract_result(result)) > 0

@@ -7,6 +7,7 @@
 - Built on functional composition patterns with immutable data structures
 - Integrates Pydantic for runtime validation and type safety
 - Supports SurrealDB's graph features including edge relationships and graph traversal
+- Supports vector similarity search through MTREE indexes for AI/ML embeddings
 - **Requirements**: Python 3.12+ and SurrealDB 1.0+
 - **Version**: 0.1.0 (Alpha)
 - **License**: Apache 2.0
@@ -28,7 +29,7 @@
 - Install with uv: `uv sync`
 - Install in editable mode: `pip install -e .`
 
-## From Source with pyproject.tom (Currently Recommended)
+## From Source with pyproject.toml (Currently Recommended)
 - Update the other project's `pyproject.toml` to include reverie as a dependency with:
     ```toml
     # Other project's pyproject.toml
@@ -445,6 +446,206 @@
 - Authors of liked posts: `'->likes->post<-authored<-user'`
 - Chain as needed: Up to practical depth limits
 
+# Vector Operations
+
+## MTREE Vector Indexes
+
+### Overview
+- Reverie supports vector similarity search through MTREE indexes in SurrealDB
+- MTREE indexes enable efficient nearest-neighbor search for embeddings and vectors
+- Supports multiple distance metrics and vector data types
+- Ideal for AI/ML applications with embeddings (OpenAI, sentence transformers, etc.)
+
+### Distance Metrics
+- Import: `from src.schema.table import MTreeDistanceType`
+- `MTreeDistanceType.COSINE`: Cosine similarity (ideal for normalized vectors like embeddings)
+- `MTreeDistanceType.EUCLIDEAN`: Euclidean distance (L2 norm, default)
+- `MTreeDistanceType.MANHATTAN`: Manhattan distance (L1 norm)
+- `MTreeDistanceType.MINKOWSKI`: Minkowski distance
+
+### Vector Data Types
+- Import: `from src.schema.table import MTreeVectorType`
+- `MTreeVectorType.F64`: 64-bit floating point (default, highest precision)
+- `MTreeVectorType.F32`: 32-bit floating point (recommended for embeddings)
+- `MTreeVectorType.I64`: 64-bit integer
+- `MTreeVectorType.I32`: 32-bit integer
+- `MTreeVectorType.I16`: 16-bit integer
+
+### Creating MTREE Indexes
+- Import: `from src.schema.table import mtree_index, MTreeDistanceType, MTreeVectorType`
+- Basic: `mtree_index('embedding_idx', 'embedding', 1536)`
+- With distance metric: `mtree_index('embedding_idx', 'embedding', 1536, distance=MTreeDistanceType.COSINE)`
+- With vector type: `mtree_index('embedding_idx', 'embedding', 1536, distance=MTreeDistanceType.COSINE, vector_type=MTreeVectorType.F32)`
+- Parameters:
+  * `name`: Index name (required)
+  * `column`: Column containing vector data (required)
+  * `dimension`: Number of dimensions in the vector (required)
+  * `distance`: Distance metric (optional, default: EUCLIDEAN)
+  * `vector_type`: Vector component data type (optional, default: F64)
+
+### OpenAI Embeddings Example
+```python
+from src.schema import (
+  table_schema,
+  with_fields,
+  with_indexes,
+  mtree_index,
+  array_field,
+  string_field,
+  MTreeDistanceType,
+  MTreeVectorType,
+)
+
+documents = table_schema('documents')
+documents = with_fields(
+  documents,
+  string_field('title'),
+  string_field('content'),
+  array_field('embedding'),  # Store embedding vector as array
+)
+documents = with_indexes(
+  documents,
+  mtree_index(
+    'embedding_idx',
+    'embedding',
+    1536,  # OpenAI embedding dimension
+    distance=MTreeDistanceType.COSINE,
+    vector_type=MTreeVectorType.F32,
+  ),
+)
+```
+
+### Custom Vector Index Example
+```python
+# Image feature vectors with Euclidean distance
+images = table_schema('images')
+images = with_fields(
+  images,
+  string_field('filename'),
+  array_field('features'),
+)
+images = with_indexes(
+  images,
+  mtree_index(
+    'feature_idx',
+    'features',
+    512,  # Custom vector dimension
+    distance=MTreeDistanceType.EUCLIDEAN,
+    vector_type=MTreeVectorType.F32,
+  ),
+)
+```
+
+### Multiple Vector Indexes
+```python
+# Table with multiple vector fields
+products = table_schema('products')
+products = with_fields(
+  products,
+  string_field('name'),
+  string_field('description'),
+  array_field('text_embedding'),
+  array_field('image_embedding'),
+)
+products = with_indexes(
+  products,
+  mtree_index(
+    'text_idx',
+    'text_embedding',
+    1536,
+    distance=MTreeDistanceType.COSINE,
+    vector_type=MTreeVectorType.F32,
+  ),
+  mtree_index(
+    'image_idx',
+    'image_embedding',
+    512,
+    distance=MTreeDistanceType.EUCLIDEAN,
+    vector_type=MTreeVectorType.F32,
+  ),
+)
+```
+
+### Generated SQL
+- MTREE indexes generate SurrealDB DEFINE INDEX statements
+- Example: `DEFINE INDEX embedding_idx ON TABLE documents FIELDS embedding MTREE DIMENSION 1536 DIST COSINE TYPE F32;`
+- Migrations automatically handle creation and removal
+- Use `reverie migrate up` to apply MTREE indexes to database
+
+### Vector Similarity Search
+- After creating MTREE index, use SurrealDB's vector search syntax
+- Raw query example: `SELECT * FROM documents WHERE embedding <|2,1536|> [0.1, 0.2, ...] LIMIT 10`
+- Search returns nearest neighbors based on configured distance metric
+- Note: High-level query helpers for vector search are planned for future releases
+
+### Choosing Distance Metrics
+- **COSINE**: Use for normalized vectors (embeddings from ML models like OpenAI, Cohere, sentence transformers)
+- **EUCLIDEAN**: Use for general-purpose vectors, image features, unnormalized data
+- **MANHATTAN**: Use for high-dimensional sparse vectors, grid-like data
+- **MINKOWSKI**: Use for specialized distance calculations
+
+### Choosing Vector Types
+- **F32**: Recommended for ML embeddings (balances precision and memory)
+- **F64**: Use when maximum precision is required
+- **I16/I32/I64**: Use for quantized or integer-based vectors
+
+### Performance Considerations
+- MTREE indexes improve query performance for similarity search
+- Index creation time increases with vector dimension and dataset size
+- F32 uses less memory than F64 while maintaining good precision for embeddings
+- COSINE distance is optimized for normalized vectors
+
+### Migration Example
+```python
+"""Migration: Add vector search to documents"""
+from src.schema import (
+  table_schema,
+  with_fields,
+  with_indexes,
+  mtree_index,
+  array_field,
+  string_field,
+  MTreeDistanceType,
+  MTreeVectorType,
+)
+
+def upgrade():
+  """Add MTREE index for embeddings."""
+  return [
+    table_schema(
+      'documents',
+      fields=[
+        string_field('title'),
+        string_field('content'),
+        array_field('embedding'),
+      ],
+      indexes=[
+        mtree_index(
+          'embedding_idx',
+          'embedding',
+          1536,
+          distance=MTreeDistanceType.COSINE,
+          vector_type=MTreeVectorType.F32,
+        ),
+      ],
+    )
+  ]
+
+def downgrade():
+  """Remove MTREE index."""
+  return [
+    table_schema(
+      'documents',
+      fields=[
+        string_field('title'),
+        string_field('content'),
+        array_field('embedding'),
+      ],
+      indexes=[],  # Remove all indexes
+    )
+  ]
+```
+
 # Migration System
 
 ## Migration File Structure
@@ -540,19 +741,19 @@ def downgrade():
 ## Rolling Back Migrations
 
 ### Rollback Last Migration
-- Command: `ethereal migrate down`
+- Command: `reverie migrate down`
 - Rolls back most recent migration
 - Executes downgrade function
 - Requires confirmation by default
 
 ### Rollback Multiple
-- Command: `ethereal migrate down --steps 3`
+- Command: `reverie migrate down --steps 3`
 - Rollback last 3 migrations
 - Applied in reverse order
 - Use with caution
 
 ### Dry Run Rollback
-- Command: `ethereal migrate down --dry-run`
+- Command: `reverie migrate down --dry-run`
 - Preview rollback operations
 - No database changes
 - Recommended before actual rollback
@@ -560,19 +761,19 @@ def downgrade():
 ## Migration Status and History
 
 ### Check Status
-- Command: `ethereal migrate status`
+- Command: `reverie migrate status`
 - Shows applied vs pending migrations
 - Table format by default
-- JSON format: `ethereal migrate status --format json`
+- JSON format: `reverie migrate status --format json`
 
 ### View History
-- Command: `ethereal migrate history`
+- Command: `reverie migrate history`
 - Shows all applied migrations
 - Includes timestamps and execution time
 - Stored in `_migration_history` table
 
 ### Validate Migrations
-- Command: `ethereal migrate validate`
+- Command: `reverie migrate validate`
 - Checks migration files for errors
 - Validates file naming
 - Checks for duplicate versions
@@ -645,60 +846,60 @@ def downgrade():
 
 ## Migration Commands
 
-### ethereal migrate up
+### reverie migrate up
 - Apply pending migrations to database
 - Options: `--directory PATH`, `--steps N`, `--dry-run`, `--verbose`
-- Example: `ethereal migrate up --steps 3 --dry-run`
+- Example: `reverie migrate up --steps 3 --dry-run`
 
-### ethereal migrate down
+### reverie migrate down
 - Rollback last applied migration(s)
 - Options: `--directory PATH`, `--steps N` (default: 1), `--dry-run`, `--verbose`
-- Example: `ethereal migrate down --steps 2`
+- Example: `reverie migrate down --steps 2`
 
-### ethereal migrate status
+### reverie migrate status
 - Show migration status (applied vs pending)
 - Options: `--directory PATH`, `--format FORMAT` (table/json/yaml), `--verbose`
-- Example: `ethereal migrate status --format json`
+- Example: `reverie migrate status --format json`
 
-### ethereal migrate history
+### reverie migrate history
 - Show applied migrations from database
 - Options: `--format FORMAT` (table/json/yaml), `--verbose`
-- Example: `ethereal migrate history`
+- Example: `reverie migrate history`
 
-### ethereal migrate create
+### reverie migrate create
 - Create new migration file
-- Usage: `ethereal migrate create "Description"`
+- Usage: `reverie migrate create "Description"`
 - Options: `--directory PATH`, `--verbose`
-- Example: `ethereal migrate create "Add indexes"`
+- Example: `reverie migrate create "Add indexes"`
 
-### ethereal migrate validate
+### reverie migrate validate
 - Validate migration files for errors
 - Options: `--directory PATH`, `--verbose`
-- Example: `ethereal migrate validate`
+- Example: `reverie migrate validate`
 
-### ethereal migrate generate
+### reverie migrate generate
 - Generate migration from schema changes (planned feature)
-- Usage: `ethereal migrate generate "Description"`
+- Usage: `reverie migrate generate "Description"`
 - Currently creates blank migration
 
 ## Schema Commands
 
-### ethereal schema show
+### reverie schema show
 - Display database or table schema
-- Usage: `ethereal schema show [TABLE]`
-- Show all: `ethereal schema show`
-- Show table: `ethereal schema show user`
+- Usage: `reverie schema show [TABLE]`
+- Show all: `reverie schema show`
+- Show table: `reverie schema show user`
 
 ## Database Commands
 
-### ethereal db ping
+### reverie db ping
 - Check database connection
-- Usage: `ethereal db ping`
+- Usage: `reverie db ping`
 - Returns connection status
 
-### ethereal db info
+### reverie db info
 - Show database information
-- Usage: `ethereal db info`
+- Usage: `reverie db info`
 - Shows connection details and statistics
 
 ## Output Formats

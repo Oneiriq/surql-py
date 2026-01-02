@@ -6,7 +6,7 @@ from contextlib import asynccontextmanager
 from typing import Any
 
 import structlog
-from surrealdb import Surreal
+from surrealdb import AsyncSurreal
 from tenacity import (
   AsyncRetrying,
   RetryError,
@@ -86,7 +86,7 @@ class DatabaseClient:
         with attempt:
           self._log.info('connecting_to_database', attempt=attempt.retry_state.attempt_number)
 
-          self._client = Surreal(self._config.url)
+          self._client = AsyncSurreal(self._config.url)
           await self._client.connect()
 
           if self._config.username and self._config.password:

@@ -87,6 +87,9 @@ addopts = [
 markers = [
   "asyncio: mark test as async",
 ]
+filterwarnings = [
+  "ignore:Remove `format_exc_info` from your processor chain:UserWarning:structlog",
+]
 
 [tool.coverage.run]
 source = ["src"]

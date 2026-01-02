@@ -9,6 +9,7 @@ from typing import Any
 from unittest.mock import AsyncMock, Mock
 
 import pytest
+import structlog
 from pydantic import BaseModel
 
 from src.connection.client import DatabaseClient
@@ -16,6 +17,25 @@ from src.connection.config import ConnectionConfig
 from src.schema.fields import FieldDefinition, FieldType
 from src.schema.table import IndexDefinition, IndexType, TableDefinition, TableMode
 from src.types.record_id import RecordID
+
+
+# Configure structlog for testing to avoid warnings
+@pytest.fixture(scope='session', autouse=True)
+def configure_structlog():
+  """Configure structlog for testing to suppress default processor warnings."""
+  structlog.configure(
+    processors=[
+      structlog.contextvars.merge_contextvars,
+      structlog.processors.add_log_level,
+      structlog.processors.TimeStamper(fmt='iso'),
+      structlog.processors.ExceptionRenderer(),
+      structlog.dev.ConsoleRenderer(),
+    ],
+    wrapper_class=structlog.make_filtering_bound_logger(20),
+    context_class=dict,
+    logger_factory=structlog.PrintLoggerFactory(),
+    cache_logger_on_first_use=False,
+  )
 
 # Test data models
 

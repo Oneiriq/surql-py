@@ -6,6 +6,7 @@ in a functional, composable way.
 
 from src.schema.edge import (
   EdgeDefinition,
+  EdgeMode,
   bidirectional_edge,
   edge_schema,
   typed_edge,
@@ -85,6 +86,7 @@ __all__ = [
   'with_permissions',
   'set_mode',
   # Edge schema
+  'EdgeMode',
   'EdgeDefinition',
   'edge_schema',
   'with_from_table',

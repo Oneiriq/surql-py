@@ -433,18 +433,28 @@ def _generate_modify_permissions_diff(
 
 def _generate_add_edge_diffs(edge: EdgeDefinition) -> list[SchemaDiff]:
   """Generate diffs for adding a new edge."""
+  from src.schema.edge import EdgeMode
+
   diffs: list[SchemaDiff] = []
 
-  # Edge table definition
-  forward_sql = f'DEFINE TABLE {edge.name} TYPE RELATION'
+  # Edge table definition - varies by mode
+  if edge.mode == EdgeMode.RELATION:
+    # TYPE RELATION syntax
+    forward_sql = f'DEFINE TABLE {edge.name} TYPE RELATION'
 
-  if edge.from_table:
-    forward_sql += f' FROM {edge.from_table}'
+    if edge.from_table:
+      forward_sql += f' FROM {edge.from_table}'
 
-  if edge.to_table:
-    forward_sql += f' TO {edge.to_table}'
+    if edge.to_table:
+      forward_sql += f' TO {edge.to_table}'
 
-  forward_sql += ';'
+    forward_sql += ';'
+  elif edge.mode == EdgeMode.SCHEMAFULL:
+    # Traditional SCHEMAFULL table
+    forward_sql = f'DEFINE TABLE {edge.name} SCHEMAFULL;'
+  else:  # SCHEMALESS
+    forward_sql = f'DEFINE TABLE {edge.name} SCHEMALESS;'
+
   backward_sql = f'REMOVE TABLE {edge.name};'
 
   diffs.append(
@@ -464,6 +474,10 @@ def _generate_add_edge_diffs(edge: EdgeDefinition) -> list[SchemaDiff]:
   # Add edge indexes
   for index in edge.indexes:
     diffs.append(_generate_add_index_diff(edge.name, index))
+
+  # Add edge events
+  for event in edge.events:
+    diffs.append(_generate_add_event_diff(edge.name, event))
 
   return diffs
 
@@ -546,7 +560,7 @@ def _mtree_index_to_sql(table_name: str, index: IndexDefinition) -> str:
 
   Examples:
     >>> _mtree_index_to_sql('documents', mtree_index('emb_idx', 'embedding', 1536))
-    'DEFINE INDEX emb_idx ON TABLE documents FIELDS embedding MTREE DIMENSION 1536 DIST EUCLIDEAN TYPE F64;'
+    'DEFINE INDEX emb_idx ON TABLE documents COLUMNS embedding MTREE DIMENSION 1536 DIST EUCLIDEAN TYPE F64;'
   """
   if not index.dimension:
     msg = f'MTREE index {index.name} must have dimension specified'
@@ -555,7 +569,7 @@ def _mtree_index_to_sql(table_name: str, index: IndexDefinition) -> str:
   # MTREE indexes only support single column
   field_name = index.columns[0] if index.columns else ''
 
-  sql = f'DEFINE INDEX {index.name} ON TABLE {table_name} FIELDS {field_name} MTREE DIMENSION {index.dimension}'
+  sql = f'DEFINE INDEX {index.name} ON TABLE {table_name} COLUMNS {field_name} MTREE DIMENSION {index.dimension}'
 
   # Add optional distance metric
   if index.distance:

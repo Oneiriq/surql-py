@@ -1,8 +1,10 @@
 """RecordID type wrapper for SurrealDB record identifiers.
 
 This module provides a type-safe wrapper for SurrealDB record IDs (table:id format).
+Supports angle bracket syntax for complex IDs containing special characters.
 """
 
+import re
 from typing import Any, TypeVar
 
 from pydantic import BaseModel, ConfigDict, field_validator
@@ -15,6 +17,7 @@ class RecordID[T](BaseModel):
 
   Represents a SurrealDB record ID in the format table:id.
   Supports generic typing for table types to enable type safety.
+  Automatically uses angle bracket syntax for IDs with special characters.
 
   Examples:
     Basic usage:
@@ -22,12 +25,22 @@ class RecordID[T](BaseModel):
     >>> str(record_id)
     'user:alice'
 
+    Complex IDs with angle brackets:
+    >>> record_id = RecordID(table='outlet', id='alaskabeacon.com')
+    >>> str(record_id)
+    'outlet:⟨alaskabeacon.com⟩'
+
     Parse from string:
     >>> record_id = RecordID.parse('user:123')
     >>> record_id.table
     'user'
     >>> record_id.id
     '123'
+
+    Parse angle bracket syntax:
+    >>> record_id = RecordID.parse('outlet:⟨alaskabeacon.com⟩')
+    >>> record_id.id
+    'alaskabeacon.com'
 
     Type-safe with generics:
     >>> UserID = RecordID[User]
@@ -62,13 +75,37 @@ class RecordID[T](BaseModel):
 
     return v
 
+  @staticmethod
+  def _needs_angle_brackets(id_value: str | int) -> bool:
+    """Check if an ID requires angle bracket syntax.
+
+    Args:
+      id_value: The ID value to check
+
+    Returns:
+      True if angle brackets are needed, False otherwise
+    """
+    # Integers never need angle brackets
+    if isinstance(id_value, int):
+      return False
+
+    # Simple alphanumeric IDs with underscores don't need brackets
+    # Pattern: only alphanumeric and underscores
+    # Everything else needs angle brackets (dots, hyphens, colons, etc.)
+    return not re.match(r'^[a-zA-Z0-9_]+$', id_value)
+
   def __str__(self) -> str:
     """Return string representation in table:id format.
 
+    Automatically adds angle brackets for complex IDs.
+
     Returns:
-      String in format 'table:id'
+      String in format 'table:id' or 'table:⟨id⟩'
     """
-    return f'{self.table}:{self.id}'
+    id_str = str(self.id)
+    if self._needs_angle_brackets(self.id):
+      return f'{self.table}:⟨{id_str}⟩'
+    return f'{self.table}:{id_str}'
 
   def __repr__(self) -> str:
     """Return detailed representation.
@@ -82,8 +119,10 @@ class RecordID[T](BaseModel):
   def parse(cls, record_id: str) -> 'RecordID[Any]':
     """Parse RecordID from string format.
 
+    Supports both simple and angle bracket syntax.
+
     Args:
-      record_id: String in format 'table:id'
+      record_id: String in format 'table:id' or 'table:⟨id⟩'
 
     Returns:
       RecordID instance
@@ -97,6 +136,9 @@ class RecordID[T](BaseModel):
 
       >>> RecordID.parse('post:123')
       RecordID(table='post', id=123)
+
+      >>> RecordID.parse('outlet:⟨alaskabeacon.com⟩')
+      RecordID(table='outlet', id='alaskabeacon.com')
     """
     if ':' not in record_id:
       raise ValueError(f'Invalid record ID format: {record_id}. Expected format: table:id')
@@ -106,6 +148,10 @@ class RecordID[T](BaseModel):
       raise ValueError(f'Invalid record ID format: {record_id}. Expected format: table:id')
 
     table, id_str = parts
+
+    # Strip angle brackets if present
+    if id_str.startswith('⟨') and id_str.endswith('⟩'):
+      id_str = id_str[1:-1]
 
     # Try to parse as int, otherwise keep as string
     try:
