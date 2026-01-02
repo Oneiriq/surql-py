@@ -20,7 +20,6 @@ from src.cli.common import (
   display_panel,
   display_success,
   display_warning,
-  dry_run_option,
   format_output,
   get_migrations_directory,
   handle_error,
@@ -55,7 +54,7 @@ def migrate_up(
   steps: Annotated[
     int | None, typer.Option('--steps', '-n', help='Number of migrations to apply (default: all)')
   ] = None,
-  dry_run: Annotated[bool, dry_run_option] = False,
+  dry_run: bool = typer.Option(False, '--dry-run', help='Preview changes without applying'),
   verbose: Annotated[bool, verbose_option] = False,
 ) -> None:
   """Apply pending migrations to the database.
@@ -156,7 +155,7 @@ async def _migrate_up_async(
 def migrate_down(
   directory: Annotated[Path | None, directory_option] = None,
   steps: Annotated[int, typer.Option('--steps', '-n', help='Number of migrations to rollback')] = 1,
-  dry_run: Annotated[bool, dry_run_option] = False,
+  dry_run: bool = typer.Option(False, '--dry-run', help='Preview changes without applying'),
   verbose: Annotated[bool, verbose_option] = False,
 ) -> None:
   """Rollback applied migrations.
