@@ -29,6 +29,7 @@ dmypy.json
 .pytype/
 
 # Distribution / packaging
+.ruff_cache/
 dist/
 build/
 *.egg-info/
