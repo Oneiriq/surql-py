@@ -136,7 +136,7 @@ class TestMigrateCommands:
 
   def setup_method(self) -> None:
     """Set up test resources."""
-    self.runner = CliRunner()
+    self.runner = CliRunner(env={'NO_COLOR': '1'})
 
   def test_migrate_app_exists(self) -> None:
     """Test that migrate app exists."""
@@ -268,7 +268,7 @@ class TestCLIErrorHandling:
 
   def setup_method(self) -> None:
     """Set up test resources."""
-    self.runner = CliRunner()
+    self.runner = CliRunner(env={'NO_COLOR': '1'})
 
   def test_migrate_create_error_handling(self) -> None:
     """Test error handling in migrate create."""
@@ -294,7 +294,7 @@ class TestCLIFormats:
 
   def setup_method(self) -> None:
     """Set up test resources."""
-    self.runner = CliRunner()
+    self.runner = CliRunner(env={'NO_COLOR': '1'})
 
   def test_migrate_status_table_format(self) -> None:
     """Test status with table format (default)."""
@@ -324,7 +324,7 @@ class TestCLIVerboseOption:
 
   def setup_method(self) -> None:
     """Set up test resources."""
-    self.runner = CliRunner()
+    self.runner = CliRunner(env={'NO_COLOR': '1'})
 
   def test_migrate_create_verbose(self, tmp_path: Path) -> None:
     """Test migrate create with verbose option."""
@@ -352,7 +352,7 @@ class TestCLIDryRunOption:
 
   def setup_method(self) -> None:
     """Set up test resources."""
-    self.runner = CliRunner()
+    self.runner = CliRunner(env={'NO_COLOR': '1'})
 
   def test_dry_run_option_available_up(self) -> None:
     """Test that dry-run option is available for up command."""
@@ -374,7 +374,7 @@ class TestCLIDirectoryOption:
 
   def setup_method(self) -> None:
     """Set up test resources."""
-    self.runner = CliRunner()
+    self.runner = CliRunner(env={'NO_COLOR': '1'})
 
   def test_directory_option_available(self) -> None:
     """Test that directory option is available."""
@@ -406,7 +406,7 @@ class TestCLIStepsOption:
 
   def setup_method(self) -> None:
     """Set up test resources."""
-    self.runner = CliRunner()
+    self.runner = CliRunner(env={'NO_COLOR': '1'})
 
   def test_steps_option_available_up(self) -> None:
     """Test that steps option is available for up command."""
@@ -428,7 +428,7 @@ class TestCLIGenerateCommand:
 
   def setup_method(self) -> None:
     """Set up test resources."""
-    self.runner = CliRunner()
+    self.runner = CliRunner(env={'NO_COLOR': '1'})
 
   def test_generate_help(self) -> None:
     """Test generate command help."""
@@ -458,7 +458,7 @@ class TestCLICommandStructure:
 
   def setup_method(self) -> None:
     """Set up test resources."""
-    self.runner = CliRunner()
+    self.runner = CliRunner(env={'NO_COLOR': '1'})
 
   def test_migrate_app_has_commands(self) -> None:
     """Test that migrate app has all expected commands."""
