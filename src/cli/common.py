@@ -169,7 +169,7 @@ def confirm_destructive(message: str) -> bool:
   display_warning(f'{message}')
   display_warning('This action cannot be undone!')
 
-  response = typer.prompt(
+  response: str = typer.prompt(
     'Type "yes" to confirm',
     default='',
   )
@@ -196,11 +196,11 @@ def get_migrations_directory(directory: Path | None = None) -> Path:
   return directory
 
 
-def spinner(text: str = 'Working...'):
+def spinner(_text: str = 'Working...') -> Progress:
   """Create a progress spinner context manager.
 
   Args:
-    text: Text to display with spinner
+    _text: Text to display with spinner (currently unused)
 
   Returns:
     Progress context manager
@@ -267,20 +267,17 @@ def validate_directory_exists(path: Path, dir_type: str = 'Directory') -> None:
 # Common Typer options
 
 verbose_option = typer.Option(
-  False,
   '--verbose',
   '-v',
   help='Enable verbose output with detailed logging',
 )
 
 dry_run_option = typer.Option(
-  False,
   '--dry-run',
   help='Show what would be done without making changes',
 )
 
 directory_option = typer.Option(
-  None,
   '--directory',
   '-d',
   help='Migrations directory path',

@@ -20,7 +20,7 @@ class TestSettings:
       assert settings.environment == 'development'
       assert settings.debug is True
       assert settings.log_level == 'INFO'
-      assert settings.app_name == 'python-uv-simple'
+      assert settings.app_name == 'ethereal'
       assert settings.version == '0.1.0'
 
   def test_settings_with_custom_values(self) -> None:

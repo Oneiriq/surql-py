@@ -6,7 +6,7 @@ with support for pagination and metadata.
 
 from typing import Any, TypeVar
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, ConfigDict, Field
 
 T = TypeVar('T', bound=BaseModel)
 
@@ -24,11 +24,7 @@ class QueryResult[T: BaseModel](BaseModel):
   time: str | None = None
   status: str = 'OK'
 
-  class Config:
-    """Pydantic configuration."""
-
-    frozen = True
-    arbitrary_types_allowed = True
+  model_config = ConfigDict(frozen=True, arbitrary_types_allowed=True)
 
 
 class RecordResult[T: BaseModel](BaseModel):
@@ -43,11 +39,7 @@ class RecordResult[T: BaseModel](BaseModel):
   record: T | None
   exists: bool = True
 
-  class Config:
-    """Pydantic configuration."""
-
-    frozen = True
-    arbitrary_types_allowed = True
+  model_config = ConfigDict(frozen=True, arbitrary_types_allowed=True)
 
   def unwrap(self) -> T:
     """Unwrap the record value.
@@ -89,11 +81,7 @@ class ListResult[T: BaseModel](BaseModel):
   offset: int | None = None
   has_more: bool = False
 
-  class Config:
-    """Pydantic configuration."""
-
-    frozen = True
-    arbitrary_types_allowed = True
+  model_config = ConfigDict(frozen=True, arbitrary_types_allowed=True)
 
   def __len__(self) -> int:
     """Return number of records.
@@ -158,10 +146,7 @@ class CountResult(BaseModel):
 
   count: int
 
-  class Config:
-    """Pydantic configuration."""
-
-    frozen = True
+  model_config = ConfigDict(frozen=True)
 
 
 class AggregateResult(BaseModel):
@@ -177,10 +162,7 @@ class AggregateResult(BaseModel):
   operation: str | None = None
   field: str | None = None
 
-  class Config:
-    """Pydantic configuration."""
-
-    frozen = True
+  model_config = ConfigDict(frozen=True)
 
 
 class PageInfo(BaseModel):
@@ -199,10 +181,7 @@ class PageInfo(BaseModel):
   has_previous: bool = False
   has_next: bool = False
 
-  class Config:
-    """Pydantic configuration."""
-
-    frozen = True
+  model_config = ConfigDict(frozen=True)
 
 
 class PaginatedResult[T: BaseModel](BaseModel):
@@ -220,11 +199,7 @@ class PaginatedResult[T: BaseModel](BaseModel):
   items: list[T] = Field(default_factory=list)
   page_info: PageInfo
 
-  class Config:
-    """Pydantic configuration."""
-
-    frozen = True
-    arbitrary_types_allowed = True
+  model_config = ConfigDict(frozen=True, arbitrary_types_allowed=True)
 
   def __len__(self) -> int:
     """Return number of items in current page.

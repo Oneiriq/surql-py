@@ -122,7 +122,7 @@ async def record_migration(
     await ensure_migration_table(client)
 
     # Create migration history record
-    data = {
+    data: dict[str, Any] = {
       'version': version,
       'description': description,
       'applied_at': datetime.utcnow().isoformat(),

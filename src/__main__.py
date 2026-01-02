@@ -41,7 +41,7 @@ def version() -> None:
 
 @app.callback()
 def main(
-  ctx: typer.Context,
+  _ctx: typer.Context,
   verbose: bool = typer.Option(
     False,
     '--verbose',
@@ -73,7 +73,7 @@ def main(
         structlog.processors.TimeStamper(fmt='iso'),
         structlog.dev.ConsoleRenderer(),
       ],
-      wrapper_class=structlog.make_filtering_bound_logger(logging_level=10),
+      wrapper_class=structlog.make_filtering_bound_logger(10),
       context_class=dict,
       logger_factory=structlog.PrintLoggerFactory(),
       cache_logger_on_first_use=False,
@@ -87,7 +87,7 @@ def main(
         structlog.processors.TimeStamper(fmt='iso'),
         structlog.dev.ConsoleRenderer(),
       ],
-      wrapper_class=structlog.make_filtering_bound_logger(logging_level=20),
+      wrapper_class=structlog.make_filtering_bound_logger(20),
       context_class=dict,
       logger_factory=structlog.PrintLoggerFactory(),
       cache_logger_on_first_use=False,

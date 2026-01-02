@@ -6,7 +6,7 @@ function calls, and aggregate operations.
 
 from typing import Any
 
-from pydantic import BaseModel
+from pydantic import BaseModel, ConfigDict
 
 from src.types.operators import _quote_value
 
@@ -24,10 +24,7 @@ class Expression(BaseModel):
 
   sql: str
 
-  class Config:
-    """Pydantic configuration."""
-
-    frozen = True
+  model_config = ConfigDict(frozen=True)
 
   def to_surql(self) -> str:
     """Convert expression to SurrealQL string.

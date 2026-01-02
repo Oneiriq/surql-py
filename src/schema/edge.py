@@ -4,7 +4,7 @@ This module provides functions for defining edge schemas for graph relationships
 in SurrealDB.
 """
 
-from pydantic import BaseModel
+from pydantic import BaseModel, ConfigDict
 
 from src.schema.fields import FieldDefinition
 from src.schema.table import EventDefinition, IndexDefinition
@@ -34,10 +34,7 @@ class EdgeDefinition(BaseModel):
   events: list[EventDefinition] = []
   permissions: dict[str, str] | None = None
 
-  class Config:
-    """Pydantic configuration."""
-
-    frozen = True
+  model_config = ConfigDict(frozen=True)
 
 
 # Edge builder functions

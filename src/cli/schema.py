@@ -60,13 +60,13 @@ def show_schema(
     asyncio.run(_show_schema_async(table, output_format, verbose))
   except Exception as e:
     handle_error(e, verbose)
-    raise typer.Exit(1)
+    raise typer.Exit(1) from e
 
 
 async def _show_schema_async(
   table: str | None,
   output_format: OutputFormat,
-  verbose: bool,
+  _verbose: bool,
 ) -> None:
   """Async implementation of show schema."""
   config = get_db_config()
@@ -106,7 +106,7 @@ async def _show_schema_async(
 
 @app.command('diff')
 def diff_schema(
-  verbose: Annotated[bool, verbose_option] = False,
+  _verbose: Annotated[bool, verbose_option] = False,
 ) -> None:
   """Compare code schema definitions with database schema.
 
@@ -124,10 +124,10 @@ def diff_schema(
 
 @app.command('sync')
 def sync_schema(
-  dry_run: Annotated[
+  _dry_run: Annotated[
     bool, typer.Option('--dry-run', help='Show what would be synced without making changes')
   ] = False,
-  verbose: Annotated[bool, verbose_option] = False,
+  _verbose: Annotated[bool, verbose_option] = False,
 ) -> None:
   """Synchronize code schema to database.
 
@@ -171,14 +171,14 @@ def export_schema(
     asyncio.run(_export_schema_async(output, table, format, verbose))
   except Exception as e:
     handle_error(e, verbose)
-    raise typer.Exit(1)
+    raise typer.Exit(1) from e
 
 
 async def _export_schema_async(
   output: str | None,
   table: str | None,
   format: str,
-  verbose: bool,
+  _verbose: bool,
 ) -> None:
   """Async implementation of export schema."""
   config = get_db_config()
@@ -241,12 +241,12 @@ def list_tables(
     asyncio.run(_list_tables_async(output_format, verbose))
   except Exception as e:
     handle_error(e, verbose)
-    raise typer.Exit(1)
+    raise typer.Exit(1) from e
 
 
 async def _list_tables_async(
   output_format: OutputFormat,
-  verbose: bool,
+  _verbose: bool,
 ) -> None:
   """Async implementation of list tables."""
   config = get_db_config()
@@ -300,12 +300,12 @@ def inspect_table(
     asyncio.run(_inspect_table_async(table, verbose))
   except Exception as e:
     handle_error(e, verbose)
-    raise typer.Exit(1)
+    raise typer.Exit(1) from e
 
 
 async def _inspect_table_async(
   table: str,
-  verbose: bool,
+  _verbose: bool,
 ) -> None:
   """Async implementation of inspect table."""
   config = get_db_config()

@@ -54,10 +54,10 @@ def init_database(
     asyncio.run(_init_database_async(verbose))
   except Exception as e:
     handle_error(e, verbose)
-    raise typer.Exit(1)
+    raise typer.Exit(1) from e
 
 
-async def _init_database_async(verbose: bool) -> None:
+async def _init_database_async(_verbose: bool) -> None:
   """Async implementation of init database."""
   config = get_db_config()
 
@@ -80,7 +80,7 @@ async def _init_database_async(verbose: bool) -> None:
   except DBConnectionError as e:
     display_error(f'Connection failed: {e}')
     display_info('Check your database configuration in environment variables')
-    raise typer.Exit(1)
+    raise typer.Exit(1) from e
 
 
 @app.command('ping')
@@ -100,7 +100,7 @@ def ping_database(
     asyncio.run(_ping_database_async(verbose))
   except Exception as e:
     handle_error(e, verbose)
-    raise typer.Exit(1)
+    raise typer.Exit(1) from e
 
 
 async def _ping_database_async(verbose: bool) -> None:
@@ -129,7 +129,7 @@ async def _ping_database_async(verbose: bool) -> None:
   except DBConnectionError as e:
     display_error(f'Connection failed: {e}')
     display_info('Verify your database is running and configuration is correct')
-    raise typer.Exit(1)
+    raise typer.Exit(1) from e
 
 
 @app.command('info')
@@ -181,7 +181,7 @@ def database_info(
 
   except Exception as e:
     handle_error(e, verbose)
-    raise typer.Exit(1)
+    raise typer.Exit(1) from e
 
 
 @app.command('reset')
@@ -205,7 +205,7 @@ def reset_database(
     asyncio.run(_reset_database_async(confirm, verbose))
   except Exception as e:
     handle_error(e, verbose)
-    raise typer.Exit(1)
+    raise typer.Exit(1) from e
 
 
 async def _reset_database_async(skip_confirm: bool, verbose: bool) -> None:
@@ -233,12 +233,16 @@ async def _reset_database_async(skip_confirm: bool, verbose: bool) -> None:
 
       # Extract table names
       tables = []
-      if isinstance(result, list) and len(result) > 0:
-        if isinstance(result[0], dict) and 'result' in result[0]:
-          db_info = result[0]['result']
+      if (
+        isinstance(result, list)
+        and len(result) > 0
+        and isinstance(result[0], dict)
+        and 'result' in result[0]
+      ):
+        db_info = result[0]['result']
 
-          if isinstance(db_info, dict) and 'tb' in db_info:
-            tables = list(db_info['tb'].keys())
+        if isinstance(db_info, dict) and 'tb' in db_info:
+          tables = list(db_info['tb'].keys())
 
       if not tables:
         display_info('No tables found to remove')
@@ -267,7 +271,7 @@ async def _reset_database_async(skip_confirm: bool, verbose: bool) -> None:
 
   except DBConnectionError as e:
     display_error(f'Connection failed: {e}')
-    raise typer.Exit(1)
+    raise typer.Exit(1) from e
 
 
 @app.command('query')
@@ -291,7 +295,7 @@ def execute_query(
     asyncio.run(_execute_query_async(query, output_format, verbose))
   except Exception as e:
     handle_error(e, verbose)
-    raise typer.Exit(1)
+    raise typer.Exit(1) from e
 
 
 async def _execute_query_async(
@@ -322,10 +326,10 @@ async def _execute_query_async(
 
   except DBConnectionError as e:
     display_error(f'Connection failed: {e}')
-    raise typer.Exit(1)
+    raise typer.Exit(1) from e
   except Exception as e:
     display_error(f'Query failed: {e}')
-    raise typer.Exit(1)
+    raise typer.Exit(1) from e
 
 
 @app.command('version')
@@ -344,7 +348,7 @@ def database_version(
     asyncio.run(_database_version_async(verbose))
   except Exception as e:
     handle_error(e, verbose)
-    raise typer.Exit(1)
+    raise typer.Exit(1) from e
 
 
 async def _database_version_async(verbose: bool) -> None:
@@ -371,4 +375,4 @@ async def _database_version_async(verbose: bool) -> None:
 
   except DBConnectionError as e:
     display_error(f'Connection failed: {e}')
-    raise typer.Exit(1)
+    raise typer.Exit(1) from e

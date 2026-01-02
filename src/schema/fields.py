@@ -6,7 +6,7 @@ type-safe field definitions in table schemas.
 
 from enum import Enum
 
-from pydantic import BaseModel
+from pydantic import BaseModel, ConfigDict
 
 
 class FieldType(Enum):
@@ -64,10 +64,7 @@ class FieldDefinition(BaseModel):
   readonly: bool = False
   flexible: bool = False
 
-  class Config:
-    """Pydantic configuration."""
-
-    frozen = True  # Make immutable
+  model_config = ConfigDict(frozen=True)
 
 
 # Field builder functions

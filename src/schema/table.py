@@ -6,7 +6,7 @@ permissions, and events.
 
 from enum import Enum
 
-from pydantic import BaseModel
+from pydantic import BaseModel, ConfigDict
 
 from src.schema.fields import FieldDefinition
 
@@ -46,10 +46,7 @@ class IndexDefinition(BaseModel):
   columns: list[str]
   type: IndexType = IndexType.STANDARD
 
-  class Config:
-    """Pydantic configuration."""
-
-    frozen = True
+  model_config = ConfigDict(frozen=True)
 
 
 class EventDefinition(BaseModel):
@@ -69,10 +66,7 @@ class EventDefinition(BaseModel):
   condition: str
   action: str
 
-  class Config:
-    """Pydantic configuration."""
-
-    frozen = True
+  model_config = ConfigDict(frozen=True)
 
 
 class TableDefinition(BaseModel):
@@ -101,10 +95,7 @@ class TableDefinition(BaseModel):
   permissions: dict[str, str] | None = None
   drop: bool = False
 
-  class Config:
-    """Pydantic configuration."""
-
-    frozen = True
+  model_config = ConfigDict(frozen=True)
 
 
 # Table builder functions

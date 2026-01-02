@@ -74,14 +74,14 @@ def migrate_up(
     asyncio.run(_migrate_up_async(directory, steps, dry_run, verbose))
   except Exception as e:
     handle_error(e, verbose)
-    raise typer.Exit(1)
+    raise typer.Exit(1) from e
 
 
 async def _migrate_up_async(
   directory: Path | None,
   steps: int | None,
   dry_run: bool,
-  verbose: bool,
+  _verbose: bool,
 ) -> None:
   """Async implementation of migrate up."""
   migrations_dir = get_migrations_directory(directory)
@@ -175,14 +175,14 @@ def migrate_down(
     asyncio.run(_migrate_down_async(directory, steps, dry_run, verbose))
   except Exception as e:
     handle_error(e, verbose)
-    raise typer.Exit(1)
+    raise typer.Exit(1) from e
 
 
 async def _migrate_down_async(
   directory: Path | None,
   steps: int,
   dry_run: bool,
-  verbose: bool,
+  _verbose: bool,
 ) -> None:
   """Async implementation of migrate down."""
   migrations_dir = get_migrations_directory(directory)
@@ -267,13 +267,13 @@ def migration_status(
     asyncio.run(_migration_status_async(directory, output_format, verbose))
   except Exception as e:
     handle_error(e, verbose)
-    raise typer.Exit(1)
+    raise typer.Exit(1) from e
 
 
 async def _migration_status_async(
   directory: Path | None,
   output_format: OutputFormat,
-  verbose: bool,
+  _verbose: bool,
 ) -> None:
   """Async implementation of migration status."""
   migrations_dir = get_migrations_directory(directory)
@@ -334,12 +334,12 @@ def migration_history(
     asyncio.run(_migration_history_async(output_format, verbose))
   except Exception as e:
     handle_error(e, verbose)
-    raise typer.Exit(1)
+    raise typer.Exit(1) from e
 
 
 async def _migration_history_async(
   output_format: OutputFormat,
-  verbose: bool,
+  _verbose: bool,
 ) -> None:
   """Async implementation of migration history."""
   config = get_db_config()
@@ -398,7 +398,7 @@ def create_migration(
 
   except Exception as e:
     handle_error(e, verbose)
-    raise typer.Exit(1)
+    raise typer.Exit(1) from e
 
 
 @app.command('validate')
@@ -422,7 +422,7 @@ def validate_migration_files(
     asyncio.run(_validate_migrations_async(directory, verbose))
   except Exception as e:
     handle_error(e, verbose)
-    raise typer.Exit(1)
+    raise typer.Exit(1) from e
 
 
 async def _validate_migrations_async(
@@ -465,7 +465,7 @@ async def _validate_migrations_async(
     migrations = discover_migrations(migrations_dir)
   except Exception as e:
     display_error(f'Failed to load migrations: {e}')
-    raise typer.Exit(1)
+    raise typer.Exit(1) from e
 
   # Validate migration consistency
   errors = await validate_migrations(migrations)

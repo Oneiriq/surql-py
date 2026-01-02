@@ -687,7 +687,7 @@ class TestResultImmutability:
     """Test that QueryResult is immutable."""
     result = QueryResult(data={'test': 'value'})
 
-    with pytest.raises(Exception):
+    with pytest.raises((Exception, ValueError)):
       result.data = {}  # type: ignore[misc]
 
   def test_record_result_immutability(self) -> None:
@@ -695,7 +695,7 @@ class TestResultImmutability:
     user = User(name='Alice', email='alice@example.com')
     result = RecordResult(record=user, exists=True)
 
-    with pytest.raises(Exception):
+    with pytest.raises((Exception, ValueError)):
       result.exists = False  # type: ignore[misc]
 
   def test_list_result_immutability(self) -> None:
@@ -703,5 +703,5 @@ class TestResultImmutability:
     users = [User(name='Alice', email='alice@example.com')]
     result = ListResult(records=users)
 
-    with pytest.raises(Exception):
+    with pytest.raises((Exception, ValueError)):
       result.total = 100  # type: ignore[misc]

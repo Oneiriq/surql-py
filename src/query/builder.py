@@ -9,7 +9,7 @@ from __future__ import annotations
 from typing import Any, TypeVar
 
 import structlog
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, ConfigDict, Field
 
 from src.types.operators import Operator, _quote_value
 from src.types.record_id import RecordID
@@ -56,13 +56,9 @@ class Query[T: BaseModel](BaseModel):
   join_clauses: list[str] = Field(default_factory=list)
   graph_traversal: str | None = None
 
-  class Config:
-    """Pydantic configuration."""
+  model_config = ConfigDict(frozen=True, arbitrary_types_allowed=True)
 
-    frozen = True
-    arbitrary_types_allowed = True
-
-  def select(self, fields: list[str] | None = None) -> 'Query[T]':
+  def select(self, fields: list[str] | None = None) -> Query[T]:
     """Start a SELECT query.
 
     Args:
@@ -82,7 +78,7 @@ class Query[T: BaseModel](BaseModel):
       }
     )
 
-  def from_table(self, table: str) -> 'Query[T]':
+  def from_table(self, table: str) -> Query[T]:
     """Specify the table to query from.
 
     Args:
@@ -97,7 +93,7 @@ class Query[T: BaseModel](BaseModel):
     """
     return self.model_copy(update={'table_name': table})
 
-  def where(self, condition: str | Operator) -> 'Query[T]':
+  def where(self, condition: str | Operator) -> Query[T]:
     """Add WHERE condition to query.
 
     Args:
@@ -114,7 +110,7 @@ class Query[T: BaseModel](BaseModel):
     condition_str = condition.to_surql() if isinstance(condition, Operator) else condition
     return self.model_copy(update={'conditions': [*self.conditions, condition_str]})
 
-  def order_by(self, field: str, direction: str = 'ASC') -> 'Query[T]':
+  def order_by(self, field: str, direction: str = 'ASC') -> Query[T]:
     """Add ORDER BY clause.
 
     Args:
@@ -135,7 +131,7 @@ class Query[T: BaseModel](BaseModel):
       update={'order_fields': [*self.order_fields, (field, direction.upper())]}
     )
 
-  def group_by(self, *fields: str) -> 'Query[T]':
+  def group_by(self, *fields: str) -> Query[T]:
     """Add GROUP BY clause.
 
     Args:
@@ -149,7 +145,7 @@ class Query[T: BaseModel](BaseModel):
     """
     return self.model_copy(update={'group_fields': [*self.group_fields, *fields]})
 
-  def limit(self, n: int) -> 'Query[T]':
+  def limit(self, n: int) -> Query[T]:
     """Add LIMIT clause.
 
     Args:
@@ -166,7 +162,7 @@ class Query[T: BaseModel](BaseModel):
 
     return self.model_copy(update={'limit_value': n})
 
-  def offset(self, n: int) -> 'Query[T]':
+  def offset(self, n: int) -> Query[T]:
     """Add OFFSET clause for pagination.
 
     Args:
@@ -183,7 +179,7 @@ class Query[T: BaseModel](BaseModel):
 
     return self.model_copy(update={'offset_value': n})
 
-  def insert(self, table: str, data: dict[str, Any]) -> 'Query[T]':
+  def insert(self, table: str, data: dict[str, Any]) -> Query[T]:
     """Create an INSERT query.
 
     Args:
@@ -204,7 +200,7 @@ class Query[T: BaseModel](BaseModel):
       }
     )
 
-  def update(self, target: str, data: dict[str, Any]) -> 'Query[T]':
+  def update(self, target: str, data: dict[str, Any]) -> Query[T]:
     """Create an UPDATE query.
 
     Args:
@@ -226,7 +222,7 @@ class Query[T: BaseModel](BaseModel):
       }
     )
 
-  def delete(self, target: str) -> 'Query[T]':
+  def delete(self, target: str) -> Query[T]:
     """Create a DELETE query.
 
     Args:
@@ -249,10 +245,10 @@ class Query[T: BaseModel](BaseModel):
   def relate(
     self,
     edge_table: str,
-    from_record: str | 'RecordID[Any]',
-    to_record: str | 'RecordID[Any]',
+    from_record: str | RecordID[Any],
+    to_record: str | RecordID[Any],
     data: dict[str, Any] | None = None,
-  ) -> 'Query[T]':
+  ) -> Query[T]:
     """Create a RELATE query for graph edges.
 
     Args:
@@ -281,7 +277,7 @@ class Query[T: BaseModel](BaseModel):
       }
     )
 
-  def traverse(self, path: str) -> 'Query[T]':
+  def traverse(self, path: str) -> Query[T]:
     """Add graph traversal path to query.
 
     Args:
@@ -296,7 +292,7 @@ class Query[T: BaseModel](BaseModel):
     """
     return self.model_copy(update={'graph_traversal': path})
 
-  def join(self, join_clause: str) -> 'Query[T]':
+  def join(self, join_clause: str) -> Query[T]:
     """Add JOIN clause to query.
 
     Args:
@@ -467,7 +463,7 @@ class Query[T: BaseModel](BaseModel):
 # Functional query builder helpers
 
 
-def select(fields: list[str] | None = None) -> 'Query[Any]':
+def select(fields: list[str] | None = None) -> Query[Any]:
   """Create a SELECT query.
 
   Args:
@@ -549,7 +545,7 @@ def offset[T: BaseModel](query: Query[T], n: int) -> Query[T]:
   return query.offset(n)
 
 
-def insert(table: str, data: dict[str, Any]) -> 'Query[Any]':
+def insert(table: str, data: dict[str, Any]) -> Query[Any]:
   """Create an INSERT query.
 
   Args:
@@ -562,7 +558,7 @@ def insert(table: str, data: dict[str, Any]) -> 'Query[Any]':
   return Query().insert(table, data)
 
 
-def update(target: str, data: dict[str, Any]) -> 'Query[Any]':
+def update(target: str, data: dict[str, Any]) -> Query[Any]:
   """Create an UPDATE query.
 
   Args:
@@ -575,7 +571,7 @@ def update(target: str, data: dict[str, Any]) -> 'Query[Any]':
   return Query().update(target, data)
 
 
-def delete(target: str) -> 'Query[Any]':
+def delete(target: str) -> Query[Any]:
   """Create a DELETE query.
 
   Args:
@@ -589,10 +585,10 @@ def delete(target: str) -> 'Query[Any]':
 
 def relate(
   edge_table: str,
-  from_record: str | 'RecordID[Any]',
-  to_record: str | 'RecordID[Any]',
+  from_record: str | RecordID[Any],
+  to_record: str | RecordID[Any],
   data: dict[str, Any] | None = None,
-) -> 'Query[Any]':
+) -> Query[Any]:
   """Create a RELATE query.
 
   Args:

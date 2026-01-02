@@ -10,7 +10,7 @@ from enum import Enum
 from pathlib import Path
 from typing import Any
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, ConfigDict, Field
 
 
 class MigrationState(Enum):
@@ -51,11 +51,7 @@ class Migration(BaseModel):
   checksum: str | None = Field(None, description='Migration content checksum')
   depends_on: list[str] = Field(default_factory=list, description='Dependencies')
 
-  class Config:
-    """Pydantic configuration."""
-
-    arbitrary_types_allowed = True
-    frozen = True
+  model_config = ConfigDict(arbitrary_types_allowed=True, frozen=True)
 
 
 class MigrationHistory(BaseModel):
@@ -78,10 +74,7 @@ class MigrationHistory(BaseModel):
   checksum: str = Field(..., description='Migration content checksum')
   execution_time_ms: int | None = Field(None, description='Execution time in milliseconds')
 
-  class Config:
-    """Pydantic configuration."""
-
-    frozen = True
+  model_config = ConfigDict(frozen=True)
 
 
 class MigrationPlan(BaseModel):
@@ -99,10 +92,7 @@ class MigrationPlan(BaseModel):
   migrations: list[Migration] = Field(..., description='Ordered list of migrations')
   direction: MigrationDirection = Field(..., description='Execution direction')
 
-  class Config:
-    """Pydantic configuration."""
-
-    frozen = True
+  model_config = ConfigDict(frozen=True)
 
   @property
   def count(self) -> int:
@@ -133,10 +123,7 @@ class MigrationMetadata(BaseModel):
   author: str = 'ethereal'
   depends_on: list[str] = Field(default_factory=list)
 
-  class Config:
-    """Pydantic configuration."""
-
-    frozen = True
+  model_config = ConfigDict(frozen=True)
 
 
 class MigrationStatus(BaseModel):
@@ -157,10 +144,7 @@ class MigrationStatus(BaseModel):
   applied_at: datetime | None = None
   error: str | None = None
 
-  class Config:
-    """Pydantic configuration."""
-
-    frozen = True
+  model_config = ConfigDict(frozen=True)
 
 
 class DiffOperation(Enum):
@@ -201,7 +185,4 @@ class SchemaDiff(BaseModel):
   backward_sql: str
   details: dict[str, Any] = Field(default_factory=dict)
 
-  class Config:
-    """Pydantic configuration."""
-
-    frozen = True
+  model_config = ConfigDict(frozen=True)

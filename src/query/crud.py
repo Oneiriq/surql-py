@@ -103,7 +103,7 @@ async def create_records[T: BaseModel](
 
 async def get_record[T: BaseModel](
   table: str,
-  record_id: str | 'RecordID[Any]',
+  record_id: str | RecordID[Any],
   model: type[T],
   client: DatabaseClient | None = None,
 ) -> T | None:
@@ -151,7 +151,7 @@ async def get_record[T: BaseModel](
 
 async def update_record[T: BaseModel](
   table: str,
-  record_id: str | 'RecordID[Any]',
+  record_id: str | RecordID[Any],
   data: T | dict[str, Any],
   client: DatabaseClient | None = None,
 ) -> dict[str, Any]:
@@ -195,7 +195,7 @@ async def update_record[T: BaseModel](
 
 async def merge_record(
   table: str,
-  record_id: str | 'RecordID[Any]',
+  record_id: str | RecordID[Any],
   data: dict[str, Any],
   client: DatabaseClient | None = None,
 ) -> dict[str, Any]:
@@ -235,7 +235,7 @@ async def merge_record(
 
 async def delete_record(
   table: str,
-  record_id: str | 'RecordID[Any]',
+  record_id: str | RecordID[Any],
   client: DatabaseClient | None = None,
 ) -> None:
   """Delete a record from the database.
@@ -426,18 +426,22 @@ async def count_records(
   result = await db.execute(query.to_surql())
 
   # Extract count from result
-  if isinstance(result, list) and len(result) > 0 and isinstance(result[0], dict):
-    if 'result' in result[0]:
-      data = result[0]['result']
-      if isinstance(data, list) and len(data) > 0:
-        return data[0].get('count', 0)  # type: ignore[no-any-return]
+  if (
+    isinstance(result, list)
+    and len(result) > 0
+    and isinstance(result[0], dict)
+    and 'result' in result[0]
+  ):
+    data = result[0]['result']
+    if isinstance(data, list) and len(data) > 0:
+      return data[0].get('count', 0)  # type: ignore[no-any-return]
 
   return 0
 
 
 async def exists(
   table: str,
-  record_id: str | 'RecordID[Any]',
+  record_id: str | RecordID[Any],
   client: DatabaseClient | None = None,
 ) -> bool:
   """Check if a record exists.

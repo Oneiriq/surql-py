@@ -208,7 +208,7 @@ def _get_migration_function(
   if not hasattr(module, name):
     raise MigrationLoadError(f'Migration {path} missing {name}() function')
 
-  fn = getattr(module, name)
+  fn: Callable[[], list[str]] = getattr(module, name)
 
   if not callable(fn):
     raise MigrationLoadError(f'Migration {path} {name} is not callable')
@@ -294,11 +294,8 @@ def validate_migration_name(filename: str) -> bool:
     return False
 
   # Second part should be HHMMSS (6 digits)
-  if len(parts[1]) != 6 or not parts[1].isdigit():
-    return False
-
   # Rest is description
-  return True
+  return len(parts[1]) == 6 and parts[1].isdigit()
 
 
 def get_version_from_filename(filename: str) -> str | None:

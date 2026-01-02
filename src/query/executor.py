@@ -150,7 +150,7 @@ async def fetch_many(
   query: Query[T],
   model: type[T],
   client: DatabaseClient | None = None,
-  batch_size: int = 100,
+  _batch_size: int = 100,
 ) -> AsyncIterator[T]:
   """Execute query and stream results as async iterator.
 

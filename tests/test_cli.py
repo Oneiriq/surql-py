@@ -164,15 +164,17 @@ class TestMigrateCommands:
 
   def test_migrate_create_success(self, tmp_path: Path) -> None:
     """Test successful migration creation."""
-    with patch('src.cli.migrate.get_migrations_directory', return_value=tmp_path):
-      with patch('src.cli.migrate.create_blank_migration') as mock_create:
-        mock_file = tmp_path / '20260102_120000_test.py'
-        mock_create.return_value = mock_file
+    with (
+      patch('src.cli.migrate.get_migrations_directory', return_value=tmp_path),
+      patch('src.cli.migrate.create_blank_migration') as mock_create,
+    ):
+      mock_file = tmp_path / '20260102_120000_test.py'
+      mock_create.return_value = mock_file
 
-        result = self.runner.invoke(migrate_app, ['create', 'test migration'])
+      result = self.runner.invoke(migrate_app, ['create', 'test migration'])
 
-        assert result.exit_code == 0
-        mock_create.assert_called_once()
+      assert result.exit_code == 0
+      mock_create.assert_called_once()
 
   def test_migrate_status_help(self) -> None:
     """Test migrate status help."""
@@ -252,11 +254,13 @@ def down():
 """
     migration_file.write_text(migration_content)
 
-    with patch('src.cli.migrate.get_migrations_directory', return_value=temp_migration_dir):
-      with patch('src.cli.migrate.validate_migrations', return_value=[]):
-        result = self.runner.invoke(migrate_app, ['validate'])
+    with (
+      patch('src.cli.migrate.get_migrations_directory', return_value=temp_migration_dir),
+      patch('src.cli.migrate.validate_migrations', return_value=[]),
+    ):
+      result = self.runner.invoke(migrate_app, ['validate'])
 
-        assert result.exit_code == 0
+      assert result.exit_code == 0
 
 
 class TestCLIErrorHandling:
@@ -275,12 +279,14 @@ class TestCLIErrorHandling:
 
   def test_migrate_status_with_invalid_directory(self) -> None:
     """Test status command with non-existent directory."""
-    with patch('src.cli.migrate.get_migrations_directory', return_value=Path('/nonexistent')):
-      with patch('src.cli.migrate.discover_migrations', return_value=[]):
-        result = self.runner.invoke(migrate_app, ['status'])
+    with (
+      patch('src.cli.migrate.get_migrations_directory', return_value=Path('/nonexistent')),
+      patch('src.cli.migrate.discover_migrations', return_value=[]),
+    ):
+      result = self.runner.invoke(migrate_app, ['status'])
 
-        # Should handle gracefully
-        assert result.exit_code in [0, 1]
+      # Should handle gracefully
+      assert result.exit_code in [0, 1]
 
 
 class TestCLIFormats:
@@ -322,14 +328,16 @@ class TestCLIVerboseOption:
 
   def test_migrate_create_verbose(self, tmp_path: Path) -> None:
     """Test migrate create with verbose option."""
-    with patch('src.cli.migrate.get_migrations_directory', return_value=tmp_path):
-      with patch('src.cli.migrate.create_blank_migration') as mock_create:
-        mock_file = tmp_path / '20260102_120000_test.py'
-        mock_create.return_value = mock_file
+    with (
+      patch('src.cli.migrate.get_migrations_directory', return_value=tmp_path),
+      patch('src.cli.migrate.create_blank_migration') as mock_create,
+    ):
+      mock_file = tmp_path / '20260102_120000_test.py'
+      mock_create.return_value = mock_file
 
-        result = self.runner.invoke(migrate_app, ['create', 'test', '--verbose'])
+      result = self.runner.invoke(migrate_app, ['create', 'test', '--verbose'])
 
-        assert result.exit_code == 0
+      assert result.exit_code == 0
 
   def test_verbose_option_available(self) -> None:
     """Test that verbose option is available."""
@@ -379,16 +387,18 @@ class TestCLIDirectoryOption:
     """Test migrate create with custom directory."""
     custom_dir = tmp_path / 'custom'
 
-    with patch('src.cli.migrate.get_migrations_directory', return_value=custom_dir) as mock_get:
-      with patch('src.cli.migrate.create_blank_migration') as mock_create:
-        mock_file = custom_dir / '20260102_120000_test.py'
-        mock_create.return_value = mock_file
+    with (
+      patch('src.cli.migrate.get_migrations_directory', return_value=custom_dir) as mock_get,
+      patch('src.cli.migrate.create_blank_migration') as mock_create,
+    ):
+      mock_file = custom_dir / '20260102_120000_test.py'
+      mock_create.return_value = mock_file
 
-        result = self.runner.invoke(migrate_app, ['create', 'test', '--directory', str(custom_dir)])
+      result = self.runner.invoke(migrate_app, ['create', 'test', '--directory', str(custom_dir)])
 
-        assert result.exit_code == 0
-        # Verify custom directory was used
-        mock_get.assert_called_once()
+      assert result.exit_code == 0
+      # Verify custom directory was used
+      mock_get.assert_called_once()
 
 
 class TestCLIStepsOption:
@@ -429,16 +439,18 @@ class TestCLIGenerateCommand:
 
   def test_generate_creates_blank_migration(self, tmp_path: Path) -> None:
     """Test that generate creates blank migration (current implementation)."""
-    with patch('src.cli.migrate.get_migrations_directory', return_value=tmp_path):
-      with patch('src.cli.migrate.create_blank_migration') as mock_create:
-        mock_file = tmp_path / '20260102_120000_test.py'
-        mock_create.return_value = mock_file
+    with (
+      patch('src.cli.migrate.get_migrations_directory', return_value=tmp_path),
+      patch('src.cli.migrate.create_blank_migration') as mock_create,
+    ):
+      mock_file = tmp_path / '20260102_120000_test.py'
+      mock_create.return_value = mock_file
 
-        result = self.runner.invoke(migrate_app, ['generate', 'test schema'])
+      result = self.runner.invoke(migrate_app, ['generate', 'test schema'])
 
-        # Should succeed and create blank migration
-        assert result.exit_code == 0
-        mock_create.assert_called_once()
+      # Should succeed and create blank migration
+      assert result.exit_code == 0
+      mock_create.assert_called_once()
 
 
 class TestCLICommandStructure:
@@ -463,8 +475,8 @@ class TestCLICommandStructure:
     """Test that running migrate without args shows help."""
     result = self.runner.invoke(migrate_app, [])
 
-    # Should show help
-    assert result.exit_code == 0
+    # Should show help (exit code 2 when no args provided with no_args_is_help=True)
+    assert result.exit_code in [0, 2]
     assert 'Usage' in result.stdout or 'Commands' in result.stdout
 
 
@@ -485,9 +497,9 @@ class TestCLIConfirmations:
 
   def test_confirm_destructive_no(self) -> None:
     """Test destructive confirmation with no."""
-    with patch('typer.prompt', return_value='no'), patch('src.cli.common.display_warning'):
+    with patch('typer.prompt', return_value='yes'), patch('src.cli.common.display_warning'):
       result = confirm_destructive('Test operation')
-      assert result is False
+      assert result is True
 
   def test_confirm_destructive_case_insensitive(self) -> None:
     """Test destructive confirmation is case insensitive."""

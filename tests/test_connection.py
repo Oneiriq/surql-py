@@ -177,7 +177,7 @@ class TestDatabaseClient:
     assert client._connected is False
     assert client.is_connected is False
 
-  @pytest.mark.asyncio
+  @pytest.mark.anyio
   async def test_connect_success(
     self, db_config: ConnectionConfig, mock_surreal_client: Mock
   ) -> None:
@@ -192,7 +192,7 @@ class TestDatabaseClient:
       mock_surreal_client.signin.assert_called_once()
       mock_surreal_client.use.assert_called_once_with('test', 'test_db')
 
-  @pytest.mark.asyncio
+  @pytest.mark.anyio
   async def test_connect_without_auth(self) -> None:
     """Test connection without username/password."""
     config = ConnectionConfig(username=None, password=None)
@@ -207,7 +207,7 @@ class TestDatabaseClient:
       assert client.is_connected is True
       mock_surreal.signin.assert_not_called()
 
-  @pytest.mark.asyncio
+  @pytest.mark.anyio
   async def test_connect_already_connected(self, mock_db_client: DatabaseClient) -> None:
     """Test connecting when already connected."""
     # Client is already connected from fixture
@@ -216,7 +216,7 @@ class TestDatabaseClient:
     # Should still be connected (warning logged but no error)
     assert mock_db_client.is_connected is True
 
-  @pytest.mark.asyncio
+  @pytest.mark.anyio
   async def test_connect_failure(self, db_config: ConnectionConfig) -> None:
     """Test connection failure after retries."""
     client = DatabaseClient(db_config)
@@ -227,18 +227,20 @@ class TestDatabaseClient:
       with pytest.raises(ConnectionError) as exc_info:
         await client.connect()
 
-      assert 'Failed to connect' in str(exc_info.value)
+      assert 'Connection failed' in str(exc_info.value)
       assert client.is_connected is False
 
-  @pytest.mark.asyncio
+  @pytest.mark.anyio
   async def test_disconnect_success(self, mock_db_client: DatabaseClient) -> None:
     """Test successful disconnection."""
+    # Save reference to mock client before disconnect sets it to None
+    mock_client = mock_db_client._client
     await mock_db_client.disconnect()
 
-    mock_db_client._client.close.assert_called_once()
+    mock_client.close.assert_called_once()
     assert mock_db_client.is_connected is False
 
-  @pytest.mark.asyncio
+  @pytest.mark.anyio
   async def test_disconnect_not_connected(self, db_config: ConnectionConfig) -> None:
     """Test disconnecting when not connected."""
     client = DatabaseClient(db_config)
@@ -247,7 +249,7 @@ class TestDatabaseClient:
     await client.disconnect()
     assert client.is_connected is False
 
-  @pytest.mark.asyncio
+  @pytest.mark.anyio
   async def test_disconnect_failure(self, mock_db_client: DatabaseClient) -> None:
     """Test disconnection failure."""
     mock_db_client._client.close = AsyncMock(side_effect=Exception('Close failed'))
@@ -258,7 +260,7 @@ class TestDatabaseClient:
     # Client should still be marked as disconnected
     assert mock_db_client.is_connected is False
 
-  @pytest.mark.asyncio
+  @pytest.mark.anyio
   async def test_execute_success(self, mock_db_client: DatabaseClient) -> None:
     """Test successful query execution."""
     query = 'SELECT * FROM user'
@@ -269,7 +271,7 @@ class TestDatabaseClient:
     mock_db_client._client.query.assert_called_once_with(query, params)
     assert result is not None
 
-  @pytest.mark.asyncio
+  @pytest.mark.anyio
   async def test_execute_not_connected(self, db_config: ConnectionConfig) -> None:
     """Test execute when not connected."""
     client = DatabaseClient(db_config)
@@ -279,7 +281,7 @@ class TestDatabaseClient:
 
     assert 'not connected' in str(exc_info.value)
 
-  @pytest.mark.asyncio
+  @pytest.mark.anyio
   async def test_execute_query_error(self, mock_db_client: DatabaseClient) -> None:
     """Test execute with query error."""
     mock_db_client._client.query = AsyncMock(side_effect=Exception('Query failed'))
@@ -289,14 +291,14 @@ class TestDatabaseClient:
 
     assert 'Query execution failed' in str(exc_info.value)
 
-  @pytest.mark.asyncio
+  @pytest.mark.anyio
   async def test_select_success(self, mock_db_client: DatabaseClient) -> None:
     """Test successful SELECT operation."""
     await mock_db_client.select('user')
 
     mock_db_client._client.select.assert_called_once_with('user')
 
-  @pytest.mark.asyncio
+  @pytest.mark.anyio
   async def test_select_not_connected(self, db_config: ConnectionConfig) -> None:
     """Test SELECT when not connected."""
     client = DatabaseClient(db_config)
@@ -304,7 +306,7 @@ class TestDatabaseClient:
     with pytest.raises(ConnectionError):
       await client.select('user')
 
-  @pytest.mark.asyncio
+  @pytest.mark.anyio
   async def test_create_success(self, mock_db_client: DatabaseClient) -> None:
     """Test successful CREATE operation."""
     data = {'name': 'Alice', 'email': 'alice@example.com'}
@@ -313,7 +315,7 @@ class TestDatabaseClient:
     mock_db_client._client.create.assert_called_once_with('user', data)
     assert result['id'] == 'user:123'
 
-  @pytest.mark.asyncio
+  @pytest.mark.anyio
   async def test_update_success(self, mock_db_client: DatabaseClient) -> None:
     """Test successful UPDATE operation."""
     data = {'status': 'active'}
@@ -321,7 +323,7 @@ class TestDatabaseClient:
 
     mock_db_client._client.update.assert_called_once_with('user:alice', data)
 
-  @pytest.mark.asyncio
+  @pytest.mark.anyio
   async def test_merge_success(self, mock_db_client: DatabaseClient) -> None:
     """Test successful MERGE operation."""
     data = {'status': 'active'}
@@ -329,14 +331,14 @@ class TestDatabaseClient:
 
     mock_db_client._client.merge.assert_called_once_with('user:alice', data)
 
-  @pytest.mark.asyncio
+  @pytest.mark.anyio
   async def test_delete_success(self, mock_db_client: DatabaseClient) -> None:
     """Test successful DELETE operation."""
     await mock_db_client.delete('user:alice')
 
     mock_db_client._client.delete.assert_called_once_with('user:alice')
 
-  @pytest.mark.asyncio
+  @pytest.mark.anyio
   async def test_insert_relation_success(self, mock_db_client: DatabaseClient) -> None:
     """Test successful INSERT RELATION operation."""
     data = {'in': 'user:alice', 'out': 'post:123'}
@@ -344,7 +346,7 @@ class TestDatabaseClient:
 
     mock_db_client._client.insert_relation.assert_called_once_with('likes', data)
 
-  @pytest.mark.asyncio
+  @pytest.mark.anyio
   async def test_context_manager(self, db_config: ConnectionConfig) -> None:
     """Test DatabaseClient as async context manager."""
     mock_surreal = Mock()
@@ -359,7 +361,7 @@ class TestDatabaseClient:
 
       mock_surreal.close.assert_called_once()
 
-  @pytest.mark.asyncio
+  @pytest.mark.anyio
   async def test_get_client_context_manager(self, db_config: ConnectionConfig) -> None:
     """Test get_client context manager."""
     mock_surreal = Mock()
@@ -387,7 +389,7 @@ class TestTransaction:
     assert txn.state == TransactionState.PENDING
     assert txn.is_active is False
 
-  @pytest.mark.asyncio
+  @pytest.mark.anyio
   async def test_begin_success(self, mock_db_client: DatabaseClient) -> None:
     """Test successful transaction begin."""
     txn = Transaction(mock_db_client)
@@ -398,7 +400,7 @@ class TestTransaction:
     assert txn.is_active is True
     mock_db_client._client.query.assert_called()
 
-  @pytest.mark.asyncio
+  @pytest.mark.anyio
   async def test_begin_already_active(self, mock_db_client: DatabaseClient) -> None:
     """Test beginning transaction that is already active."""
     txn = Transaction(mock_db_client)
@@ -409,7 +411,7 @@ class TestTransaction:
 
     assert 'Cannot begin transaction' in str(exc_info.value)
 
-  @pytest.mark.asyncio
+  @pytest.mark.anyio
   async def test_commit_success(self, mock_db_client: DatabaseClient) -> None:
     """Test successful transaction commit."""
     txn = Transaction(mock_db_client)
@@ -420,7 +422,7 @@ class TestTransaction:
     assert txn.state == TransactionState.COMMITTED
     assert txn.is_active is False
 
-  @pytest.mark.asyncio
+  @pytest.mark.anyio
   async def test_commit_not_active(self, mock_db_client: DatabaseClient) -> None:
     """Test committing transaction that is not active."""
     txn = Transaction(mock_db_client)
@@ -430,7 +432,7 @@ class TestTransaction:
 
     assert 'Cannot commit transaction' in str(exc_info.value)
 
-  @pytest.mark.asyncio
+  @pytest.mark.anyio
   async def test_commit_failure(self, mock_db_client: DatabaseClient) -> None:
     """Test transaction commit failure."""
     txn = Transaction(mock_db_client)
@@ -443,7 +445,7 @@ class TestTransaction:
 
     assert txn.state == TransactionState.CANCELLED
 
-  @pytest.mark.asyncio
+  @pytest.mark.anyio
   async def test_cancel_success(self, mock_db_client: DatabaseClient) -> None:
     """Test successful transaction cancel."""
     txn = Transaction(mock_db_client)
@@ -454,7 +456,7 @@ class TestTransaction:
     assert txn.state == TransactionState.CANCELLED
     assert txn.is_active is False
 
-  @pytest.mark.asyncio
+  @pytest.mark.anyio
   async def test_cancel_pending(self, mock_db_client: DatabaseClient) -> None:
     """Test canceling pending transaction."""
     txn = Transaction(mock_db_client)
@@ -463,7 +465,7 @@ class TestTransaction:
 
     assert txn.state == TransactionState.CANCELLED
 
-  @pytest.mark.asyncio
+  @pytest.mark.anyio
   async def test_cancel_already_committed(self, mock_db_client: DatabaseClient) -> None:
     """Test canceling already committed transaction."""
     txn = Transaction(mock_db_client)
@@ -474,7 +476,7 @@ class TestTransaction:
     await txn.cancel()
     assert txn.state == TransactionState.COMMITTED
 
-  @pytest.mark.asyncio
+  @pytest.mark.anyio
   async def test_execute_in_transaction(self, mock_db_client: DatabaseClient) -> None:
     """Test executing query in transaction context."""
     txn = Transaction(mock_db_client)
@@ -484,7 +486,7 @@ class TestTransaction:
 
     assert result is not None
 
-  @pytest.mark.asyncio
+  @pytest.mark.anyio
   async def test_execute_not_active(self, mock_db_client: DatabaseClient) -> None:
     """Test executing query when transaction is not active."""
     txn = Transaction(mock_db_client)
@@ -494,7 +496,7 @@ class TestTransaction:
 
     assert 'Cannot execute query' in str(exc_info.value)
 
-  @pytest.mark.asyncio
+  @pytest.mark.anyio
   async def test_transaction_context_manager_success(self, mock_db_client: DatabaseClient) -> None:
     """Test Transaction as async context manager with success."""
     async with Transaction(mock_db_client) as txn:
@@ -504,7 +506,7 @@ class TestTransaction:
     # Should auto-commit on successful exit
     assert txn.state == TransactionState.COMMITTED
 
-  @pytest.mark.asyncio
+  @pytest.mark.anyio
   async def test_transaction_context_manager_exception(
     self, mock_db_client: DatabaseClient
   ) -> None:
@@ -521,7 +523,7 @@ class TestTransaction:
     # Should auto-cancel on exception
     assert txn.state == TransactionState.CANCELLED
 
-  @pytest.mark.asyncio
+  @pytest.mark.anyio
   async def test_transaction_helper_function(self, mock_db_client: DatabaseClient) -> None:
     """Test transaction helper context manager function."""
     async with transaction(mock_db_client) as txn:

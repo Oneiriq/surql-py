@@ -5,7 +5,7 @@ This module provides a type-safe wrapper for SurrealDB record IDs (table:id form
 
 from typing import Any, TypeVar
 
-from pydantic import BaseModel, field_validator
+from pydantic import BaseModel, ConfigDict, field_validator
 
 T = TypeVar('T')
 
@@ -123,7 +123,4 @@ class RecordID[T](BaseModel):
     """
     return str(self)
 
-  class Config:
-    """Pydantic configuration."""
-
-    frozen = True  # Make immutable
+  model_config = ConfigDict(frozen=True)

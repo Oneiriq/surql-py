@@ -23,7 +23,7 @@ T = TypeVar('T', bound=BaseModel)
 
 
 async def traverse[T: BaseModel](
-  start: str | 'RecordID[Any]',
+  start: str | RecordID[Any],
   path: str,
   model: type[T],
   client: DatabaseClient | None = None,
@@ -62,7 +62,7 @@ async def traverse[T: BaseModel](
 
 
 async def traverse_with_depth[T: BaseModel](
-  start: str | 'RecordID[Any]',
+  start: str | RecordID[Any],
   edge_table: str,
   target_table: str,
   direction: str = 'out',
@@ -120,17 +120,21 @@ async def traverse_with_depth[T: BaseModel](
     result = await db.execute(query.to_surql())
 
     # Extract data from result
-    if isinstance(result, list) and len(result) > 0:
-      if isinstance(result[0], dict) and 'result' in result[0]:
-        return result[0]['result']  # type: ignore[no-any-return]
+    if (
+      isinstance(result, list)
+      and len(result) > 0
+      and isinstance(result[0], dict)
+      and 'result' in result[0]
+    ):
+      return result[0]['result']  # type: ignore[no-any-return]
 
     return result if isinstance(result, list) else [result] if result else []
 
 
 async def relate(
   edge_table: str,
-  from_record: str | 'RecordID[Any]',
-  to_record: str | 'RecordID[Any]',
+  from_record: str | RecordID[Any],
+  to_record: str | RecordID[Any],
   data: dict[str, Any] | None = None,
   client: DatabaseClient | None = None,
 ) -> dict[str, Any]:
@@ -174,17 +178,21 @@ async def relate(
   logger.info('relation_created', edge_table=edge_table)
 
   # Extract result data
-  if isinstance(result, list) and len(result) > 0:
-    if isinstance(result[0], dict) and 'result' in result[0]:
-      return result[0]['result']  # type: ignore[no-any-return]
+  if (
+    isinstance(result, list)
+    and len(result) > 0
+    and isinstance(result[0], dict)
+    and 'result' in result[0]
+  ):
+    return result[0]['result']  # type: ignore[no-any-return]
 
   return result  # type: ignore[no-any-return]
 
 
 async def unrelate(
   edge_table: str,
-  from_record: str | 'RecordID[Any]',
-  to_record: str | 'RecordID[Any]',
+  from_record: str | RecordID[Any],
+  to_record: str | RecordID[Any],
   client: DatabaseClient | None = None,
 ) -> None:
   """Remove an edge relationship between two records.
@@ -216,7 +224,7 @@ async def unrelate(
 
 
 async def get_outgoing_edges[T: BaseModel](
-  record: str | 'RecordID[Any]',
+  record: str | RecordID[Any],
   edge_table: str,
   model: type[T] | None = None,
   client: DatabaseClient | None = None,
@@ -246,7 +254,7 @@ async def get_outgoing_edges[T: BaseModel](
   result = await db.execute(sql)
 
   # Extract data
-  data = []
+  data: list[Any] = []
   if isinstance(result, list) and len(result) > 0:
     data = result[0]['result'] if isinstance(result[0], dict) and 'result' in result[0] else result
 
@@ -257,7 +265,7 @@ async def get_outgoing_edges[T: BaseModel](
 
 
 async def get_incoming_edges[T: BaseModel](
-  record: str | 'RecordID[Any]',
+  record: str | RecordID[Any],
   edge_table: str,
   model: type[T] | None = None,
   client: DatabaseClient | None = None,
@@ -287,7 +295,7 @@ async def get_incoming_edges[T: BaseModel](
   result = await db.execute(sql)
 
   # Extract data
-  data = []
+  data: list[Any] = []
   if isinstance(result, list) and len(result) > 0:
     data = result[0]['result'] if isinstance(result[0], dict) and 'result' in result[0] else result
 
@@ -298,7 +306,7 @@ async def get_incoming_edges[T: BaseModel](
 
 
 async def get_related_records[T: BaseModel](
-  record: str | 'RecordID[Any]',
+  record: str | RecordID[Any],
   edge_table: str,
   target_table: str,
   direction: str = 'out',
@@ -346,15 +354,19 @@ async def get_related_records[T: BaseModel](
     result = await db.execute(sql)
 
     # Extract data
-    if isinstance(result, list) and len(result) > 0:
-      if isinstance(result[0], dict) and 'result' in result[0]:
-        return result[0]['result']  # type: ignore[no-any-return]
+    if (
+      isinstance(result, list)
+      and len(result) > 0
+      and isinstance(result[0], dict)
+      and 'result' in result[0]
+    ):
+      return result[0]['result']  # type: ignore[no-any-return]
 
     return result if isinstance(result, list) else [result] if result else []
 
 
 async def count_related(
-  record: str | 'RecordID[Any]',
+  record: str | RecordID[Any],
   edge_table: str,
   direction: str = 'out',
   client: DatabaseClient | None = None,
@@ -392,18 +404,22 @@ async def count_related(
   result = await db.execute(sql)
 
   # Extract count
-  if isinstance(result, list) and len(result) > 0:
-    if isinstance(result[0], dict) and 'result' in result[0]:
-      data = result[0]['result']
-      if isinstance(data, list) and len(data) > 0:
-        return data[0].get('count', 0)  # type: ignore[no-any-return]
+  if (
+    isinstance(result, list)
+    and len(result) > 0
+    and isinstance(result[0], dict)
+    and 'result' in result[0]
+  ):
+    data = result[0]['result']
+    if isinstance(data, list) and len(data) > 0:
+      return data[0].get('count', 0)  # type: ignore[no-any-return]
 
   return 0
 
 
 async def shortest_path(
-  from_record: str | 'RecordID[Any]',
-  to_record: str | 'RecordID[Any]',
+  from_record: str | RecordID[Any],
+  to_record: str | RecordID[Any],
   edge_table: str,
   max_depth: int = 10,
   client: DatabaseClient | None = None,
