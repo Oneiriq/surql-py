@@ -1,13 +1,264 @@
 # Ethereal
 
-Ethereal is a code-first database toolkit for building modern applications with SurrealDB. It provides a seamless developer experience by integrating database operations directly into the codebase, allowing developers to define, query, and manipulate data using familiar programming constructs and most importantly **code-first migrations**.
+[![License](https://img.shields.io/badge/License-Apache%202.0-blue.svg)](LICENSE)
+[![Python Version](https://img.shields.io/badge/python-3.12%2B-blue)](https://www.python.org/downloads/)
+[![SurrealDB](https://img.shields.io/badge/SurrealDB-1.0%2B-ff00a0)](https://surrealdb.com/)
+
+Ethereal is a code-first database toolkit for building modern applications with SurrealDB. It provides a seamless developer experience by integrating database operations directly into the codebase, allowing developers to define, query, and manipulate data using familiar programming constructs and **code-first migrations**.
 
 ## Features
 
-- **Code-First Migrations**: Define and manage database schema changes directly in code, ensuring version control and easy collaboration.
-- **Type Safety**: Leverage Python's type hints to ensure data integrity and reduce runtime errors.
-- **Seamless Integration**: Easily integrate with existing Python applications and frameworks (e.g., FastAPI, Django, MCP).
-- **Async Support**: Built with asynchronous programming in mind for high-performance applications.
-- **Comprehensive Documentation**: Detailed guides and API references to help you get started quickly.
-- **Testing Utilities**: Tools to facilitate testing of database interactions in your applications.
+- **Code-First Migrations** - Define and manage database schema changes directly in code with automatic migration generation
+- **Type Safety** - Leverage Python's type hints with Pydantic for validation and reduced runtime errors
+- **Functional Composition** - Pure functions and immutable data structures for predictable, testable code
+- **Async-First** - Built with async/await for high-performance database operations
+- **Schema Definition** - Declarative schema definitions with fields, indexes, events, and permissions
+- **Query Builder** - Composable, type-safe query building with Pydantic model integration
+- **Graph Traversal** - Native support for SurrealDB's graph features and edge relationships
+- **CLI Tools** - Comprehensive command-line interface for migrations and database management
+- **Testing Utilities** - Tools to facilitate testing of database interactions
 
+## Quick Start
+
+### Installation
+
+```shell
+# Using pip
+pip install ethereal
+
+# Using uv (recommended)
+uv add ethereal
+```
+
+### Define a Schema
+
+```python
+from src.schema.fields import string_field, int_field, datetime_field
+from src.schema.table import table_schema, unique_index, TableMode
+
+user_schema = table_schema(
+  'user',
+  mode=TableMode.SCHEMAFULL,
+  fields=[
+    string_field('name', assertion='string::len($value) > 0'),
+    string_field('email', assertion='string::is::email($value)'),
+    int_field('age', assertion='$value >= 0 AND $value <= 150'),
+    datetime_field('created_at', default='time::now()', readonly=True),
+  ],
+  indexes=[
+    unique_index('email_idx', ['email']),
+  ],
+)
+```
+
+### Create a Migration
+
+```shell
+# Create a new migration file
+ethereal migrate create "Add user table"
+
+# Apply migrations
+ethereal migrate up
+
+# Check migration status
+ethereal migrate status
+```
+
+### Perform CRUD Operations
+
+```python
+from pydantic import BaseModel
+from src.connection.client import DatabaseClient, get_client
+from src.connection.config import ConnectionConfig
+from src.query.crud import create_record, query_records
+
+class User(BaseModel):
+  name: str
+  email: str
+  age: int
+
+# Connect to database
+config = ConnectionConfig(
+  url='ws://localhost:8000/rpc',
+  namespace='test',
+  database='test',
+  username='root',
+  password='root',
+)
+
+async with get_client(config) as client:
+  # Create a user
+  user = await create_record('user', User(
+    name='Alice',
+    email='alice@example.com',
+    age=30,
+  ))
+
+  # Query users
+  users = await query_records(
+    'user',
+    User,
+    conditions=['age > 18'],
+    order_by=('created_at', 'DESC'),
+    limit=10,
+  )
+
+  for user in users:
+    print(f'{user.name} - {user.email}')
+```
+
+## Documentation
+
+- [Installation Guide](docs/installation.md) - Detailed installation and setup
+- [Quick Start Tutorial](docs/quickstart.md) - Step-by-step tutorial
+- [Schema Definition Guide](docs/schema.md) - Complete schema definition reference
+- [Migration System](docs/migrations.md) - Migration creation and management
+- [Query Builder & ORM](docs/queries.md) - Querying and CRUD operations
+- [CLI Reference](docs/cli.md) - Command-line interface documentation
+- [API Reference](docs/api/README.md) - Module and function reference
+- [Examples](docs/examples/) - Working code examples
+
+## Architecture
+
+Ethereal is built on several core principles:
+
+- **Functional Composition** - Favor pure functions and composition over inheritance
+- **Type Safety** - Strict typing with mypy and runtime validation with Pydantic
+- **Immutability** - Immutable data structures and pure transformations
+- **Async-First** - All database operations are asynchronous
+- **Modular Design** - Small, focused modules with single responsibilities
+
+See the [Architecture Document](plans/architecture.md) for detailed design information.
+
+## Project Structure
+
+```
+ethereal/
+├── src/
+│   ├── schema/          # Schema definition layer
+│   │   ├── fields.py    # Field type definitions
+│   │   ├── table.py     # Table schema composition
+│   │   └── edge.py      # Edge/relationship schemas
+│   ├── migration/       # Migration system
+│   │   ├── generator.py # Migration generation
+│   │   ├── executor.py  # Migration execution
+│   │   ├── discovery.py # Migration file discovery
+│   │   └── history.py   # Migration tracking
+│   ├── query/           # Query builder and ORM
+│   │   ├── builder.py   # Query builder
+│   │   ├── crud.py      # CRUD operations
+│   │   ├── executor.py  # Query execution
+│   │   └── graph.py     # Graph traversal
+│   ├── connection/      # Database connection
+│   │   ├── client.py    # Async client wrapper
+│   │   ├── config.py    # Connection configuration
+│   │   └── context.py   # Context management
+│   ├── types/           # Type definitions
+│   │   ├── record_id.py # RecordID type
+│   │   └── operators.py # Query operators
+│   └── cli/             # CLI commands
+│       ├── migrate.py   # Migration commands
+│       ├── schema.py    # Schema commands
+│       └── db.py        # Database commands
+├── docs/                # Documentation
+├── tests/               # Test suite
+└── migrations/          # Migration files
+```
+
+## CLI Commands
+
+```shell
+# Migration commands
+ethereal migrate up              # Apply pending migrations
+ethereal migrate down            # Rollback last migration
+ethereal migrate status          # Show migration status
+ethereal migrate history         # Show applied migrations
+ethereal migrate create <name>   # Create new migration
+
+# Schema commands
+ethereal schema show             # Show database schema
+ethereal schema show <table>     # Show table schema
+
+# Database commands
+ethereal db info                 # Show database information
+ethereal db ping                 # Check database connection
+```
+
+## Requirements
+
+- Python 3.12+
+- SurrealDB 1.0+
+
+## Development
+
+```shell
+# Clone the repository
+git clone https://github.com/yourusername/ethereal.git
+cd ethereal
+
+# Install dependencies with uv
+uv sync
+
+# Run tests
+pytest
+
+# Run linting
+ruff check src/
+
+# Type checking
+mypy src/
+```
+
+## Contributing
+
+Contributions are welcome! Please follow these guidelines:
+
+1. Fork the repository
+2. Create a feature branch (`git checkout -b feature/amazing-feature`)
+3. Make your changes following the project's coding standards
+4. Add tests for new functionality
+5. Ensure all tests pass (`pytest`)
+6. Run linting and type checking (`ruff check`, `mypy`)
+7. Commit your changes (`git commit -m 'Add amazing feature'`)
+8. Push to the branch (`git push origin feature/amazing-feature`)
+9. Open a Pull Request
+
+### Coding Standards
+
+- Follow PEP 8 style guidelines
+- Use 2-space indentation
+- Write docstrings for all public functions and classes
+- Maintain type hints for all function signatures
+- Prefer functional composition over inheritance
+- Write tests for new features and bug fixes
+
+## License
+
+This project is licensed under the Apache License 2.0 - see the [LICENSE](LICENSE) file for details.
+
+## Acknowledgments
+
+- Built on [SurrealDB](https://surrealdb.com/) - The ultimate multi-model database
+- Uses [Pydantic](https://docs.pydantic.dev/) for data validation
+- CLI powered by [Typer](https://typer.tiangolo.com/)
+
+## Support
+
+- Documentation: [docs/](docs/)
+- Issues: [GitHub Issues](https://github.com/yourusername/ethereal/issues)
+- Discussions: [GitHub Discussions](https://github.com/yourusername/ethereal/discussions)
+
+## Roadmap
+
+- [x] Core schema definition system
+- [x] Migration generation and execution
+- [x] CRUD operations and query builder
+- [x] CLI interface
+- [ ] Auto-migration generation from schema changes
+- [ ] Schema validation against database
+- [ ] Advanced graph query helpers
+- [ ] Query result caching
+- [ ] Migration squashing
+- [ ] Schema visualization
+
+---

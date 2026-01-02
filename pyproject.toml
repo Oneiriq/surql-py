@@ -34,7 +34,7 @@ dependencies = [
 
 
 [project.scripts]
-ethereal = "src.__main__:main"
+ethereal = "src.__main__:cli"
 
 [build-system]
 requires = ["hatchling"]
