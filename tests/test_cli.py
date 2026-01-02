@@ -1,5 +1,6 @@
 """Tests for the CLI module."""
 
+import re
 from pathlib import Path
 from unittest.mock import patch
 
@@ -15,6 +16,12 @@ from src.cli.common import (
   validate_file_exists,
 )
 from src.cli.migrate import app as migrate_app
+
+
+def strip_ansi(text: str) -> str:
+  """Remove ANSI escape sequences from text."""
+  ansi_escape = re.compile(r'\x1b\[[0-9;]*m')
+  return ansi_escape.sub('', text)
 
 
 class TestOutputFormat:
@@ -301,7 +308,7 @@ class TestCLIFormats:
     result = self.runner.invoke(migrate_app, ['status', '--help'])
 
     assert result.exit_code == 0
-    assert '--format' in result.stdout
+    assert '--format' in strip_ansi(result.stdout)
 
   def test_migrate_status_json_format(self) -> None:
     """Test status with JSON format option."""
@@ -309,14 +316,14 @@ class TestCLIFormats:
 
     assert result.exit_code == 0
     # JSON format should be available as option
-    assert '--format' in result.stdout
+    assert '--format' in strip_ansi(result.stdout)
 
   def test_migrate_history_formats(self) -> None:
     """Test history command supports format option."""
     result = self.runner.invoke(migrate_app, ['history', '--help'])
 
     assert result.exit_code == 0
-    assert '--format' in result.stdout
+    assert '--format' in strip_ansi(result.stdout)
 
 
 class TestCLIVerboseOption:
