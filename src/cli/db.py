@@ -48,7 +48,7 @@ def init_database(
 
   Examples:
     Initialize database:
-    $ ethereal db init
+    $ reverie db init
   """
   try:
     asyncio.run(_init_database_async(verbose))
@@ -94,7 +94,7 @@ def ping_database(
 
   Examples:
     Test connection:
-    $ ethereal db ping
+    $ reverie db ping
   """
   try:
     asyncio.run(_ping_database_async(verbose))
@@ -143,10 +143,10 @@ def database_info(
 
   Examples:
     Show database info:
-    $ ethereal db info
+    $ reverie db info
 
     Show as JSON:
-    $ ethereal db info --format json
+    $ reverie db info --format json
   """
   try:
     config = get_db_config()
@@ -196,10 +196,10 @@ def reset_database(
 
   Examples:
     Reset database (with confirmation):
-    $ ethereal db reset
+    $ reverie db reset
 
     Reset without confirmation prompt:
-    $ ethereal db reset --yes
+    $ reverie db reset --yes
   """
   try:
     asyncio.run(_reset_database_async(confirm, verbose))
@@ -267,7 +267,7 @@ async def _reset_database_async(skip_confirm: bool, verbose: bool) -> None:
 
       display_success(f'Successfully removed {len(tables)} table(s)')
       display_info('Database has been reset')
-      display_info('Run "ethereal db init" to reinitialize migration tracking')
+      display_info('Run "reverie db init" to reinitialize migration tracking')
 
   except DBConnectionError as e:
     display_error(f'Connection failed: {e}')
@@ -286,10 +286,10 @@ def execute_query(
 
   Examples:
     Execute query:
-    $ ethereal db query "SELECT * FROM user LIMIT 5"
+    $ reverie db query "SELECT * FROM user LIMIT 5"
 
     Execute with table format:
-    $ ethereal db query "SELECT * FROM user" --format table
+    $ reverie db query "SELECT * FROM user" --format table
   """
   try:
     asyncio.run(_execute_query_async(query, output_format, verbose))
@@ -342,7 +342,7 @@ def database_version(
 
   Examples:
     Show version:
-    $ ethereal db version
+    $ reverie db version
   """
   try:
     asyncio.run(_database_version_async(verbose))

@@ -1,6 +1,6 @@
 # Schema Definition Guide
 
-This guide covers defining type-safe database schemas using Ethereal's functional composition API.
+This guide covers defining type-safe database schemas using reverie's functional composition API.
 
 ## Table of Contents
 
@@ -16,7 +16,7 @@ This guide covers defining type-safe database schemas using Ethereal's functiona
 
 ## Overview
 
-Ethereal provides a code-first approach to schema definition using:
+reverie provides a code-first approach to schema definition using:
 
 - **Pure functions** - All schema builders return immutable data structures
 - **Pydantic models** - Type-safe schema definitions with validation
@@ -47,7 +47,7 @@ schema = table_schema(
 
 ### Basic Field Types
 
-Ethereal supports all SurrealDB field types:
+reverie supports all SurrealDB field types:
 
 ```python
 from src.schema.fields import (
@@ -566,7 +566,7 @@ email_field = string_field(
 
 ## Functional Composition
 
-Ethereal emphasizes functional composition for building schemas.
+reverie emphasizes functional composition for building schemas.
 
 ### Composing Tables
 

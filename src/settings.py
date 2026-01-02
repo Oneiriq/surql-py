@@ -21,7 +21,7 @@ class Settings(BaseSettings):
   environment: Literal['development', 'staging', 'production'] = 'development'
   debug: bool = True
   log_level: Literal['DEBUG', 'INFO', 'WARNING', 'ERROR', 'CRITICAL'] = 'INFO'
-  app_name: str = 'ethereal'
+  app_name: str = 'reverie'
   version: str = '0.1.0'
 
   database: ConnectionConfig = Field(

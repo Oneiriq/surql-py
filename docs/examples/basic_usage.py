@@ -1,4 +1,4 @@
-"""Basic usage example for Ethereal ORM.
+"""Basic usage example for reverie ORM.
 
 This example demonstrates:
 - Connecting to SurrealDB
@@ -181,7 +181,7 @@ async def main():
 
 
 if __name__ == '__main__':
-  print('Ethereal Basic Usage Example')
+  print('reverie Basic Usage Example')
   print('=' * 40)
   print()
 

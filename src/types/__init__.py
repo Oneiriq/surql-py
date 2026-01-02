@@ -1,4 +1,4 @@
-"""Type definitions and utilities for ethereal ORM.
+"""Type definitions and utilities for reverie ORM.
 
 This package provides type-safe wrappers and operators for building SurrealDB queries.
 """

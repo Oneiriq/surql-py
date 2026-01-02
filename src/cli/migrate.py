@@ -61,13 +61,13 @@ def migrate_up(
 
   Examples:
     Apply all pending migrations:
-    $ ethereal migrate up
+    $ reverie migrate up
 
     Apply only the next migration:
-    $ ethereal migrate up --steps 1
+    $ reverie migrate up --steps 1
 
     Preview migrations without applying:
-    $ ethereal migrate up --dry-run
+    $ reverie migrate up --dry-run
   """
   try:
     asyncio.run(_migrate_up_async(directory, steps, dry_run, verbose))
@@ -162,13 +162,13 @@ def migrate_down(
 
   Examples:
     Rollback the last migration:
-    $ ethereal migrate down
+    $ reverie migrate down
 
     Rollback the last 3 migrations:
-    $ ethereal migrate down --steps 3
+    $ reverie migrate down --steps 3
 
     Preview rollback without executing:
-    $ ethereal migrate down --dry-run
+    $ reverie migrate down --dry-run
   """
   try:
     asyncio.run(_migrate_down_async(directory, steps, dry_run, verbose))
@@ -257,10 +257,10 @@ def migration_status(
 
   Examples:
     Show status:
-    $ ethereal migrate status
+    $ reverie migrate status
 
     Show status as JSON:
-    $ ethereal migrate status --format json
+    $ reverie migrate status --format json
   """
   try:
     asyncio.run(_migration_status_async(directory, output_format, verbose))
@@ -324,10 +324,10 @@ def migration_history(
 
   Examples:
     Show history:
-    $ ethereal migrate history
+    $ reverie migrate history
 
     Show history as JSON:
-    $ ethereal migrate history --format json
+    $ reverie migrate history --format json
   """
   try:
     asyncio.run(_migration_history_async(output_format, verbose))
@@ -380,10 +380,10 @@ def create_migration(
 
   Examples:
     Create migration:
-    $ ethereal migrate create "Add user table"
+    $ reverie migrate create "Add user table"
 
     Create in custom directory:
-    $ ethereal migrate create "Add indexes" --directory ./db/migrations
+    $ reverie migrate create "Add indexes" --directory ./db/migrations
   """
   try:
     migrations_dir = get_migrations_directory(directory)
@@ -415,7 +415,7 @@ def validate_migration_files(
 
   Examples:
     Validate migrations:
-    $ ethereal migrate validate
+    $ reverie migrate validate
   """
   try:
     asyncio.run(_validate_migrations_async(directory, verbose))
@@ -496,7 +496,7 @@ def generate_migration(
 
   Examples:
     Generate migration:
-    $ ethereal migrate generate "Update user schema"
+    $ reverie migrate generate "Update user schema"
   """
   display_warning('Auto-generation from schema not yet implemented')
   display_info('Creating blank migration instead...')

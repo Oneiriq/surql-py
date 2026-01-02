@@ -1,6 +1,6 @@
 # Quick Start Tutorial
 
-This tutorial will walk you through creating your first Ethereal project, defining schemas, creating migrations, and performing CRUD operations.
+This tutorial will walk you through creating your first reverie project, defining schemas, creating migrations, and performing CRUD operations.
 
 ## Table of Contents
 
@@ -21,7 +21,7 @@ Before starting, ensure you have:
 
 - Python 3.12+ installed
 - SurrealDB 1.0+ installed and running
-- Ethereal installed (`pip install ethereal` or `uv add ethereal`)
+- reverie installed (`pip install reverie` or `uv add reverie`)
 
 If you haven't completed these steps, see the [Installation Guide](installation.md).
 
@@ -41,10 +41,10 @@ python -m venv venv
 source venv/bin/activate  # On Windows: venv\Scripts\activate
 ```
 
-### 3. Install Ethereal
+### 3. Install reverie
 
 ```shell
-pip install ethereal
+pip install reverie
 ```
 
 ### 4. Create Project Structure
@@ -145,7 +145,7 @@ post_schema = table_schema(
 ### 1. Create Migration File
 
 ```shell
-ethereal migrate create "Create user and post tables"
+reverie migrate create "Create user and post tables"
 ```
 
 This creates a file like `migrations/20260102_120000_create_user_and_post_tables.py`.
@@ -197,7 +197,7 @@ def down() -> list[str]:
 metadata = {
   'version': '20260102_120000',
   'description': 'Create user and post tables',
-  'author': 'ethereal',
+  'author': 'reverie',
   'depends_on': [],
 }
 ```
@@ -225,7 +225,7 @@ async def get_db_client():
 ### 1. Check Migration Status
 
 ```shell
-ethereal migrate status
+reverie migrate status
 ```
 
 Output:
@@ -242,7 +242,7 @@ Total: 1 | Applied: 0 | Pending: 1
 ### 2. Apply Migrations
 
 ```shell
-ethereal migrate up
+reverie migrate up
 ```
 
 Output:
@@ -256,7 +256,7 @@ Successfully applied 1 migration(s)
 ### 3. Verify
 
 ```shell
-ethereal schema show
+reverie schema show
 ```
 
 ## Perform CRUD Operations
@@ -317,7 +317,7 @@ async def create_post_example(author_id: str):
       'post',
       Post(
         title='My First Blog Post',
-        content='This is my first post using Ethereal!',
+        content='This is my first post using reverie!',
         slug='my-first-post',
         author=author_id,
         published=True,
@@ -429,7 +429,7 @@ likes_edge = edge_schema(
 ### Create Edge Migration
 
 ```shell
-ethereal migrate create "Create likes edge"
+reverie migrate create "Create likes edge"
 ```
 
 Edit the migration file:
@@ -452,7 +452,7 @@ def down() -> list[str]:
 Apply the migration:
 
 ```shell
-ethereal migrate up
+reverie migrate up
 ```
 
 ### Create Relationships
@@ -529,8 +529,8 @@ async def main():
     post = await create_record(
       'post',
       Post(
-        title='Getting Started with Ethereal',
-        content='Ethereal makes working with SurrealDB easy!',
+        title='Getting Started with reverie',
+        content='reverie makes working with SurrealDB easy!',
         slug='getting-started',
         author=user['id'],
       ),
@@ -594,7 +594,7 @@ Created post: post:abc123
 Publishing post...
 
 Querying published posts...
-  - Getting Started with Ethereal (by user:alice)
+  - Getting Started with reverie (by user:alice)
 
 Creating like relationship...
 
@@ -714,7 +714,7 @@ If connection fails:
 
 ```shell
 # Test database connectivity
-ethereal db ping
+reverie db ping
 
 # Check SurrealDB is running
 surreal version

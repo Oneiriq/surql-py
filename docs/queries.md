@@ -1,6 +1,6 @@
 # Query Builder & ORM Guide
 
-This guide covers querying and manipulating data using Ethereal's type-safe query builder and ORM functions.
+This guide covers querying and manipulating data using reverie's type-safe query builder and ORM functions.
 
 ## Table of Contents
 
@@ -16,7 +16,7 @@ This guide covers querying and manipulating data using Ethereal's type-safe quer
 
 ## Overview
 
-Ethereal provides two ways to interact with your database:
+reverie provides two ways to interact with your database:
 
 1. **High-level CRUD functions** - Simple async functions for common operations
 2. **Query Builder** - Composable query construction with type safety

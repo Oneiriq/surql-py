@@ -1,7 +1,7 @@
-"""Main CLI entry point for ethereal.
+"""Main CLI entry point for reverie.
 
 This module provides the main Typer application and command groups for
-the ethereal database toolkit.
+the reverie database toolkit.
 """
 
 import sys
@@ -18,7 +18,7 @@ console = Console()
 
 # Create main Typer app
 app = typer.Typer(
-  name='ethereal',
+  name='reverie',
   help='Code-first database toolkit for SurrealDB',
   no_args_is_help=True,
   add_completion=True,
@@ -33,9 +33,9 @@ app.add_typer(db_app, name='db')
 
 @app.command()
 def version() -> None:
-  """Show ethereal version information."""
+  """Show reverie version information."""
   settings = get_settings()
-  console.print(f'[bold cyan]ethereal[/bold cyan] version {settings.version}')
+  console.print(f'[bold cyan]reverie[/bold cyan] version {settings.version}')
   console.print(f'Environment: {settings.environment}')
 
 
@@ -49,9 +49,9 @@ def main(
     help='Enable verbose logging',
   ),
 ) -> None:
-  """Ethereal - Code-first database toolkit for SurrealDB.
+  """reverie - Code-first database toolkit for SurrealDB.
 
-  Ethereal provides a modern, type-safe way to work with SurrealDB through:
+  reverie provides a modern, type-safe way to work with SurrealDB through:
 
   • Code-first schema definitions
   • Automatic migration generation

@@ -376,7 +376,7 @@ async def main():
 
 
 if __name__ == '__main__':
-  print('Ethereal Advanced Queries Example')
+  print('reverie Advanced Queries Example')
   print('=' * 60)
   print()
 

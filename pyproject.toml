@@ -1,5 +1,5 @@
 [project]
-name = "ethereal"
+name = "reverie"
 
 version = "0.1.0"
 description = "Code-first schema, validation, generation, and serialization for Python and SurrealDB."
@@ -34,7 +34,7 @@ dependencies = [
 
 
 [project.scripts]
-ethereal = "src.__main__:cli"
+reverie = "src.__main__:cli"
 
 [build-system]
 requires = ["hatchling"]

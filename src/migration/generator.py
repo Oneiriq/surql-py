@@ -31,7 +31,7 @@ def generate_migration(
   new_tables: dict[str, TableDefinition] | None = None,
   old_edges: dict[str, EdgeDefinition] | None = None,
   new_edges: dict[str, EdgeDefinition] | None = None,
-  author: str = 'ethereal',
+  author: str = 'reverie',
 ) -> Path:
   """Generate a migration file from schema changes.
 
@@ -111,7 +111,7 @@ def generate_initial_migration(
   tables: dict[str, TableDefinition],
   edges: dict[str, EdgeDefinition] | None = None,
   description: str = 'Initial schema',
-  author: str = 'ethereal',
+  author: str = 'reverie',
 ) -> Path:
   """Generate initial migration from schema definitions.
 
@@ -309,7 +309,7 @@ def _generate_filename(version: str, description: str) -> str:
 def create_blank_migration(
   directory: Path,
   description: str,
-  author: str = 'ethereal',
+  author: str = 'reverie',
 ) -> Path:
   """Create a blank migration file for manual editing.
 
@@ -392,7 +392,7 @@ def generate_migration_from_diffs(
   directory: Path,
   description: str,
   diffs: list[SchemaDiff],
-  author: str = 'ethereal',
+  author: str = 'reverie',
 ) -> Path:
   """Generate migration file from a list of diffs.
 

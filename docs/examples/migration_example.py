@@ -1,4 +1,4 @@
-"""Migration workflow example for Ethereal.
+"""Migration workflow example for reverie.
 
 This example demonstrates:
 - Creating migration files programmatically
@@ -64,7 +64,7 @@ def down() -> list[str]:
 metadata = {{
   'version': '{version}',
   'description': 'Create user table',
-  'author': 'ethereal',
+  'author': 'reverie',
   'depends_on': [],
 }}
 '''
@@ -101,7 +101,7 @@ def down() -> list[str]:
 metadata = {{
   'version': '{version}',
   'description': 'Create post table',
-  'author': 'ethereal',
+  'author': 'reverie',
   'depends_on': [],
 }}
 '''
@@ -225,7 +225,7 @@ async def main():
 
 
 if __name__ == '__main__':
-  print('Ethereal Migration Workflow Example')
+  print('reverie Migration Workflow Example')
   print('=' * 60)
   print()
 

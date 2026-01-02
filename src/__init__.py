@@ -1,4 +1,4 @@
-"""Ethereal - Code-first database toolkit for SurrealDB."""
+"""reverie - Code-first database toolkit for SurrealDB."""
 
 from src.connection import (
   ConnectionConfig,

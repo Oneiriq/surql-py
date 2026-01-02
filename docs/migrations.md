@@ -1,6 +1,6 @@
 # Migration System Guide
 
-This guide covers creating, managing, and executing database migrations with Ethereal's migration system.
+This guide covers creating, managing, and executing database migrations with reverie's migration system.
 
 ## Table of Contents
 
@@ -16,7 +16,7 @@ This guide covers creating, managing, and executing database migrations with Eth
 
 ## Overview
 
-Ethereal's migration system provides:
+reverie's migration system provides:
 
 - **Version control** - Track database schema changes over time
 - **Reversibility** - Roll back changes using down migrations
@@ -58,7 +58,7 @@ def down() -> list[str]:
 metadata = {
   'version': '20260102_120000',
   'description': 'Create user table',
-  'author': 'ethereal',
+  'author': 'reverie',
   'depends_on': [],
 }
 ```
@@ -75,7 +75,7 @@ metadata = {
 metadata = {
   'version': '20260102_120000',        # Unique version (timestamp)
   'description': 'Create user table',   # Human-readable description
-  'author': 'ethereal',                 # Migration author
+  'author': 'reverie',                 # Migration author
   'depends_on': [],                     # List of required migrations
 }
 ```
@@ -87,7 +87,7 @@ metadata = {
 Create a blank migration file:
 
 ```shell
-ethereal migrate create "Add user table"
+reverie migrate create "Add user table"
 ```
 
 This generates:
@@ -250,14 +250,14 @@ Examples:
 
 ```shell
 # Good - Clear and descriptive
-ethereal migrate create "Create user and post tables"
-ethereal migrate create "Add email verification fields"
-ethereal migrate create "Create follows edge table"
+reverie migrate create "Create user and post tables"
+reverie migrate create "Add email verification fields"
+reverie migrate create "Create follows edge table"
 
 # Avoid - Vague or generic
-ethereal migrate create "Update database"
-ethereal migrate create "Changes"
-ethereal migrate create "Fix"
+reverie migrate create "Update database"
+reverie migrate create "Changes"
+reverie migrate create "Fix"
 ```
 
 ## Running Migrations
@@ -265,7 +265,7 @@ ethereal migrate create "Fix"
 ### Apply All Pending Migrations
 
 ```shell
-ethereal migrate up
+reverie migrate up
 ```
 
 Output:
@@ -282,17 +282,17 @@ Successfully applied 2 migration(s)
 
 ```shell
 # Apply only the next migration
-ethereal migrate up --steps 1
+reverie migrate up --steps 1
 
 # Apply next 3 migrations
-ethereal migrate up --steps 3
+reverie migrate up --steps 3
 ```
 
 ### Dry Run (Preview)
 
 ```shell
 # See what will be executed without applying
-ethereal migrate up --dry-run
+reverie migrate up --dry-run
 ```
 
 Output shows SQL that would be executed:
@@ -314,7 +314,7 @@ Dry run mode - no changes will be made
 ### Check Migration Status
 
 ```shell
-ethereal migrate status
+reverie migrate status
 ```
 
 Output:
@@ -333,7 +333,7 @@ Total: 2 | Applied: 1 | Pending: 1
 ### View Migration History
 
 ```shell
-ethereal migrate history
+reverie migrate history
 ```
 
 Output:
@@ -351,7 +351,7 @@ Migration History
 
 ### History Storage
 
-Ethereal stores migration history in a special table:
+reverie stores migration history in a special table:
 
 ```sql
 CREATE TABLE _migration_history SCHEMAFULL;
@@ -386,20 +386,20 @@ async def view_history():
 ### Rollback Last Migration
 
 ```shell
-ethereal migrate down
+reverie migrate down
 ```
 
 ### Rollback Multiple Migrations
 
 ```shell
 # Rollback last 3 migrations
-ethereal migrate down --steps 3
+reverie migrate down --steps 3
 ```
 
 ### Preview Rollback
 
 ```shell
-ethereal migrate down --dry-run
+reverie migrate down --dry-run
 ```
 
 ### Writing Reversible Migrations
@@ -466,28 +466,28 @@ def down() -> list[str]:
 
 ```shell
 # Good - Focused migrations
-ethereal migrate create "Create user table"
-ethereal migrate create "Create post table"
-ethereal migrate create "Add user indexes"
+reverie migrate create "Create user table"
+reverie migrate create "Create post table"
+reverie migrate create "Add user indexes"
 
 # Avoid - Multiple unrelated changes
-ethereal migrate create "Create all tables and indexes"
+reverie migrate create "Create all tables and indexes"
 ```
 
 ### 2. Test Migrations Locally
 
 ```shell
 # Apply migration
-ethereal migrate up
+reverie migrate up
 
 # Verify it works
-ethereal schema show user
+reverie schema show user
 
 # Test rollback
-ethereal migrate down
+reverie migrate down
 
 # Verify rollback worked
-ethereal schema show user  # Should not exist
+reverie schema show user  # Should not exist
 ```
 
 ### 3. Use Transactions for Safety
@@ -572,7 +572,7 @@ def up() -> list[str]:
 
 ```shell
 # Validate before committing
-ethereal migrate validate
+reverie migrate validate
 ```
 
 ### 9. Use Dependencies
@@ -723,11 +723,11 @@ Migrations run in transactions. If a statement fails, all changes are rolled bac
 
 ```shell
 # Check what went wrong
-ethereal migrate status --verbose
+reverie migrate status --verbose
 
 # Fix the migration file
 # Then try again
-ethereal migrate up
+reverie migrate up
 ```
 
 ### Migration Already Applied
@@ -735,17 +735,17 @@ ethereal migrate up
 ```shell
 # If you need to re-run a migration:
 # 1. Rollback first
-ethereal migrate down
+reverie migrate down
 
 # 2. Re-apply
-ethereal migrate up
+reverie migrate up
 ```
 
 ### Duplicate Version Numbers
 
 ```shell
 # Check for duplicates
-ethereal migrate validate
+reverie migrate validate
 
 # Rename file with new timestamp
 mv migrations/20260102_120000_old.py \

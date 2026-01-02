@@ -113,14 +113,14 @@ class MigrationMetadata(BaseModel):
     >>> metadata = MigrationMetadata(
     ...   version='20260102_120000',
     ...   description='Create user table',
-    ...   author='ethereal',
+    ...   author='reverie',
     ...   depends_on=[],
     ... )
   """
 
   version: str
   description: str
-  author: str = 'ethereal'
+  author: str = 'reverie'
   depends_on: list[str] = Field(default_factory=list)
 
   model_config = ConfigDict(frozen=True)

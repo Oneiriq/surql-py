@@ -1,4 +1,4 @@
-"""Schema definition example for Ethereal.
+"""Schema definition example for reverie.
 
 This example demonstrates:
 - Defining table schemas
@@ -322,7 +322,7 @@ def print_schema_info(schema, schema_name):
 
 
 if __name__ == '__main__':
-  print('Ethereal Schema Definition Example')
+  print('reverie Schema Definition Example')
   print('=' * 60)
 
   # Display schema information

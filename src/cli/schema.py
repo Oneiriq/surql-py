@@ -48,13 +48,13 @@ def show_schema(
 
   Examples:
     Show all schema:
-    $ ethereal schema show
+    $ reverie schema show
 
     Show specific table:
-    $ ethereal schema show user
+    $ reverie schema show user
 
     Show as JSON:
-    $ ethereal schema show --format json
+    $ reverie schema show --format json
   """
   try:
     asyncio.run(_show_schema_async(table, output_format, verbose))
@@ -115,11 +115,11 @@ def diff_schema(
 
   Examples:
     Compare schemas:
-    $ ethereal schema diff
+    $ reverie schema diff
   """
   display_warning('Schema diff not yet implemented')
   display_info('This feature requires schema registry implementation')
-  display_info('Use "ethereal schema show" to view current database schema')
+  display_info('Use "reverie schema show" to view current database schema')
 
 
 @app.command('sync')
@@ -138,11 +138,11 @@ def sync_schema(
 
   Examples:
     Preview sync:
-    $ ethereal schema sync --dry-run
+    $ reverie schema sync --dry-run
   """
   display_warning('Schema sync not yet implemented')
   display_info('This feature requires schema registry implementation')
-  display_info('Use "ethereal migrate" commands to safely manage schema changes')
+  display_info('Use "reverie migrate" commands to safely manage schema changes')
 
 
 @app.command('export')
@@ -162,10 +162,10 @@ def export_schema(
 
   Examples:
     Export all schema to SQL:
-    $ ethereal schema export --output schema.sql
+    $ reverie schema export --output schema.sql
 
     Export specific table as JSON:
-    $ ethereal schema export --table user --format json --output user.json
+    $ reverie schema export --table user --format json --output user.json
   """
   try:
     asyncio.run(_export_schema_async(output, table, format, verbose))
@@ -232,10 +232,10 @@ def list_tables(
 
   Examples:
     List tables:
-    $ ethereal schema tables
+    $ reverie schema tables
 
     List as JSON:
-    $ ethereal schema tables --format json
+    $ reverie schema tables --format json
   """
   try:
     asyncio.run(_list_tables_async(output_format, verbose))
@@ -294,7 +294,7 @@ def inspect_table(
 
   Examples:
     Inspect table:
-    $ ethereal schema inspect user
+    $ reverie schema inspect user
   """
   try:
     asyncio.run(_inspect_table_async(table, verbose))

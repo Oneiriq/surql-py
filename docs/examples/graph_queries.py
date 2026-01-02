@@ -329,7 +329,7 @@ async def main():
 
 
 if __name__ == '__main__':
-  print('Ethereal Graph Queries Example')
+  print('reverie Graph Queries Example')
   print('=' * 60)
   print()
 

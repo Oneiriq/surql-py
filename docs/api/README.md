@@ -1,6 +1,6 @@
 # API Reference
 
-This document provides an overview of Ethereal's API modules. For detailed implementation, refer to the source code.
+This document provides an overview of reverie's API modules. For detailed implementation, refer to the source code.
 
 ## Table of Contents
 

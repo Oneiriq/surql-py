@@ -1,6 +1,6 @@
 """CLI command modules.
 
-This module contains all CLI command groups for the ethereal application.
+This module contains all CLI command groups for the reverie application.
 """
 
 from src.cli.db import app as db_app

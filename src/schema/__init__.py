@@ -1,4 +1,4 @@
-"""Schema definition layer for ethereal ORM.
+"""Schema definition layer for reverie ORM.
 
 This package provides functions and types for defining table and edge schemas
 in a functional, composable way.

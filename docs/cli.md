@@ -1,6 +1,6 @@
 # CLI Reference
 
-Complete reference for the Ethereal command-line interface.
+Complete reference for the reverie command-line interface.
 
 ## Table of Contents
 
@@ -15,35 +15,35 @@ Complete reference for the Ethereal command-line interface.
 
 ## Overview
 
-The Ethereal CLI provides commands for managing database schemas, migrations, and inspecting your database.
+The reverie CLI provides commands for managing database schemas, migrations, and inspecting your database.
 
 ```shell
-ethereal [OPTIONS] COMMAND [ARGS]
+reverie [OPTIONS] COMMAND [ARGS]
 ```
 
 ### Getting Help
 
 ```shell
 # Show all commands
-ethereal --help
+reverie --help
 
 # Show help for specific command
-ethereal migrate --help
+reverie migrate --help
 
 # Show help for subcommand
-ethereal migrate up --help
+reverie migrate up --help
 ```
 
 ### Version Information
 
 ```shell
-ethereal version
+reverie version
 ```
 
 Output:
 
 ```shell
-ethereal version 0.1.0
+reverie version 0.1.0
 Environment: development
 ```
 
@@ -56,8 +56,8 @@ These options work with any command:
 Enable verbose logging for detailed output.
 
 ```shell
-ethereal --verbose migrate up
-ethereal -v schema show
+reverie --verbose migrate up
+reverie -v schema show
 ```
 
 ### `--help`
@@ -65,8 +65,8 @@ ethereal -v schema show
 Show help message and exit.
 
 ```shell
-ethereal --help
-ethereal migrate --help
+reverie --help
+reverie migrate --help
 ```
 
 ## Migration Commands
@@ -74,7 +74,7 @@ ethereal migrate --help
 All migration commands are under the `migrate` subcommand:
 
 ```shell
-ethereal migrate [COMMAND] [OPTIONS]
+reverie migrate [COMMAND] [OPTIONS]
 ```
 
 ### `migrate up`
@@ -82,7 +82,7 @@ ethereal migrate [COMMAND] [OPTIONS]
 Apply pending migrations to the database.
 
 ```shell
-ethereal migrate up [OPTIONS]
+reverie migrate up [OPTIONS]
 ```
 
 **Options:**
@@ -96,22 +96,22 @@ ethereal migrate up [OPTIONS]
 
 ```shell
 # Apply all pending migrations
-ethereal migrate up
+reverie migrate up
 
 # Apply only the next migration
-ethereal migrate up --steps 1
+reverie migrate up --steps 1
 
 # Apply next 3 migrations
-ethereal migrate up --steps 3
+reverie migrate up --steps 3
 
 # Preview what will be applied
-ethereal migrate up --dry-run
+reverie migrate up --dry-run
 
 # Use custom migration directory
-ethereal migrate up --directory ./db/migrations
+reverie migrate up --directory ./db/migrations
 
 # Verbose output
-ethereal migrate up --verbose
+reverie migrate up --verbose
 ```
 
 **Output:**
@@ -129,7 +129,7 @@ Successfully applied 2 migration(s)
 Rollback the last applied migration(s).
 
 ```shell
-ethereal migrate down [OPTIONS]
+reverie migrate down [OPTIONS]
 ```
 
 **Options:**
@@ -143,16 +143,16 @@ ethereal migrate down [OPTIONS]
 
 ```shell
 # Rollback last migration
-ethereal migrate down
+reverie migrate down
 
 # Rollback last 3 migrations
-ethereal migrate down --steps 3
+reverie migrate down --steps 3
 
 # Preview rollback
-ethereal migrate down --dry-run
+reverie migrate down --dry-run
 
 # Verbose output
-ethereal migrate down --verbose
+reverie migrate down --verbose
 ```
 
 **Output:**
@@ -169,7 +169,7 @@ Successfully rolled back 1 migration(s)
 Show migration status (applied vs pending).
 
 ```shell
-ethereal migrate status [OPTIONS]
+reverie migrate status [OPTIONS]
 ```
 
 **Options:**
@@ -182,13 +182,13 @@ ethereal migrate status [OPTIONS]
 
 ```shell
 # Show status as table
-ethereal migrate status
+reverie migrate status
 
 # Show status as JSON
-ethereal migrate status --format json
+reverie migrate status --format json
 
 # Use custom directory
-ethereal migrate status --directory ./db/migrations
+reverie migrate status --directory ./db/migrations
 ```
 
 **Output (table):**
@@ -235,7 +235,7 @@ Total: 3 | Applied: 2 | Pending: 1
 Show applied migrations from database history.
 
 ```shell
-ethereal migrate history [OPTIONS]
+reverie migrate history [OPTIONS]
 ```
 
 **Options:**
@@ -247,10 +247,10 @@ ethereal migrate history [OPTIONS]
 
 ```shell
 # Show history as table
-ethereal migrate history
+reverie migrate history
 
 # Show history as JSON
-ethereal migrate history --format json
+reverie migrate history --format json
 ```
 
 **Output:**
@@ -270,7 +270,7 @@ Migration History
 Create a new blank migration file.
 
 ```shell
-ethereal migrate create DESCRIPTION [OPTIONS]
+reverie migrate create DESCRIPTION [OPTIONS]
 ```
 
 **Arguments:**
@@ -286,10 +286,10 @@ ethereal migrate create DESCRIPTION [OPTIONS]
 
 ```shell
 # Create migration
-ethereal migrate create "Add user indexes"
+reverie migrate create "Add user indexes"
 
 # Create in custom directory
-ethereal migrate create "Add posts" --directory ./db/migrations
+reverie migrate create "Add posts" --directory ./db/migrations
 ```
 
 **Output:**
@@ -305,7 +305,7 @@ Path: migrations/20260102_143000_add_user_indexes.py
 Validate migration files for errors.
 
 ```shell
-ethereal migrate validate [OPTIONS]
+reverie migrate validate [OPTIONS]
 ```
 
 **Options:**
@@ -317,10 +317,10 @@ ethereal migrate validate [OPTIONS]
 
 ```shell
 # Validate migrations
-ethereal migrate validate
+reverie migrate validate
 
 # Validate with verbose output
-ethereal migrate validate --verbose
+reverie migrate validate --verbose
 ```
 
 **Output:**
@@ -338,7 +338,7 @@ All 3 migration(s) are valid
 Generate migration from schema changes (auto-generation).
 
 ```shell
-ethereal migrate generate DESCRIPTION [OPTIONS]
+reverie migrate generate DESCRIPTION [OPTIONS]
 ```
 
 **Note:** Full auto-generation is not yet implemented. Currently creates a blank migration.
@@ -355,7 +355,7 @@ ethereal migrate generate DESCRIPTION [OPTIONS]
 **Examples:**
 
 ```shell
-ethereal migrate generate "Update user schema"
+reverie migrate generate "Update user schema"
 ```
 
 ## Schema Commands
@@ -363,7 +363,7 @@ ethereal migrate generate "Update user schema"
 Commands for inspecting database schema:
 
 ```shell
-ethereal schema [COMMAND] [OPTIONS]
+reverie schema [COMMAND] [OPTIONS]
 ```
 
 ### `schema show`
@@ -371,7 +371,7 @@ ethereal schema [COMMAND] [OPTIONS]
 Display database or table schema.
 
 ```shell
-ethereal schema show [TABLE] [OPTIONS]
+reverie schema show [TABLE] [OPTIONS]
 ```
 
 **Arguments:**
@@ -382,13 +382,13 @@ ethereal schema show [TABLE] [OPTIONS]
 
 ```shell
 # Show entire database schema
-ethereal schema show
+reverie schema show
 
 # Show specific table schema
-ethereal schema show user
+reverie schema show user
 
 # Show post table schema
-ethereal schema show post
+reverie schema show post
 ```
 
 **Output (database):**
@@ -428,7 +428,7 @@ Indexes:
 Commands for database management:
 
 ```shell
-ethereal db [COMMAND] [OPTIONS]
+reverie db [COMMAND] [OPTIONS]
 ```
 
 ### `db ping`
@@ -436,13 +436,13 @@ ethereal db [COMMAND] [OPTIONS]
 Check database connection.
 
 ```shell
-ethereal db ping
+reverie db ping
 ```
 
 **Examples:**
 
 ```shell
-ethereal db ping
+reverie db ping
 ```
 
 **Output:**
@@ -459,13 +459,13 @@ Database: blog
 Show database information.
 
 ```shell
-ethereal db info
+reverie db info
 ```
 
 **Examples:**
 
 ```shell
-ethereal db info
+reverie db info
 ```
 
 **Output:**
@@ -492,13 +492,13 @@ Migrations Applied: 3
 mkdir migrations
 
 # Create first migration
-ethereal migrate create "Initial schema"
+reverie migrate create "Initial schema"
 
 # Edit migration file
 # ... add your SQL statements ...
 
 # Apply migration
-ethereal migrate up
+reverie migrate up
 ```
 
 ### Development Workflow
@@ -506,75 +506,75 @@ ethereal migrate up
 ```shell
 # 1. Make schema changes in code
 # 2. Create migration
-ethereal migrate create "Add email verification"
+reverie migrate create "Add email verification"
 
 # 3. Edit migration file with SQL
 # 4. Preview changes
-ethereal migrate up --dry-run
+reverie migrate up --dry-run
 
 # 5. Apply migration
-ethereal migrate up
+reverie migrate up
 
 # 6. Verify schema
-ethereal schema show
+reverie schema show
 ```
 
 ### Rollback Workflow
 
 ```shell
 # Check current status
-ethereal migrate status
+reverie migrate status
 
 # Preview rollback
-ethereal migrate down --dry-run
+reverie migrate down --dry-run
 
 # Rollback if needed
-ethereal migrate down
+reverie migrate down
 
 # Verify
-ethereal migrate status
+reverie migrate status
 ```
 
 ### Debugging Migrations
 
 ```shell
 # Validate migration files
-ethereal migrate validate
+reverie migrate validate
 
 # Check what's pending
-ethereal migrate status
+reverie migrate status
 
 # Try dry run first
-ethereal migrate up --dry-run
+reverie migrate up --dry-run
 
 # Apply with verbose logging
-ethereal migrate up --verbose
+reverie migrate up --verbose
 ```
 
 ### Production Deployment
 
 ```shell
 # 1. Check status on production
-ethereal migrate status --format json > status.json
+reverie migrate status --format json > status.json
 
 # 2. Preview changes
-ethereal migrate up --dry-run
+reverie migrate up --dry-run
 
 # 3. Apply migrations
-ethereal migrate up
+reverie migrate up
 
 # 4. Verify
-ethereal migrate history
+reverie migrate history
 
 # 5. Check database
-ethereal db info
+reverie db info
 ```
 
 ## Configuration
 
 ### Configuration Files
 
-Ethereal loads configuration from:
+reverie loads configuration from:
 
 1. Environment variables
 2. `.env` file in current directory
@@ -624,14 +624,14 @@ Load specific environment:
 
 ```shell
 # Linux/macOS
-export $(cat .env.production | xargs) && ethereal migrate up
+export $(cat .env.production | xargs) && reverie migrate up
 
 # Windows PowerShell
 Get-Content .env.production | ForEach-Object {
   $name, $value = $_.split('=')
   Set-Content env:\$name $value
 }
-ethereal migrate up
+reverie migrate up
 ```
 
 ## Environment Variables
@@ -697,41 +697,41 @@ Check exit code:
 
 ```shell
 # Linux/macOS
-ethereal migrate up
+reverie migrate up
 echo $?
 
 # Windows Command Prompt
-ethereal migrate up
+reverie migrate up
 echo %ERRORLEVEL%
 
 # Windows PowerShell
-ethereal migrate up
+reverie migrate up
 echo $LASTEXITCODE
 ```
 
 ## Shell Completion
 
-Ethereal supports shell completion for shell, zsh, and fish.
+reverie supports shell completion for shell, zsh, and fish.
 
 ### shell
 
 ```shell
 # Add to ~/.shellrc
-eval "$(_ETHEREAL_COMPLETE=shell_source ethereal)"
+eval "$(_reverie_COMPLETE=shell_source reverie)"
 ```
 
 ### Zsh
 
 ```shell
 # Add to ~/.zshrc
-eval "$(_ETHEREAL_COMPLETE=zsh_source ethereal)"
+eval "$(_reverie_COMPLETE=zsh_source reverie)"
 ```
 
 ### Fish
 
 ```shell
 # Add to ~/.config/fish/config.fish
-eval (env _ETHEREAL_COMPLETE=fish_source ethereal)
+eval (env _reverie_COMPLETE=fish_source reverie)
 ```
 
 ## Troubleshooting
@@ -740,23 +740,23 @@ eval (env _ETHEREAL_COMPLETE=fish_source ethereal)
 
 ```shell
 # Check database is running
-ethereal db ping
+reverie db ping
 
 # Test connection with verbose output
-ethereal --verbose db info
+reverie --verbose db info
 ```
 
 ### Migration Errors
 
 ```shell
 # Validate migration files
-ethereal migrate validate
+reverie migrate validate
 
 # Check migration status
-ethereal migrate status
+reverie migrate status
 
 # View migration history
-ethereal migrate history
+reverie migrate history
 ```
 
 ### Permission Errors
@@ -773,10 +773,10 @@ mkdir -p migrations
 
 ```shell
 # Use JSON for script parsing
-ethereal migrate status --format json | jq '.[] | select(.status == "PENDING")'
+reverie migrate status --format json | jq '.[] | select(.status == "PENDING")'
 
 # Use table for human-readable output
-ethereal migrate status --format table
+reverie migrate status --format table
 ```
 
 ## Scripting Examples
@@ -789,13 +789,13 @@ set -e
 
 # Apply migrations in CI/CD
 echo "Checking migration status..."
-ethereal migrate status
+reverie migrate status
 
 echo "Applying migrations..."
-ethereal migrate up
+reverie migrate up
 
 echo "Verifying migrations..."
-ethereal migrate history
+reverie migrate history
 
 echo "Done!"
 ```
@@ -811,7 +811,7 @@ def run_migrations():
   try:
     # Check status
     result = subprocess.run(
-      ['ethereal', 'migrate', 'status', '--format', 'json'],
+      ['reverie', 'migrate', 'status', '--format', 'json'],
       capture_output=True,
       text=True,
       check=True,
@@ -821,7 +821,7 @@ def run_migrations():
     
     # Apply migrations
     subprocess.run(
-      ['ethereal', 'migrate', 'up'],
+      ['reverie', 'migrate', 'up'],
       check=True,
     )
     

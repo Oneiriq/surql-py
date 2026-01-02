@@ -1,4 +1,4 @@
-"""Migration system for ethereal ORM.
+"""Migration system for reverie ORM.
 
 This module provides code-first migration capabilities including:
 - Auto-generation of migrations from schema changes

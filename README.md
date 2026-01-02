@@ -1,10 +1,10 @@
-# Ethereal
+# Reverie
 
 [![License](https://img.shields.io/badge/License-Apache%202.0-blue.svg)](LICENSE)
 [![Python Version](https://img.shields.io/badge/python-3.12%2B-blue)](https://www.python.org/downloads/)
 [![SurrealDB](https://img.shields.io/badge/SurrealDB-1.0%2B-ff00a0)](https://surrealdb.com/)
 
-Ethereal is a code-first database toolkit for building modern applications with SurrealDB. It provides a seamless developer experience by integrating database operations directly into the codebase, allowing developers to define, query, and manipulate data using familiar programming constructs and **code-first migrations**.
+Reverie is a code-first database toolkit for building modern applications with SurrealDB. It provides a seamless developer experience by integrating database operations directly into the codebase, allowing developers to define, query, and manipulate data using familiar programming constructs and **code-first migrations**.
 
 ## Features
 
@@ -24,10 +24,10 @@ Ethereal is a code-first database toolkit for building modern applications with 
 
 ```shell
 # Using pip
-pip install ethereal
+pip install reverie
 
 # Using uv (recommended)
-uv add ethereal
+uv add reverie
 ```
 
 ### Define a Schema
@@ -55,13 +55,13 @@ user_schema = table_schema(
 
 ```shell
 # Create a new migration file
-ethereal migrate create "Add user table"
+reverie migrate create "Add user table"
 
 # Apply migrations
-ethereal migrate up
+reverie migrate up
 
 # Check migration status
-ethereal migrate status
+reverie migrate status
 ```
 
 ### Perform CRUD Operations
@@ -120,7 +120,7 @@ async with get_client(config) as client:
 
 ## Architecture
 
-Ethereal is built on several core principles:
+reverie is built on several core principles:
 
 - **Functional Composition** - Favor pure functions and composition over inheritance
 - **Type Safety** - Strict typing with mypy and runtime validation with Pydantic
@@ -133,7 +133,7 @@ See the [Architecture Document](plans/architecture.md) for detailed design infor
 ## Project Structure
 
 ```
-ethereal/
+reverie/
 ├── src/
 │   ├── schema/          # Schema definition layer
 │   │   ├── fields.py    # Field type definitions
@@ -169,19 +169,19 @@ ethereal/
 
 ```shell
 # Migration commands
-ethereal migrate up              # Apply pending migrations
-ethereal migrate down            # Rollback last migration
-ethereal migrate status          # Show migration status
-ethereal migrate history         # Show applied migrations
-ethereal migrate create <name>   # Create new migration
+reverie migrate up              # Apply pending migrations
+reverie migrate down            # Rollback last migration
+reverie migrate status          # Show migration status
+reverie migrate history         # Show applied migrations
+reverie migrate create <name>   # Create new migration
 
 # Schema commands
-ethereal schema show             # Show database schema
-ethereal schema show <table>     # Show table schema
+reverie schema show             # Show database schema
+reverie schema show <table>     # Show table schema
 
 # Database commands
-ethereal db info                 # Show database information
-ethereal db ping                 # Check database connection
+reverie db info                 # Show database information
+reverie db ping                 # Check database connection
 ```
 
 ## Requirements
@@ -193,8 +193,8 @@ ethereal db ping                 # Check database connection
 
 ```shell
 # Clone the repository
-git clone https://github.com/yourusername/ethereal.git
-cd ethereal
+git clone https://github.com/yourusername/reverie.git
+cd reverie
 
 # Install dependencies with uv
 uv sync
@@ -245,8 +245,8 @@ This project is licensed under the Apache License 2.0 - see the [LICENSE](LICENS
 ## Support
 
 - Documentation: [docs/](docs/)
-- Issues: [GitHub Issues](https://github.com/yourusername/ethereal/issues)
-- Discussions: [GitHub Discussions](https://github.com/yourusername/ethereal/discussions)
+- Issues: [GitHub Issues](https://github.com/yourusername/reverie/issues)
+- Discussions: [GitHub Discussions](https://github.com/yourusername/reverie/discussions)
 
 ## Roadmap
 

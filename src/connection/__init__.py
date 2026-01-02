@@ -1,4 +1,4 @@
-"""Database connection layer for ethereal ORM.
+"""Database connection layer for reverie ORM.
 
 This module provides:
 - Connection configuration management

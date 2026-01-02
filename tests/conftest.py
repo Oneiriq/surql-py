@@ -1,4 +1,4 @@
-"""Shared pytest fixtures for ethereal ORM tests.
+"""Shared pytest fixtures for reverie ORM tests.
 
 This module provides common fixtures used across all test modules including
 mock database clients, sample schemas, and test utilities.

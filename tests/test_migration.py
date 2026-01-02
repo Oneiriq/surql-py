@@ -243,7 +243,7 @@ class TestMigrationMetadata:
       description='Test',
     )
 
-    assert metadata.author == 'ethereal'
+    assert metadata.author == 'reverie'
     assert metadata.depends_on == []
 
 

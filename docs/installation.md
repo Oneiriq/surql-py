@@ -1,11 +1,11 @@
 # Installation Guide
 
-This guide covers installing Ethereal and setting up SurrealDB for development.
+This guide covers installing reverie and setting up SurrealDB for development.
 
 ## Table of Contents
 
 - [Requirements](#requirements)
-- [Installing Ethereal](#installing-ethereal)
+- [Installing reverie](#installing-reverie)
 - [Installing SurrealDB](#installing-surrealdb)
 - [Configuration](#configuration)
 - [Verification](#verification)
@@ -30,12 +30,12 @@ python3 --version
 
 - SurrealDB 1.0 or higher
 
-## Installing Ethereal
+## Installing reverie
 
 ### Using pip
 
 ```shell
-pip install ethereal
+pip install reverie
 ```
 
 ### Using uv (Recommended)
@@ -46,8 +46,8 @@ pip install ethereal
 # Install uv if you haven't already
 pip install uv
 
-# Add ethereal to your project
-uv add ethereal
+# Add reverie to your project
+uv add reverie
 ```
 
 ### From Source
@@ -56,8 +56,8 @@ For development or to use the latest features:
 
 ```shell
 # Clone the repository
-git clone https://github.com/yourusername/ethereal.git
-cd ethereal
+git clone https://github.com/yourusername/reverie.git
+cd reverie
 
 # Install with uv
 uv sync
@@ -224,7 +224,7 @@ config = ConnectionConfig(
 
 ### Loading from Environment
 
-Ethereal automatically loads configuration from environment variables:
+reverie automatically loads configuration from environment variables:
 
 ```python
 from src.settings import get_db_config
@@ -235,18 +235,18 @@ config = get_db_config()
 
 ## Verification
 
-### Verify Ethereal Installation
+### Verify reverie Installation
 
 ```shell
-ethereal --help
+reverie --help
 ```
 
 You should see the CLI help output:
 
 ```shell
-Usage: ethereal [OPTIONS] COMMAND [ARGS]...
+Usage: reverie [OPTIONS] COMMAND [ARGS]...
 
-  Ethereal - Code-first database toolkit for SurrealDB.
+  reverie - Code-first database toolkit for SurrealDB.
 
 Options:
   --verbose, -v  Enable verbose logging
@@ -256,7 +256,7 @@ Commands:
   db       Database management commands
   migrate  Database migration commands
   schema   Schema inspection commands
-  version  Show ethereal version information
+  version  Show reverie version information
 ```
 
 ### Test Database Connection
@@ -296,10 +296,10 @@ python test_connection.py
 
 ```shell
 # Check database connection
-ethereal db ping
+reverie db ping
 
 # Show database info
-ethereal db info
+reverie db info
 ```
 
 ## Project Setup
@@ -315,7 +315,7 @@ mkdir migrations
 ### Create First Migration
 
 ```shell
-ethereal migrate create "Initial setup"
+reverie migrate create "Initial setup"
 ```
 
 This creates a migration file in `migrations/` with the current timestamp.
@@ -359,8 +359,8 @@ If you get a connection refused error:
 If you get import errors:
 
 ```shell
-# Reinstall ethereal
-pip install --force-reinstall ethereal
+# Reinstall reverie
+pip install --force-reinstall reverie
 
 # Or with uv
 uv sync --reinstall
@@ -372,12 +372,12 @@ If you get permission errors on Linux/macOS:
 
 ```shell
 # Run with sudo (not recommended for pip)
-sudo pip install ethereal
+sudo pip install reverie
 
 # Or use virtual environment (recommended)
 python -m venv venv
 source venv/bin/activate  # On Windows: venv\Scripts\activate
-pip install ethereal
+pip install reverie
 ```
 
 ### SurrealDB Not Found
@@ -397,7 +397,7 @@ If `surreal` command is not found after installation:
 
 ## Next Steps
 
-Now that you have Ethereal installed and configured:
+Now that you have reverie installed and configured:
 
 1. Follow the [Quick Start Tutorial](quickstart.md) to create your first schema and migration
 2. Read the [Schema Definition Guide](schema.md) to learn about schema features
@@ -408,5 +408,5 @@ Now that you have Ethereal installed and configured:
 
 - [SurrealDB Documentation](https://surrealdb.com/docs)
 - [SurrealDB Installation](https://surrealdb.com/install)
-- [Ethereal GitHub Repository](https://github.com/yourusername/ethereal)
+- [reverie GitHub Repository](https://github.com/yourusername/reverie)
 - [Python Virtual Environments](https://docs.python.org/3/tutorial/venv.html)
