@@ -23,7 +23,6 @@ from reverie.schema import (
   with_indexes,
 )
 
-
 # Define chunk table with 1024-dimensional MTREE index (driftnet pattern)
 chunk = table_schema('chunk')
 chunk = with_fields(

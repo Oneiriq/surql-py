@@ -1,7 +1,7 @@
 """Tests for migration history tracking module."""
 
-from datetime import datetime, timezone
-from unittest.mock import AsyncMock, patch
+from datetime import UTC, datetime
+from unittest.mock import AsyncMock
 
 import pytest
 
@@ -570,7 +570,7 @@ class TestParseDatetime:
 
   def test_parse_datetime_from_datetime_object(self):
     """Test parsing datetime from datetime object."""
-    now = datetime.now(timezone.utc)
+    now = datetime.now(UTC)
     result = _parse_datetime(now)
     assert result == now
 

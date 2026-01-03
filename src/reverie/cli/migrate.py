@@ -122,7 +122,7 @@ async def _migrate_up_async(
     # Display plan
     display_info(f'Found {plan.count} pending migration(s):')
     for migration in plan.migrations:
-      display_info(f'  • {migration.version}: {migration.description}')
+      display_info(f'  - {migration.version}: {migration.description}')
 
     if dry_run:
       display_warning('Dry run mode - no changes will be made')
@@ -156,6 +156,7 @@ def migrate_down(
   directory: Annotated[Path | None, directory_option] = None,
   steps: Annotated[int, typer.Option('--steps', '-n', help='Number of migrations to rollback')] = 1,
   dry_run: bool = typer.Option(False, '--dry-run', help='Preview changes without applying'),
+  confirm: Annotated[bool, typer.Option('--yes', '-y', help='Skip confirmation prompt')] = False,
   verbose: Annotated[bool, verbose_option] = False,
 ) -> None:
   """Rollback applied migrations.
@@ -169,9 +170,12 @@ def migrate_down(
 
     Preview rollback without executing:
     $ reverie migrate down --dry-run
+
+    Rollback without confirmation:
+    $ reverie migrate down --yes
   """
   try:
-    asyncio.run(_migrate_down_async(directory, steps, dry_run, verbose))
+    asyncio.run(_migrate_down_async(directory, steps, dry_run, confirm, verbose))
   except Exception as e:
     handle_error(e, verbose)
     raise typer.Exit(1) from e
@@ -181,6 +185,7 @@ async def _migrate_down_async(
   directory: Path | None,
   steps: int,
   dry_run: bool,
+  skip_confirm: bool,
   _verbose: bool,
 ) -> None:
   """Async implementation of migrate down."""
@@ -211,7 +216,7 @@ async def _migrate_down_async(
     # Display plan
     display_warning(f'Will rollback {plan.count} migration(s):')
     for migration in reversed(plan.migrations):
-      display_warning(f'  • {migration.version}: {migration.description}')
+      display_warning(f'  - {migration.version}: {migration.description}')
 
     if dry_run:
       display_warning('Dry run mode - no changes will be made')
@@ -227,8 +232,8 @@ async def _migrate_down_async(
         )
       return
 
-    # Confirm destructive action
-    if not confirm_destructive('Rollback migrations?'):
+    # Confirm destructive action (skip if --yes flag provided)
+    if not skip_confirm and not confirm_destructive('Rollback migrations?'):
       display_info('Rollback cancelled')
       return
 
@@ -315,6 +320,7 @@ async def _migration_status_async(
 
 @app.command('history')
 def migration_history(
+  directory: Annotated[Path | None, directory_option] = None,
   output_format: Annotated[OutputFormat, typer.Option('--format', '-f')] = OutputFormat.TABLE,
   verbose: Annotated[bool, verbose_option] = False,
 ) -> None:
@@ -330,17 +336,19 @@ def migration_history(
     $ reverie migrate history --format json
   """
   try:
-    asyncio.run(_migration_history_async(output_format, verbose))
+    asyncio.run(_migration_history_async(directory, output_format, verbose))
   except Exception as e:
     handle_error(e, verbose)
     raise typer.Exit(1) from e
 
 
 async def _migration_history_async(
+  directory: Path | None,
   output_format: OutputFormat,
   _verbose: bool,
 ) -> None:
   """Async implementation of migration history."""
+  _migrations_dir = get_migrations_directory(directory)
   config = get_db_config()
 
   async with get_client(config) as client:
@@ -480,7 +488,7 @@ async def _validate_migrations_async(
 
   if verbose:
     for migration in migrations:
-      display_info(f'  ✓ {migration.version}: {migration.description}')
+      display_info(f'  [OK] {migration.version}: {migration.description}')
 
 
 @app.command('generate')

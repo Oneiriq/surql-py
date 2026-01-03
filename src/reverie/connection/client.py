@@ -86,7 +86,7 @@ class DatabaseClient:
         with attempt:
           self._log.info('connecting_to_database', attempt=attempt.retry_state.attempt_number)
 
-          self._client = AsyncSurreal()
+          self._client = AsyncSurreal(self._config.url)
           await self._client.connect(self._config.url)
 
           if self._config.username and self._config.password:

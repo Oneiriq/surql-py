@@ -141,7 +141,7 @@ class TestRecordID:
 
     assert record_id.table == 'outlet'
     assert record_id.id == 'alaskabeacon.com'
-    assert str(record_id) == 'outlet:⟨alaskabeacon.com⟩'
+    assert str(record_id) == 'outlet:<alaskabeacon.com>'
 
   def test_record_id_with_composite_id(self) -> None:
     """Test RecordID with composite ID containing colon."""
@@ -149,13 +149,13 @@ class TestRecordID:
 
     assert record_id.table == 'document'
     assert record_id.id == 'alaskabeacon.com:01JEHE123'
-    assert str(record_id) == 'document:⟨alaskabeacon.com:01JEHE123⟩'
+    assert str(record_id) == 'document:<alaskabeacon.com:01JEHE123>'
 
   def test_record_id_with_hyphen_id(self) -> None:
     """Test RecordID with hyphen in ID (requires angle brackets)."""
     record_id = RecordID(table='user', id='john-doe')
 
-    assert str(record_id) == 'user:⟨john-doe⟩'
+    assert str(record_id) == 'user:<john-doe>'
 
   def test_record_id_simple_no_brackets(self) -> None:
     """Test that simple alphanumeric IDs don't get angle brackets."""
@@ -171,19 +171,19 @@ class TestRecordID:
 
   def test_record_id_parse_angle_bracket_domain(self) -> None:
     """Test parsing RecordID with angle bracket domain syntax."""
-    record_id = RecordID.parse('outlet:⟨alaskabeacon.com⟩')
+    record_id = RecordID.parse('outlet:<alaskabeacon.com>')
 
     assert record_id.table == 'outlet'
     assert record_id.id == 'alaskabeacon.com'
-    assert str(record_id) == 'outlet:⟨alaskabeacon.com⟩'
+    assert str(record_id) == 'outlet:<alaskabeacon.com>'
 
   def test_record_id_parse_angle_bracket_composite(self) -> None:
     """Test parsing RecordID with angle bracket composite ID."""
-    record_id = RecordID.parse('document:⟨domain.com:ulid123⟩')
+    record_id = RecordID.parse('document:<domain.com:ulid123>')
 
     assert record_id.table == 'document'
     assert record_id.id == 'domain.com:ulid123'
-    assert str(record_id) == 'document:⟨domain.com:ulid123⟩'
+    assert str(record_id) == 'document:<domain.com:ulid123>'
 
   def test_record_id_bidirectional_parsing_simple(self) -> None:
     """Test bidirectional parsing for simple IDs."""
@@ -223,13 +223,13 @@ class TestRecordID:
     assert record_id.table == 'outlet'
     assert record_id.id == 'alaskabeacon.com'
     # When converted to string, brackets are added automatically
-    assert str(record_id) == 'outlet:⟨alaskabeacon.com⟩'
+    assert str(record_id) == 'outlet:<alaskabeacon.com>'
 
   def test_record_id_to_surql_with_angle_brackets(self) -> None:
     """Test converting RecordID with angle brackets to SurrealQL format."""
     record_id = RecordID(table='outlet', id='alaskabeacon.com')
 
-    assert record_id.to_surql() == 'outlet:⟨alaskabeacon.com⟩'
+    assert record_id.to_surql() == 'outlet:<alaskabeacon.com>'
 
   def test_record_id_integer_no_brackets(self) -> None:
     """Test that integer IDs never get angle brackets."""

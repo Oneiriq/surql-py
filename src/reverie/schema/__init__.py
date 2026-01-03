@@ -31,6 +31,20 @@ from reverie.schema.fields import (
   record_field,
   string_field,
 )
+from reverie.schema.parser import (
+  SchemaParseError,
+  parse_db_info,
+  parse_table_info,
+)
+from reverie.schema.registry import (
+  SchemaRegistry,
+  clear_registry,
+  get_registered_edges,
+  get_registered_tables,
+  get_registry,
+  register_edge,
+  register_table,
+)
 from reverie.schema.table import (
   EventDefinition,
   IndexDefinition,
@@ -97,4 +111,16 @@ __all__ = [
   'with_edge_permissions',
   'bidirectional_edge',
   'typed_edge',
+  # Registry
+  'SchemaRegistry',
+  'get_registry',
+  'register_table',
+  'register_edge',
+  'clear_registry',
+  'get_registered_tables',
+  'get_registered_edges',
+  # Parser
+  'SchemaParseError',
+  'parse_table_info',
+  'parse_db_info',
 ]

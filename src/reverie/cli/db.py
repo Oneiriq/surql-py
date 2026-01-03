@@ -116,8 +116,8 @@ async def _ping_database_async(verbose: bool) -> None:
       task = progress.add_task('Connecting...', total=None)
 
       async with get_client(config) as client:
-        # Try a simple query
-        result = await client.execute('SELECT 1 as ping;')
+        # Try a simple query - RETURN is the correct SurrealDB syntax
+        result = await client.execute('RETURN 1;')
 
         progress.update(task, completed=True)
 

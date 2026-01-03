@@ -377,6 +377,390 @@ Set-Alias -Name rvstop -Value Stop-ReverieDatabase
 
 #endregion
 
+#region CLI Commands
+
+function Test-ReverieConnection {
+  <#
+  .SYNOPSIS
+    Tests the database connection using reverie CLI.
+  .DESCRIPTION
+    Executes 'reverie db ping' to verify database connectivity.
+    This is the first step in UAT to confirm SurrealDB is accessible.
+  .EXAMPLE
+    Test-ReverieConnection
+    Tests the database connection.
+  .EXAMPLE
+    rvping
+    Uses the alias to quickly test connection.
+  #>
+  [CmdletBinding()]
+  param()
+
+  Write-ReverieMessage -Message 'Testing database connection...' -Type 'Info'
+
+  Invoke-ReverieCommand -Command 'uv run reverie db ping' -PassThru
+
+  if ($LASTEXITCODE -eq 0) {
+    Write-ReverieMessage -Message 'Database connection successful' -Type 'Success'
+  }
+  else {
+    Write-ReverieMessage -Message 'Database connection failed' -Type 'Error'
+  }
+}
+Set-Alias -Name rvping -Value Test-ReverieConnection
+
+function Get-ReverieDatabaseInfo {
+  <#
+  .SYNOPSIS
+    Shows database information using reverie CLI.
+  .DESCRIPTION
+    Executes 'reverie db info' to display database details including
+    connection info, tables, and migration count.
+  .EXAMPLE
+    Get-ReverieDatabaseInfo
+    Shows database information.
+  .EXAMPLE
+    rvdbinfo
+    Uses the alias to quickly show database info.
+  #>
+  [CmdletBinding()]
+  param()
+
+  Write-ReverieMessage -Message 'Fetching database information...' -Type 'Info'
+
+  Invoke-ReverieCommand -Command 'uv run reverie db info' -PassThru
+}
+Set-Alias -Name rvdbinfo -Value Get-ReverieDatabaseInfo
+
+function New-ReverieMigration {
+  <#
+  .SYNOPSIS
+    Creates a new migration file using reverie CLI.
+  .DESCRIPTION
+    Executes 'reverie migrate create' to generate a new migration file
+    with the specified description. The file is created in the migrations
+    directory with a timestamp-based filename.
+  .PARAMETER Description
+    The description of the migration (e.g., "Create user table").
+  .PARAMETER Directory
+    The migrations directory path. Defaults to 'migrations'.
+  .EXAMPLE
+    New-ReverieMigration -Description "Create user table"
+    Creates a new migration file for creating the user table.
+  .EXAMPLE
+    rvmigcreate "Add post table" -Directory uat_migrations
+    Uses the alias with a custom directory.
+  #>
+  [CmdletBinding()]
+  param(
+    [Parameter(Mandatory, Position = 0)]
+    [string]$Description,
+
+    [Parameter()]
+    [string]$Directory = 'migrations'
+  )
+
+  Write-ReverieMessage -Message "Creating migration: $Description" -Type 'Info'
+
+  $command = "uv run reverie migrate create `"$Description`" --directory `"$Directory`""
+  Invoke-ReverieCommand -Command $command -PassThru
+
+  if ($LASTEXITCODE -eq 0) {
+    Write-ReverieMessage -Message 'Migration file created successfully' -Type 'Success'
+  }
+  else {
+    Write-ReverieMessage -Message 'Failed to create migration file' -Type 'Error'
+  }
+}
+Set-Alias -Name rvmigcreate -Value New-ReverieMigration
+
+function Get-ReverieMigrationStatus {
+  <#
+  .SYNOPSIS
+    Shows migration status using reverie CLI.
+  .DESCRIPTION
+    Executes 'reverie migrate status' to display which migrations have
+    been applied and which are pending.
+  .PARAMETER Directory
+    The migrations directory path. Defaults to 'migrations'.
+  .PARAMETER Format
+    Output format: table, json, or yaml. Defaults to 'table'.
+  .EXAMPLE
+    Get-ReverieMigrationStatus
+    Shows migration status in table format.
+  .EXAMPLE
+    rvmigstatus -Format json
+    Shows migration status in JSON format.
+  .EXAMPLE
+    rvmigstatus -Directory uat_migrations
+    Shows status for migrations in custom directory.
+  #>
+  [CmdletBinding()]
+  param(
+    [Parameter()]
+    [string]$Directory = 'migrations',
+
+    [Parameter()]
+    [ValidateSet('table', 'json', 'yaml')]
+    [string]$Format = 'table'
+  )
+
+  Write-ReverieMessage -Message 'Checking migration status...' -Type 'Info'
+
+  $command = "uv run reverie migrate status --directory `"$Directory`" --format $Format"
+  Invoke-ReverieCommand -Command $command -PassThru
+}
+Set-Alias -Name rvmigstatus -Value Get-ReverieMigrationStatus
+
+function Invoke-ReverieMigrationUp {
+  <#
+  .SYNOPSIS
+    Applies pending migrations using reverie CLI.
+  .DESCRIPTION
+    Executes 'reverie migrate up' to apply pending migrations to the database.
+    Can optionally perform a dry run to preview changes without applying them.
+  .PARAMETER Directory
+    The migrations directory path. Defaults to 'migrations'.
+  .PARAMETER Steps
+    Number of migrations to apply. If not specified, applies all pending.
+  .PARAMETER DryRun
+    Preview changes without applying them.
+  .EXAMPLE
+    Invoke-ReverieMigrationUp
+    Applies all pending migrations.
+  .EXAMPLE
+    rvmigup -DryRun
+    Previews migrations without applying.
+  .EXAMPLE
+    rvmigup -Steps 1 -Directory uat_migrations
+    Applies only the next pending migration from custom directory.
+  #>
+  [CmdletBinding(SupportsShouldProcess)]
+  param(
+    [Parameter()]
+    [string]$Directory = 'migrations',
+
+    [Parameter()]
+    [int]$Steps,
+
+    [Parameter()]
+    [switch]$DryRun
+  )
+
+  $action = if ($DryRun) { 'Preview migrations (dry run)' } else { 'Apply migrations' }
+
+  if ($DryRun -or $PSCmdlet.ShouldProcess('Database', $action)) {
+    $message = if ($DryRun) { 'Previewing migrations (dry run)...' } else { 'Applying migrations...' }
+    Write-ReverieMessage -Message $message -Type 'Info'
+
+    $command = "uv run reverie migrate up --directory `"$Directory`""
+
+    if ($Steps) {
+      $command += " --steps $Steps"
+    }
+
+    if ($DryRun) {
+      $command += ' --dry-run'
+    }
+
+    Invoke-ReverieCommand -Command $command -PassThru
+
+    if ($LASTEXITCODE -eq 0) {
+      $successMsg = if ($DryRun) { 'Dry run completed' } else { 'Migrations applied successfully' }
+      Write-ReverieMessage -Message $successMsg -Type 'Success'
+    }
+    else {
+      Write-ReverieMessage -Message 'Migration failed' -Type 'Error'
+    }
+  }
+}
+Set-Alias -Name rvmigup -Value Invoke-ReverieMigrationUp
+
+function Invoke-ReverieMigrationDown {
+  <#
+  .SYNOPSIS
+    Rolls back migrations using reverie CLI.
+  .DESCRIPTION
+    Executes 'reverie migrate down' to rollback the last applied migration(s).
+    Can optionally perform a dry run to preview the rollback without executing.
+  .PARAMETER Directory
+    The migrations directory path. Defaults to 'migrations'.
+  .PARAMETER Steps
+    Number of migrations to rollback. Defaults to 1.
+  .PARAMETER DryRun
+    Preview rollback without executing.
+  .PARAMETER Yes
+    Skip confirmation prompt.
+  .EXAMPLE
+    Invoke-ReverieMigrationDown
+    Rolls back the last migration.
+  .EXAMPLE
+    rvmigdown -Steps 3
+    Rolls back the last 3 migrations.
+  .EXAMPLE
+    rvmigdown -DryRun
+    Previews rollback without executing.
+  .EXAMPLE
+    rvmigdown -Yes
+    Rolls back without confirmation prompt.
+  #>
+  [CmdletBinding(SupportsShouldProcess)]
+  param(
+    [Parameter()]
+    [string]$Directory = 'migrations',
+
+    [Parameter()]
+    [int]$Steps = 1,
+
+    [Parameter()]
+    [switch]$DryRun,
+
+    [Parameter()]
+    [Alias('y')]
+    [switch]$Yes
+  )
+
+  $action = if ($DryRun) { 'Preview rollback (dry run)' } else { "Rollback $Steps migration(s)" }
+
+  if ($DryRun -or $Yes -or $PSCmdlet.ShouldProcess('Database', $action)) {
+    $message = if ($DryRun) { 'Previewing rollback (dry run)...' } else { "Rolling back $Steps migration(s)..." }
+    Write-ReverieMessage -Message $message -Type 'Info'
+
+    $command = "uv run reverie migrate down --directory `"$Directory`" --steps $Steps"
+
+    if ($DryRun) {
+      $command += ' --dry-run'
+    }
+
+    if ($Yes) {
+      $command += ' --yes'
+    }
+
+    Invoke-ReverieCommand -Command $command -PassThru
+
+    if ($LASTEXITCODE -eq 0) {
+      $successMsg = if ($DryRun) { 'Dry run completed' } else { 'Rollback completed successfully' }
+      Write-ReverieMessage -Message $successMsg -Type 'Success'
+    }
+    else {
+      Write-ReverieMessage -Message 'Rollback failed' -Type 'Error'
+    }
+  }
+}
+Set-Alias -Name rvmigdown -Value Invoke-ReverieMigrationDown
+
+function Get-ReverieMigrationHistory {
+  <#
+  .SYNOPSIS
+    Shows migration history using reverie CLI.
+  .DESCRIPTION
+    Executes 'reverie migrate history' to display the history of applied
+    migrations including timestamps and execution times.
+  .PARAMETER Directory
+    The migrations directory path. Defaults to 'migrations'.
+  .PARAMETER Format
+    Output format: table, json, or yaml. Defaults to 'table'.
+  .EXAMPLE
+    Get-ReverieMigrationHistory
+    Shows migration history in table format.
+  .EXAMPLE
+    rvmighist -Format json
+    Shows migration history in JSON format.
+  #>
+  [CmdletBinding()]
+  param(
+    [Parameter()]
+    [string]$Directory = 'migrations',
+
+    [Parameter()]
+    [ValidateSet('table', 'json', 'yaml')]
+    [string]$Format = 'table'
+  )
+
+  Write-ReverieMessage -Message 'Fetching migration history...' -Type 'Info'
+
+  $command = "uv run reverie migrate history --directory `"$Directory`" --format $Format"
+  Invoke-ReverieCommand -Command $command -PassThru
+}
+Set-Alias -Name rvmighist -Value Get-ReverieMigrationHistory
+
+function Get-ReverieSchema {
+  <#
+  .SYNOPSIS
+    Shows database or table schema using reverie CLI.
+  .DESCRIPTION
+    Executes 'reverie schema show' to display the database schema or
+    a specific table's schema including fields, indexes, and constraints.
+  .PARAMETER Table
+    Optional table name to show specific table schema.
+    If not specified, shows the entire database schema.
+  .EXAMPLE
+    Get-ReverieSchema
+    Shows the entire database schema.
+  .EXAMPLE
+    rvschema user
+    Shows the schema for the user table.
+  .EXAMPLE
+    Get-ReverieSchema -Table post
+    Shows the schema for the post table.
+  #>
+  [CmdletBinding()]
+  param(
+    [Parameter(Position = 0)]
+    [string]$Table
+  )
+
+  $target = if ($Table) { "table '$Table'" } else { 'database' }
+  Write-ReverieMessage -Message "Fetching schema for $target..." -Type 'Info'
+
+  $command = 'uv run reverie schema show'
+
+  if ($Table) {
+    $command += " $Table"
+  }
+
+  Invoke-ReverieCommand -Command $command -PassThru
+}
+Set-Alias -Name rvschema -Value Get-ReverieSchema
+
+function Test-ReverieMigration {
+  <#
+  .SYNOPSIS
+    Validates migration files using reverie CLI.
+  .DESCRIPTION
+    Executes 'reverie migrate validate' to check migration files for errors
+    including syntax, missing functions, and metadata issues.
+  .PARAMETER Directory
+    The migrations directory path. Defaults to 'migrations'.
+  .EXAMPLE
+    Test-ReverieMigration
+    Validates all migration files.
+  .EXAMPLE
+    rvmigvalid -Directory uat_migrations
+    Validates migrations in custom directory.
+  #>
+  [CmdletBinding()]
+  param(
+    [Parameter()]
+    [string]$Directory = 'migrations'
+  )
+
+  Write-ReverieMessage -Message 'Validating migration files...' -Type 'Info'
+
+  $command = "uv run reverie migrate validate --directory `"$Directory`""
+  Invoke-ReverieCommand -Command $command -PassThru
+
+  if ($LASTEXITCODE -eq 0) {
+    Write-ReverieMessage -Message 'All migrations are valid' -Type 'Success'
+  }
+  else {
+    Write-ReverieMessage -Message 'Migration validation failed' -Type 'Error'
+  }
+}
+Set-Alias -Name rvmigvalid -Value Test-ReverieMigration
+
+#endregion
+
 #region Code Quality & Testing
 
 function Invoke-ReverieLint {
@@ -749,82 +1133,80 @@ function Show-ReverieHelp {
   param()
 
   Write-Host ''
-  Write-Host '╔══════════════════════════════════════════════════════════════════════╗' -ForegroundColor Cyan
-  Write-Host '║            Reverie PowerShell Development Commands                  ║' -ForegroundColor Cyan
-  Write-Host '╚══════════════════════════════════════════════════════════════════════╝' -ForegroundColor Cyan
+  Write-Host '+----------------------------------------------------------------------+' -ForegroundColor Cyan
+  Write-Host '|            Reverie PowerShell Development Commands                  |' -ForegroundColor Cyan
+  Write-Host '+----------------------------------------------------------------------+' -ForegroundColor Cyan
   Write-Host ''
 
-  $commands = @(
-    @{Name = 'Remove-ReverieArtifacts'; Alias = 'rvrm'; Description = 'Remove build artifacts and caches' }
-    @{Name = 'Install-ReverieDependencies'; Alias = 'rvinst'; Description = 'Install project dependencies' }
-    @{Name = 'Initialize-ReverieDatabase'; Alias = 'rvinit'; Description = 'Initialize SurrealDB database' }
-    @{Name = 'Invoke-ReverieMigration'; Alias = 'rvmig'; Description = 'Run database migrations' }
-    @{Name = 'Start-ReverieDatabase'; Alias = 'rvstart'; Description = 'Start database containers' }
-    @{Name = 'Stop-ReverieDatabase'; Alias = 'rvstop'; Description = 'Stop database containers' }
-    @{Name = 'Invoke-ReverieLint'; Alias = 'rvlint'; Description = 'Run ruff linter' }
-    @{Name = 'Invoke-ReverieFormat'; Alias = 'rvfmt'; Description = 'Format code with ruff' }
-    @{Name = 'Invoke-ReverieTypeCheck'; Alias = 'rvtype'; Description = 'Run mypy type checker' }
-    @{Name = 'Test-Reverie'; Alias = 'rvtest'; Description = 'Run test suite' }
-    @{Name = 'Test-ReverieCoverage'; Alias = 'rvcov'; Description = 'Run tests with coverage' }
-    @{Name = 'Invoke-ReverieCheck'; Alias = 'rvcheck'; Description = 'Run all quality checks' }
-    @{Name = 'Start-Reverie'; Alias = 'rvrun'; Description = 'Start Reverie CLI' }
-    @{Name = 'Show-ReverieHelp'; Alias = 'rvhelp'; Description = 'Show this help message' }
-  )
+  # Helper function to print command row
+  $printCmd = {
+    param($c)
+    $p1 = [Math]::Max(1, 35 - $c.Name.Length)
+    $p2 = [Math]::Max(1, 16 - "($($c.Alias))".Length)
+    Write-Host "  $($c.Name)" -ForegroundColor Magenta -NoNewline
+    Write-Host (' ' * $p1) -NoNewline
+    Write-Host "($($c.Alias))" -ForegroundColor Yellow -NoNewline
+    Write-Host (' ' * $p2) -NoNewline
+    Write-Host $c.Description -ForegroundColor Gray
+  }
 
   Write-Host 'PROJECT MANAGEMENT:' -ForegroundColor Cyan
-  $commands[0..1] | ForEach-Object {
-    Write-Host '  ' -NoNewline
-    Write-Host $_.Name -ForegroundColor Magenta -NoNewline
-    Write-Host (' ' * (35 - $_.Name.Length)) -NoNewline
-    Write-Host "($($_.Alias))" -ForegroundColor Yellow -NoNewline
-    Write-Host (' ' * (12 - "($($_.Alias))".Length)) -NoNewline
-    Write-Host $_.Description -ForegroundColor Gray
-  }
+  @(
+    @{ Name = 'Initialize-ReverieProject'; Alias = 'rvinitproj'; Description = 'Set up a new Reverie project' }
+    @{ Name = 'Remove-ReverieArtifacts'; Alias = 'rvrm'; Description = 'Remove build artifacts and caches' }
+    @{ Name = 'Install-ReverieDependencies'; Alias = 'rvinst'; Description = 'Install project dependencies' }
+  ) | ForEach-Object { & $printCmd $_ }
   Write-Host ''
 
-  Write-Host 'DATABASE:' -ForegroundColor Cyan
-  $commands[2..5] | ForEach-Object {
-    Write-Host '  ' -NoNewline
-    Write-Host $_.Name -ForegroundColor Magenta -NoNewline
-    Write-Host (' ' * (35 - $_.Name.Length)) -NoNewline
-    Write-Host "($($_.Alias))" -ForegroundColor Yellow -NoNewline
-    Write-Host (' ' * (12 - "($($_.Alias))".Length)) -NoNewline
-    Write-Host $_.Description -ForegroundColor Gray
-  }
+  Write-Host 'DATABASE CONTAINERS:' -ForegroundColor Cyan
+  @(
+    @{ Name = 'Initialize-ReverieDatabase'; Alias = 'rvinit'; Description = 'Initialize SurrealDB database' }
+    @{ Name = 'Start-ReverieDatabase'; Alias = 'rvstart'; Description = 'Start database containers' }
+    @{ Name = 'Stop-ReverieDatabase'; Alias = 'rvstop'; Description = 'Stop database containers' }
+  ) | ForEach-Object { & $printCmd $_ }
+  Write-Host ''
+
+  Write-Host 'CLI - DATABASE:' -ForegroundColor Cyan
+  @(
+    @{ Name = 'Test-ReverieConnection'; Alias = 'rvping'; Description = 'Test database connection' }
+    @{ Name = 'Get-ReverieDatabaseInfo'; Alias = 'rvdbinfo'; Description = 'Show database information' }
+    @{ Name = 'Get-ReverieSchema'; Alias = 'rvschema'; Description = 'Show database/table schema' }
+  ) | ForEach-Object { & $printCmd $_ }
+  Write-Host ''
+
+  Write-Host 'CLI - MIGRATIONS:' -ForegroundColor Cyan
+  @(
+    @{ Name = 'Invoke-ReverieMigration'; Alias = 'rvmig'; Description = 'Run all pending migrations' }
+    @{ Name = 'Get-ReverieMigrationStatus'; Alias = 'rvmigstatus'; Description = 'Show migration status' }
+    @{ Name = 'New-ReverieMigration'; Alias = 'rvmigcreate'; Description = 'Create new migration file' }
+    @{ Name = 'Invoke-ReverieMigrationUp'; Alias = 'rvmigup'; Description = 'Apply pending migrations' }
+    @{ Name = 'Invoke-ReverieMigrationDown'; Alias = 'rvmigdown'; Description = 'Rollback migrations' }
+    @{ Name = 'Get-ReverieMigrationHistory'; Alias = 'rvmighist'; Description = 'Show migration history' }
+    @{ Name = 'Test-ReverieMigration'; Alias = 'rvmigvalid'; Description = 'Validate migration files' }
+  ) | ForEach-Object { & $printCmd $_ }
   Write-Host ''
 
   Write-Host 'CODE QUALITY & TESTING:' -ForegroundColor Cyan
-  $commands[6..11] | ForEach-Object {
-    Write-Host '  ' -NoNewline
-    Write-Host $_.Name -ForegroundColor Magenta -NoNewline
-    Write-Host (' ' * (35 - $_.Name.Length)) -NoNewline
-    Write-Host "($($_.Alias))" -ForegroundColor Yellow -NoNewline
-    Write-Host (' ' * (12 - "($($_.Alias))".Length)) -NoNewline
-    Write-Host $_.Description -ForegroundColor Gray
-  }
+  @(
+    @{ Name = 'Invoke-ReverieLint'; Alias = 'rvlint'; Description = 'Run ruff linter' }
+    @{ Name = 'Invoke-ReverieFormat'; Alias = 'rvfmt'; Description = 'Format code with ruff' }
+    @{ Name = 'Invoke-ReverieTypeCheck'; Alias = 'rvtype'; Description = 'Run mypy type checker' }
+    @{ Name = 'Test-Reverie'; Alias = 'rvtest'; Description = 'Run test suite' }
+    @{ Name = 'Test-ReverieCoverage'; Alias = 'rvcov'; Description = 'Run tests with coverage' }
+    @{ Name = 'Invoke-ReverieCheck'; Alias = 'rvcheck'; Description = 'Run all quality checks' }
+  ) | ForEach-Object { & $printCmd $_ }
   Write-Host ''
 
   Write-Host 'APPLICATION:' -ForegroundColor Cyan
-  $commands[12] | ForEach-Object {
-    Write-Host '  ' -NoNewline
-    Write-Host $_.Name -ForegroundColor Magenta -NoNewline
-    Write-Host (' ' * (35 - $_.Name.Length)) -NoNewline
-    Write-Host "($($_.Alias))" -ForegroundColor Yellow -NoNewline
-    Write-Host (' ' * (12 - "($($_.Alias))".Length)) -NoNewline
-    Write-Host $_.Description -ForegroundColor Gray
-  }
+  @(
+    @{ Name = 'Start-Reverie'; Alias = 'rvrun'; Description = 'Start Reverie CLI' }
+  ) | ForEach-Object { & $printCmd $_ }
   Write-Host ''
 
   Write-Host 'HELP:' -ForegroundColor Cyan
-  $commands[13] | ForEach-Object {
-    Write-Host '  ' -NoNewline
-    Write-Host $_.Name -ForegroundColor Magenta -NoNewline
-    Write-Host (' ' * (35 - $_.Name.Length)) -NoNewline
-    Write-Host "($($_.Alias))" -ForegroundColor Yellow -NoNewline
-    Write-Host (' ' * (12 - "($($_.Alias))".Length)) -NoNewline
-    Write-Host $_.Description -ForegroundColor Gray
-  }
-  Write-Host ''
+  @(
+    @{ Name = 'Show-ReverieHelp'; Alias = 'rvhelp'; Description = 'Show this help message' }
+  ) | ForEach-Object { & $printCmd $_ }
 
   Write-Host 'TIP: Use "Get-Help <CommandName> -Detailed" for more information' -ForegroundColor DarkGray
   Write-Host ''
@@ -835,11 +1217,11 @@ Set-Alias -Name rvhelp -Value Show-ReverieHelp
 
 # Display welcome message
 Write-Host ''
-Write-Host '╔══════════════════════════════════════════════════════════════════════╗' -ForegroundColor Green
-Write-Host '║                    ' -ForegroundColor Green -NoNewline
+Write-Host '+----------------------------------------------------------------------+' -ForegroundColor Green
+Write-Host '|                    ' -ForegroundColor Green -NoNewline
 Write-Host 'Reverie Commands Loaded' -ForegroundColor Blue -NoNewline
-Write-Host '                           ║' -ForegroundColor Green
-Write-Host '╚══════════════════════════════════════════════════════════════════════╝' -ForegroundColor Green
+Write-Host '                           |' -ForegroundColor Green
+Write-Host '+----------------------------------------------------------------------+' -ForegroundColor Green
 Write-Host ''
 Write-Host 'Reverie development helper functions loaded successfully!' -ForegroundColor Cyan
 Write-Host "Type 'rvhelp' or 'Show-ReverieHelp' to see all available commands." -ForegroundColor Gray

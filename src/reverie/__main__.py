@@ -53,10 +53,10 @@ def main(
 
   reverie provides a modern, type-safe way to work with SurrealDB through:
 
-  • Code-first schema definitions
-  • Automatic migration generation
-  • Type-safe query building
-  • Async-first operations
+  - Code-first schema definitions
+  - Automatic migration generation
+  - Type-safe query building
+  - Async-first operations
 
   Use --help with any command to see detailed usage information.
   """

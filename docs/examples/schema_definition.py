@@ -9,16 +9,17 @@ This example demonstrates:
 - Edge schemas for relationships
 """
 
+from reverie.schema.edge import edge_schema
 from reverie.schema.fields import (
-  string_field,
-  int_field,
-  float_field,
-  bool_field,
-  datetime_field,
-  record_field,
   array_field,
-  object_field,
+  bool_field,
   computed_field,
+  datetime_field,
+  float_field,
+  int_field,
+  object_field,
+  record_field,
+  string_field,
 )
 from reverie.schema.table import (
   TableMode,
@@ -30,8 +31,6 @@ from reverie.schema.table import (
   with_fields,
   with_indexes,
 )
-from reverie.schema.edge import edge_schema
-
 
 # User schema with comprehensive features
 user_schema = table_schema(

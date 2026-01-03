@@ -5,25 +5,26 @@ and query functions with various scenarios including happy paths, edge cases,
 and error conditions.
 """
 
-import pytest
 from unittest.mock import AsyncMock, patch
+
+import pytest
 from pydantic import BaseModel
 
 from reverie.connection.client import DatabaseClient
 from reverie.query.crud import (
+  count_records,
   create_record,
   create_records,
   delete_record,
   delete_records,
+  exists,
+  first,
   get_record,
-  update_record,
+  last,
   merge_record,
   query_records,
   query_records_wrapped,
-  count_records,
-  exists,
-  first,
-  last,
+  update_record,
 )
 from reverie.types.operators import eq
 from reverie.types.record_id import RecordID
@@ -679,7 +680,7 @@ class TestLast:
       'reverie.query.crud.query_records',
       AsyncMock(return_value=[User(name='Zoe', email='zoe@example.com')]),
     ) as mock_query:
-      result = await last('user', User, order_by=('name', 'ASC'), client=mock_db_client)
+      await last('user', User, order_by=('name', 'ASC'), client=mock_db_client)
 
     # Verify order was reversed to DESC
     call_args = mock_query.call_args
@@ -692,7 +693,7 @@ class TestLast:
       'reverie.query.crud.query_records',
       AsyncMock(return_value=[User(name='Alice', email='alice@example.com')]),
     ) as mock_query:
-      result = await last('user', User, order_by=('created_at', 'DESC'), client=mock_db_client)
+      await last('user', User, order_by=('created_at', 'DESC'), client=mock_db_client)
 
     # Verify order was reversed to ASC
     call_args = mock_query.call_args

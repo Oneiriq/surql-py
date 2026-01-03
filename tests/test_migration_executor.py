@@ -138,15 +138,15 @@ class TestMigrateUp:
       ),
     ]
 
-    with patch(
-      'reverie.migration.executor.get_applied_versions', new=AsyncMock(return_value=set())
+    with (
+      patch('reverie.migration.executor.get_applied_versions', new=AsyncMock(return_value=set())),
+      patch('reverie.migration.executor.record_migration', new=AsyncMock()),
     ):
-      with patch('reverie.migration.executor.record_migration', new=AsyncMock()):
-        applied = await migrate_up(mock_db_client, migrations)
+      applied = await migrate_up(mock_db_client, migrations)
 
-        assert len(applied) == 2
-        assert applied[0].version == '20260101_120000'
-        assert applied[1].version == '20260102_120000'
+      assert len(applied) == 2
+      assert applied[0].version == '20260101_120000'
+      assert applied[1].version == '20260102_120000'
 
   @pytest.mark.anyio
   async def test_migrate_up_with_steps(self, mock_db_client, tmp_path: Path):
@@ -156,21 +156,21 @@ class TestMigrateUp:
         version=f'2026010{i}_120000',
         description=f'Test {i}',
         path=tmp_path / f'test{i}.py',
-        up=lambda: [f'CREATE TABLE test{i};'],
-        down=lambda: [f'DROP TABLE test{i};'],
+        up=lambda i=i: [f'CREATE TABLE test{i};'],
+        down=lambda i=i: [f'DROP TABLE test{i};'],
       )
       for i in range(1, 4)
     ]
 
-    with patch(
-      'reverie.migration.executor.get_applied_versions', new=AsyncMock(return_value=set())
+    with (
+      patch('reverie.migration.executor.get_applied_versions', new=AsyncMock(return_value=set())),
+      patch('reverie.migration.executor.record_migration', new=AsyncMock()),
     ):
-      with patch('reverie.migration.executor.record_migration', new=AsyncMock()):
-        applied = await migrate_up(mock_db_client, migrations, steps=2)
+      applied = await migrate_up(mock_db_client, migrations, steps=2)
 
-        assert len(applied) == 2
-        assert applied[0].version == '20260101_120000'
-        assert applied[1].version == '20260102_120000'
+      assert len(applied) == 2
+      assert applied[0].version == '20260101_120000'
+      assert applied[1].version == '20260102_120000'
 
   @pytest.mark.anyio
   async def test_migrate_up_no_pending(self, mock_db_client, tmp_path: Path):
@@ -242,15 +242,17 @@ class TestMigrateDown:
     ]
 
     # Mock both migrations as applied
-    with patch(
-      'reverie.migration.executor.get_applied_versions',
-      new=AsyncMock(return_value={'20260101_120000', '20260102_120000'}),
+    with (
+      patch(
+        'reverie.migration.executor.get_applied_versions',
+        new=AsyncMock(return_value={'20260101_120000', '20260102_120000'}),
+      ),
+      patch('reverie.migration.executor.remove_migration_record', new=AsyncMock()),
     ):
-      with patch('reverie.migration.executor.remove_migration_record', new=AsyncMock()):
-        rolled_back = await migrate_down(mock_db_client, migrations, steps=1)
+      rolled_back = await migrate_down(mock_db_client, migrations, steps=1)
 
-        assert len(rolled_back) == 1
-        assert rolled_back[0].version == '20260102_120000'
+      assert len(rolled_back) == 1
+      assert rolled_back[0].version == '20260102_120000'
 
   @pytest.mark.anyio
   async def test_migrate_down_multiple_steps(self, mock_db_client, tmp_path: Path):
@@ -260,25 +262,27 @@ class TestMigrateDown:
         version=f'2026010{i}_120000',
         description=f'Test {i}',
         path=tmp_path / f'test{i}.py',
-        up=lambda: [f'CREATE TABLE test{i};'],
-        down=lambda: [f'DROP TABLE test{i};'],
+        up=lambda i=i: [f'CREATE TABLE test{i};'],
+        down=lambda i=i: [f'DROP TABLE test{i};'],
       )
       for i in range(1, 4)
     ]
 
     # Mock all migrations as applied
     applied_versions = {m.version for m in migrations}
-    with patch(
-      'reverie.migration.executor.get_applied_versions',
-      new=AsyncMock(return_value=applied_versions),
+    with (
+      patch(
+        'reverie.migration.executor.get_applied_versions',
+        new=AsyncMock(return_value=applied_versions),
+      ),
+      patch('reverie.migration.executor.remove_migration_record', new=AsyncMock()),
     ):
-      with patch('reverie.migration.executor.remove_migration_record', new=AsyncMock()):
-        rolled_back = await migrate_down(mock_db_client, migrations, steps=2)
+      rolled_back = await migrate_down(mock_db_client, migrations, steps=2)
 
-        assert len(rolled_back) == 2
-        # Should rollback in reverse order
-        assert rolled_back[0].version == '20260103_120000'
-        assert rolled_back[1].version == '20260102_120000'
+      assert len(rolled_back) == 2
+      # Should rollback in reverse order
+      assert rolled_back[0].version == '20260103_120000'
+      assert rolled_back[1].version == '20260102_120000'
 
   @pytest.mark.anyio
   async def test_migrate_down_no_applied(self, mock_db_client, tmp_path: Path):

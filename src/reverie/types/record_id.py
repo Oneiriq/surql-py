@@ -28,7 +28,7 @@ class RecordID[T](BaseModel):
     Complex IDs with angle brackets:
     >>> record_id = RecordID(table='outlet', id='alaskabeacon.com')
     >>> str(record_id)
-    'outlet:⟨alaskabeacon.com⟩'
+    'outlet:<alaskabeacon.com>'
 
     Parse from string:
     >>> record_id = RecordID.parse('user:123')
@@ -38,7 +38,7 @@ class RecordID[T](BaseModel):
     '123'
 
     Parse angle bracket syntax:
-    >>> record_id = RecordID.parse('outlet:⟨alaskabeacon.com⟩')
+    >>> record_id = RecordID.parse('outlet:<alaskabeacon.com>')
     >>> record_id.id
     'alaskabeacon.com'
 
@@ -100,11 +100,11 @@ class RecordID[T](BaseModel):
     Automatically adds angle brackets for complex IDs.
 
     Returns:
-      String in format 'table:id' or 'table:⟨id⟩'
+      String in format 'table:id' or 'table:<id>'
     """
     id_str = str(self.id)
     if self._needs_angle_brackets(self.id):
-      return f'{self.table}:⟨{id_str}⟩'
+      return f'{self.table}:<{id_str}>'
     return f'{self.table}:{id_str}'
 
   def __repr__(self) -> str:
@@ -122,7 +122,7 @@ class RecordID[T](BaseModel):
     Supports both simple and angle bracket syntax.
 
     Args:
-      record_id: String in format 'table:id' or 'table:⟨id⟩'
+      record_id: String in format 'table:id' or 'table:<id>'
 
     Returns:
       RecordID instance
@@ -137,7 +137,7 @@ class RecordID[T](BaseModel):
       >>> RecordID.parse('post:123')
       RecordID(table='post', id=123)
 
-      >>> RecordID.parse('outlet:⟨alaskabeacon.com⟩')
+      >>> RecordID.parse('outlet:<alaskabeacon.com>')
       RecordID(table='outlet', id='alaskabeacon.com')
     """
     if ':' not in record_id:
@@ -150,7 +150,7 @@ class RecordID[T](BaseModel):
     table, id_str = parts
 
     # Strip angle brackets if present
-    if id_str.startswith('⟨') and id_str.endswith('⟩'):
+    if id_str.startswith('<') and id_str.endswith('>'):
       id_str = id_str[1:-1]
 
     # Try to parse as int, otherwise keep as string
