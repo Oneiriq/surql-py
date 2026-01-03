@@ -3,7 +3,7 @@
 import pytest
 from pydantic import ValidationError
 
-from src.schema.edge import (
+from reverie.schema.edge import (
   EdgeDefinition,
   bidirectional_edge,
   edge_schema,
@@ -15,7 +15,7 @@ from src.schema.edge import (
   with_from_table,
   with_to_table,
 )
-from src.schema.fields import (
+from reverie.schema.fields import (
   FieldDefinition,
   FieldType,
   array_field,
@@ -29,7 +29,7 @@ from src.schema.fields import (
   record_field,
   string_field,
 )
-from src.schema.table import (
+from reverie.schema.table import (
   EventDefinition,
   IndexDefinition,
   IndexType,

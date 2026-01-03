@@ -7,7 +7,7 @@ from unittest.mock import patch
 import pytest
 from typer.testing import CliRunner
 
-from src.cli.common import (
+from reverie.cli.common import (
   OutputFormat,
   confirm,
   confirm_destructive,
@@ -15,7 +15,7 @@ from src.cli.common import (
   validate_directory_exists,
   validate_file_exists,
 )
-from src.cli.migrate import app as migrate_app
+from reverie.cli.migrate import app as migrate_app
 
 
 def strip_ansi(text: str) -> str:
@@ -41,7 +41,7 @@ class TestGetMigrationsDirectory:
     """Test getting default migrations directory."""
     monkeypatch.chdir(tmp_path)
 
-    with patch('src.cli.common.display_info'):
+    with patch('reverie.cli.common.display_info'):
       directory = get_migrations_directory()
 
     assert directory == tmp_path / 'migrations'
@@ -51,7 +51,7 @@ class TestGetMigrationsDirectory:
     """Test getting custom migrations directory."""
     custom_dir = tmp_path / 'custom_migrations'
 
-    with patch('src.cli.common.display_info'):
+    with patch('reverie.cli.common.display_info'):
       directory = get_migrations_directory(custom_dir)
 
     assert directory == custom_dir
@@ -172,8 +172,8 @@ class TestMigrateCommands:
   def test_migrate_create_success(self, tmp_path: Path) -> None:
     """Test successful migration creation."""
     with (
-      patch('src.cli.migrate.get_migrations_directory', return_value=tmp_path),
-      patch('src.cli.migrate.create_blank_migration') as mock_create,
+      patch('reverie.cli.migrate.get_migrations_directory', return_value=tmp_path),
+      patch('reverie.cli.migrate.create_blank_migration') as mock_create,
     ):
       mock_file = tmp_path / '20260102_120000_test.py'
       mock_create.return_value = mock_file
@@ -223,7 +223,7 @@ class TestMigrateCommands:
     migrations_dir = tmp_path / 'migrations'
     migrations_dir.mkdir()
 
-    with patch('src.cli.migrate.get_migrations_directory', return_value=migrations_dir):
+    with patch('reverie.cli.migrate.get_migrations_directory', return_value=migrations_dir):
       result = self.runner.invoke(migrate_app, ['validate'])
 
       # Should succeed with warning about no files
@@ -237,7 +237,7 @@ class TestMigrateCommands:
     # Create invalid migration file
     (migrations_dir / 'invalid.py').write_text('# invalid')
 
-    with patch('src.cli.migrate.get_migrations_directory', return_value=migrations_dir):
+    with patch('reverie.cli.migrate.get_migrations_directory', return_value=migrations_dir):
       result = self.runner.invoke(migrate_app, ['validate'])
 
       # Should fail validation
@@ -262,8 +262,8 @@ def down():
     migration_file.write_text(migration_content)
 
     with (
-      patch('src.cli.migrate.get_migrations_directory', return_value=temp_migration_dir),
-      patch('src.cli.migrate.validate_migrations', return_value=[]),
+      patch('reverie.cli.migrate.get_migrations_directory', return_value=temp_migration_dir),
+      patch('reverie.cli.migrate.validate_migrations', return_value=[]),
     ):
       result = self.runner.invoke(migrate_app, ['validate'])
 
@@ -279,7 +279,7 @@ class TestCLIErrorHandling:
 
   def test_migrate_create_error_handling(self) -> None:
     """Test error handling in migrate create."""
-    with patch('src.cli.migrate.get_migrations_directory', side_effect=Exception('Test error')):
+    with patch('reverie.cli.migrate.get_migrations_directory', side_effect=Exception('Test error')):
       result = self.runner.invoke(migrate_app, ['create', 'test'])
 
       assert result.exit_code == 1
@@ -287,8 +287,8 @@ class TestCLIErrorHandling:
   def test_migrate_status_with_invalid_directory(self) -> None:
     """Test status command with non-existent directory."""
     with (
-      patch('src.cli.migrate.get_migrations_directory', return_value=Path('/nonexistent')),
-      patch('src.cli.migrate.discover_migrations', return_value=[]),
+      patch('reverie.cli.migrate.get_migrations_directory', return_value=Path('/nonexistent')),
+      patch('reverie.cli.migrate.discover_migrations', return_value=[]),
     ):
       result = self.runner.invoke(migrate_app, ['status'])
 
@@ -336,8 +336,8 @@ class TestCLIVerboseOption:
   def test_migrate_create_verbose(self, tmp_path: Path) -> None:
     """Test migrate create with verbose option."""
     with (
-      patch('src.cli.migrate.get_migrations_directory', return_value=tmp_path),
-      patch('src.cli.migrate.create_blank_migration') as mock_create,
+      patch('reverie.cli.migrate.get_migrations_directory', return_value=tmp_path),
+      patch('reverie.cli.migrate.create_blank_migration') as mock_create,
     ):
       mock_file = tmp_path / '20260102_120000_test.py'
       mock_create.return_value = mock_file
@@ -395,8 +395,8 @@ class TestCLIDirectoryOption:
     custom_dir = tmp_path / 'custom'
 
     with (
-      patch('src.cli.migrate.get_migrations_directory', return_value=custom_dir) as mock_get,
-      patch('src.cli.migrate.create_blank_migration') as mock_create,
+      patch('reverie.cli.migrate.get_migrations_directory', return_value=custom_dir) as mock_get,
+      patch('reverie.cli.migrate.create_blank_migration') as mock_create,
     ):
       mock_file = custom_dir / '20260102_120000_test.py'
       mock_create.return_value = mock_file
@@ -447,8 +447,8 @@ class TestCLIGenerateCommand:
   def test_generate_creates_blank_migration(self, tmp_path: Path) -> None:
     """Test that generate creates blank migration (current implementation)."""
     with (
-      patch('src.cli.migrate.get_migrations_directory', return_value=tmp_path),
-      patch('src.cli.migrate.create_blank_migration') as mock_create,
+      patch('reverie.cli.migrate.get_migrations_directory', return_value=tmp_path),
+      patch('reverie.cli.migrate.create_blank_migration') as mock_create,
     ):
       mock_file = tmp_path / '20260102_120000_test.py'
       mock_create.return_value = mock_file
@@ -498,18 +498,18 @@ class TestCLIConfirmations:
 
   def test_confirm_destructive_yes(self) -> None:
     """Test destructive confirmation with yes."""
-    with patch('typer.prompt', return_value='yes'), patch('src.cli.common.display_warning'):
+    with patch('typer.prompt', return_value='yes'), patch('reverie.cli.common.display_warning'):
       result = confirm_destructive('Test operation')
       assert result is True
 
   def test_confirm_destructive_no(self) -> None:
     """Test destructive confirmation with no."""
-    with patch('typer.prompt', return_value='yes'), patch('src.cli.common.display_warning'):
+    with patch('typer.prompt', return_value='yes'), patch('reverie.cli.common.display_warning'):
       result = confirm_destructive('Test operation')
       assert result is True
 
   def test_confirm_destructive_case_insensitive(self) -> None:
     """Test destructive confirmation is case insensitive."""
-    with patch('typer.prompt', return_value='YES'), patch('src.cli.common.display_warning'):
+    with patch('typer.prompt', return_value='YES'), patch('reverie.cli.common.display_warning'):
       result = confirm_destructive('Test operation')
       assert result is True

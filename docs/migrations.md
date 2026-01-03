@@ -366,9 +366,9 @@ DEFINE INDEX version_idx ON TABLE _migration_history COLUMNS version UNIQUE;
 ### Querying History
 
 ```python
-from src.migration.history import get_applied_migrations
-from src.connection.client import get_client
-from src.settings import get_db_config
+from reverie.migration.history import get_applied_migrations
+from reverie.connection.client import get_client
+from reverie.settings import get_db_config
 
 async def view_history():
   config = get_db_config()
@@ -706,7 +706,7 @@ def down() -> list[str]:
 ```python
 # Future feature - not yet implemented
 from schemas.user import user_schema
-from src.migration.generator import generate_migration
+from reverie.migration.generator import generate_migration
 
 # Generate migration from schema
 migration = generate_migration(
@@ -756,8 +756,8 @@ mv migrations/20260102_120000_old.py \
 
 ```python
 # Manually check history
-from src.connection.client import get_client
-from src.settings import get_db_config
+from reverie.connection.client import get_client
+from reverie.settings import get_db_config
 
 async def check_history():
   async with get_client(get_db_config()) as client:

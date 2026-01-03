@@ -37,8 +37,8 @@ Both approaches integrate with Pydantic for data validation.
 
 ```python
 from pydantic import BaseModel, EmailStr
-from src.connection.client import get_client
-from src.settings import get_db_config
+from reverie.connection.client import get_client
+from reverie.settings import get_db_config
 
 class User(BaseModel):
   username: str
@@ -54,7 +54,7 @@ config = get_db_config()
 #### Create Single Record
 
 ```python
-from src.query.crud import create_record
+from reverie.query.crud import create_record
 
 async def create_user():
   async with get_client(config) as client:
@@ -67,7 +67,7 @@ async def create_user():
       ),
       client=client,
     )
-    
+
     print(f"Created user: {user['id']}")
     return user
 ```
@@ -75,7 +75,7 @@ async def create_user():
 #### Create Multiple Records
 
 ```python
-from src.query.crud import create_records
+from reverie.query.crud import create_records
 
 async def create_multiple_users():
   async with get_client(config) as client:
@@ -84,7 +84,7 @@ async def create_multiple_users():
       User(username='bob', email='bob@example.com', age=25),
       User(username='charlie', email='charlie@example.com', age=35),
     ]
-    
+
     users = await create_records('user', users_data, client=client)
     print(f"Created {len(users)} users")
     return users
@@ -95,24 +95,24 @@ async def create_multiple_users():
 #### Get Single Record by ID
 
 ```python
-from src.query.crud import get_record
+from reverie.query.crud import get_record
 
 async def get_user(user_id: str):
   async with get_client(config) as client:
     user = await get_record('user', user_id, User, client=client)
-    
+
     if user:
       print(f"Found user: {user.username}")
     else:
       print("User not found")
-    
+
     return user
 ```
 
 #### Query Multiple Records
 
 ```python
-from src.query.crud import query_records
+from reverie.query.crud import query_records
 
 async def get_adult_users():
   async with get_client(config) as client:
@@ -124,17 +124,17 @@ async def get_adult_users():
       limit=10,
       client=client,
     )
-    
+
     for user in users:
       print(f"{user.username}: {user.age} years old")
-    
+
     return users
 ```
 
 #### Get First/Last Record
 
 ```python
-from src.query.crud import first, last
+from reverie.query.crud import first, last
 
 async def get_newest_user():
   async with get_client(config) as client:
@@ -160,23 +160,23 @@ async def get_oldest_user():
 #### Count Records
 
 ```python
-from src.query.crud import count_records
+from reverie.query.crud import count_records
 
 async def count_active_users():
   async with get_client(config) as client:
     total = await count_records('user', client=client)
     active = await count_records('user', 'is_active = true', client=client)
-    
+
     print(f"Total users: {total}")
     print(f"Active users: {active}")
-    
+
     return active
 ```
 
 #### Check if Record Exists
 
 ```python
-from src.query.crud import exists
+from reverie.query.crud import exists
 
 async def user_exists(user_id: str):
   async with get_client(config) as client:
@@ -191,7 +191,7 @@ async def user_exists(user_id: str):
 #### Update Entire Record
 
 ```python
-from src.query.crud import update_record
+from reverie.query.crud import update_record
 
 async def update_user(user_id: str):
   async with get_client(config) as client:
@@ -205,7 +205,7 @@ async def update_user(user_id: str):
       ),
       client=client,
     )
-    
+
     print(f"Updated user: {updated}")
     return updated
 ```
@@ -213,7 +213,7 @@ async def update_user(user_id: str):
 #### Merge Partial Data
 
 ```python
-from src.query.crud import merge_record
+from reverie.query.crud import merge_record
 
 async def update_user_email(user_id: str, new_email: str):
   async with get_client(config) as client:
@@ -223,7 +223,7 @@ async def update_user_email(user_id: str, new_email: str):
       {'email': new_email},
       client=client,
     )
-    
+
     print(f"Updated email: {updated}")
     return updated
 ```
@@ -233,7 +233,7 @@ async def update_user_email(user_id: str, new_email: str):
 #### Delete Single Record
 
 ```python
-from src.query.crud import delete_record
+from reverie.query.crud import delete_record
 
 async def delete_user(user_id: str):
   async with get_client(config) as client:
@@ -244,7 +244,7 @@ async def delete_user(user_id: str):
 #### Delete Multiple Records
 
 ```python
-from src.query.crud import delete_records
+from reverie.query.crud import delete_records
 
 async def delete_inactive_users():
   async with get_client(config) as client:
@@ -263,7 +263,7 @@ The query builder provides a functional approach to building complex queries.
 ### Basic Query Construction
 
 ```python
-from src.query.builder import Query
+from reverie.query.builder import Query
 
 # Build a query
 query = (
@@ -284,15 +284,15 @@ print(sql)
 ### Query Execution
 
 ```python
-from src.query.executor import fetch_all, fetch_one
+from reverie.query.executor import fetch_all, fetch_one
 
 async def execute_query():
   async with get_client(config) as client:
     query = Query().select().from_table('user').where('age >= 18')
-    
+
     # Fetch all results
     users = await fetch_all(query, User, client)
-    
+
     for user in users:
       print(user.username)
 ```
@@ -408,7 +408,7 @@ query = Query().select().from_table('user').where(
 ### Using Operators
 
 ```python
-from src.types.operators import eq, gt, lt, gte, lte, contains, in_list
+from reverie.types.operators import eq, gt, lt, gte, lte, contains, in_list
 
 # Equality
 Query().select().from_table('user').where(eq('status', 'active'))
@@ -566,16 +566,16 @@ Reverie automatically handles both formats in its high-level functions ([`fetch_
 High-level query functions handle result extraction automatically:
 
 ```python
-from src.query.executor import fetch_all, fetch_one
+from reverie.query.executor import fetch_all, fetch_one
 
 async def query_users():
   async with get_client(config) as client:
     query = Query().select().from_table('user')
-    
+
     # Automatically extracts and validates results
     users = await fetch_all(query, User, client)
     # Returns list[User] - no manual extraction needed
-    
+
     return users
 ```
 
@@ -586,33 +586,33 @@ For raw queries or when you need manual control:
 #### Extract All Results
 
 ```python
-from src.query.results import extract_result
+from reverie.query.results import extract_result
 
 async def raw_query_example():
   async with get_client(config) as client:
     # db.query() returns nested format
     result = await client.execute('SELECT * FROM user WHERE age > 18')
-    
+
     # Extract to flat list of dicts
     records = extract_result(result)
     # [{"id": "user:123", "name": "Alice", ...}, ...]
-    
+
     return records
 ```
 
 #### Extract Single Record
 
 ```python
-from src.query.results import extract_one
+from reverie.query.results import extract_one
 
 async def get_user_raw(user_id: str):
   async with get_client(config) as client:
     result = await client.execute(f'SELECT * FROM {user_id}')
-    
+
     # Get first record or None
     user = extract_one(result)
     # {"id": "user:123", "name": "Alice"} or None
-    
+
     return user
 ```
 
@@ -621,16 +621,16 @@ async def get_user_raw(user_id: str):
 For aggregate queries (COUNT, SUM, AVG, etc.):
 
 ```python
-from src.query.results import extract_scalar
+from reverie.query.results import extract_scalar
 
 async def count_users():
   async with get_client(config) as client:
     result = await client.execute('SELECT count() as total FROM user GROUP ALL')
-    
+
     # Extract scalar value with default
     total = extract_scalar(result, 'total', default=0)
     # Returns: 42 (or 0 if no results)
-    
+
     return total
 
 async def get_stats():
@@ -644,7 +644,7 @@ async def get_stats():
       FROM user
       GROUP ALL
     ''')
-    
+
     # Extract multiple scalar values
     return {
       'total': extract_scalar(result, 'total', 0),
@@ -657,7 +657,7 @@ async def get_stats():
 #### Check if Results Exist
 
 ```python
-from src.query.results import has_results
+from reverie.query.results import has_results
 
 async def user_exists(email: str):
   async with get_client(config) as client:
@@ -665,7 +665,7 @@ async def user_exists(email: str):
       'SELECT * FROM user WHERE email = $email LIMIT 1',
       {'email': email}
     )
-    
+
     # Check if any records returned
     return has_results(result)
 ```
@@ -673,7 +673,7 @@ async def user_exists(email: str):
 ### Complete Example
 
 ```python
-from src.query.results import extract_result, extract_one, extract_scalar, has_results
+from reverie.query.results import extract_result, extract_one, extract_scalar, has_results
 
 async def comprehensive_query_example():
   async with get_client(config) as client:
@@ -682,20 +682,20 @@ async def comprehensive_query_example():
     if not has_results(check_result):
       print("No users found")
       return
-    
+
     # Get all active users
     users_result = await client.execute('''
       SELECT * FROM user WHERE is_active = true
     ''')
     users = extract_result(users_result)
     print(f"Found {len(users)} active users")
-    
+
     # Get specific user
     user_result = await client.execute('SELECT * FROM user:alice')
     user = extract_one(user_result)
     if user:
       print(f"User: {user['name']}")
-    
+
     # Get user count
     count_result = await client.execute('''
       SELECT count() as total FROM user GROUP ALL
@@ -726,7 +726,7 @@ else:
   users = result
 
 # After (with reverie utilities)
-from src.query.results import extract_result
+from reverie.query.results import extract_result
 
 result = await db.query('SELECT * FROM user')
 users = extract_result(result)  # Handles both formats
@@ -739,7 +739,7 @@ Execute multiple operations atomically.
 ### Using Context Manager
 
 ```python
-from src.connection.transaction import transaction
+from reverie.connection.transaction import transaction
 
 async def transfer_credits(from_user: str, to_user: str, amount: int):
   async with get_client(config) as client:
@@ -748,12 +748,12 @@ async def transfer_credits(from_user: str, to_user: str, amount: int):
       await client.execute(
         f"UPDATE {from_user} SET credits -= {amount}"
       )
-      
+
       # Add to receiver
       await client.execute(
         f"UPDATE {to_user} SET credits += {amount}"
       )
-      
+
       # Log transaction
       await client.execute(
         f"""
@@ -774,14 +774,14 @@ async def manual_transaction():
     try:
       # Begin transaction
       await client.execute('BEGIN TRANSACTION')
-      
+
       # Perform operations
       await client.execute('CREATE user SET name = "Alice"')
       await client.execute('CREATE post SET title = "Hello"')
-      
+
       # Commit
       await client.execute('COMMIT TRANSACTION')
-      
+
     except Exception as e:
       # Rollback on error
       await client.execute('CANCEL TRANSACTION')
@@ -803,7 +803,7 @@ class User(BaseModel):
   age: int = Field(ge=0, le=150)
   is_active: bool = True
   created_at: Optional[datetime] = None
-  
+
   @field_validator('email')
   @classmethod
   def validate_email(cls, v: str) -> str:
@@ -820,13 +820,13 @@ async def type_safe_create():
       email='alice@example.com',
       age=30,
     )
-    
+
     # Type-safe create
     result = await create_record('user', user, client=client)
-    
+
     # Type-safe read
     fetched = await get_record('user', 'alice', User, client=client)
-    
+
     # TypedDict hints work in IDE
     if fetched:
       print(fetched.username)  # IDE autocomplete works
@@ -925,7 +925,7 @@ async def search_posts(search_term: str):
 async def paginate_users(page: int = 1, page_size: int = 10):
   async with get_client(config) as client:
     offset = (page - 1) * page_size
-    
+
     users = await query_records(
       'user',
       User,
@@ -934,9 +934,9 @@ async def paginate_users(page: int = 1, page_size: int = 10):
       offset=offset,
       client=client,
     )
-    
+
     total = await count_records('user', client=client)
-    
+
     return {
       'users': users,
       'page': page,
@@ -996,7 +996,7 @@ user2 = await create_record('user', user_data2)
 ### 3. Handle Errors Gracefully
 
 ```python
-from src.connection.client import QueryError
+from reverie.connection.client import QueryError
 
 async def safe_query():
   try:

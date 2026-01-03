@@ -69,7 +69,7 @@
 - Create environment-specific files: `.env.development`, `.env.staging`, `.env.production`
 
 ## Connection Configuration
-- Import: `from src.connection.config import ConnectionConfig`
+- Import: `from reverie.connection.config import ConnectionConfig`
 - Create programmatically: `config = ConnectionConfig(url='ws://localhost:8000/rpc', namespace='test', database='test', username='root', password='root')`
 - Load from environment: `config = ConnectionConfig()` (automatically loads from env vars)
 - Validates URL format (must start with `ws://`, `wss://`, `http://`, or `https://`)
@@ -79,7 +79,7 @@
 # Schema Definition
 
 ## Field Types Overview
-- Import field types: `from src.schema.fields import FieldType`
+- Import field types: `from reverie.schema.fields import FieldType`
 - Available types: `STRING`, `INT`, `FLOAT`, `BOOL`, `DATETIME`, `DURATION`, `DECIMAL`, `NUMBER`, `OBJECT`, `ARRAY`, `RECORD`, `GEOMETRY`, `ANY`
 - All field functions in: `src.schema.fields`
 
@@ -91,7 +91,7 @@
 - `permissions`: Dictionary of permission rules with keys `select`, `create`, `update`, `delete` (optional)
 
 ## String Fields
-- Import: `from src.schema.fields import string_field`
+- Import: `from reverie.schema.fields import string_field`
 - Create: `string_field('name', assertion='string::len($value) > 0')`
 - Email validation: `string_field('email', assertion='string::is::email($value)')`
 - Length validation: `string_field('username', assertion='string::len($value) >= 3 AND string::len($value) <= 20')`
@@ -100,54 +100,54 @@
 - Readonly: `string_field('id_number', readonly=True)`
 
 ## Integer Fields
-- Import: `from src.schema.fields import int_field`
+- Import: `from reverie.schema.fields import int_field`
 - Create: `int_field('age', assertion='$value >= 0 AND $value <= 150')`
 - Range validation: `int_field('score', assertion='$value >= 0 AND $value <= 100')`
 - Default value: `int_field('attempts', default='0')`
 - Positive only: `int_field('quantity', assertion='$value > 0')`
 
 ## Float Fields
-- Import: `from src.schema.fields import float_field`
+- Import: `from reverie.schema.fields import float_field`
 - Create: `float_field('price', assertion='$value >= 0.0')`
 - Precision: `float_field('latitude', assertion='$value >= -90.0 AND $value <= 90.0')`
 - Default value: `float_field('rating', default='0.0')`
 
 ## Boolean Fields
-- Import: `from src.schema.fields import bool_field`
+- Import: `from reverie.schema.fields import bool_field`
 - Create: `bool_field('is_active', default='true')`
 - Default to false: `bool_field('is_deleted', default='false')`
 - Readonly: `bool_field('is_verified', readonly=True)`
 
 ## Datetime Fields
-- Import: `from src.schema.fields import datetime_field`
+- Import: `from reverie.schema.fields import datetime_field`
 - Create: `datetime_field('created_at', default='time::now()', readonly=True)`
 - Auto timestamp: `datetime_field('updated_at', default='time::now()')`
 - Future date: `datetime_field('expires_at', assertion='$value > time::now()')`
 - Past date: `datetime_field('birth_date', assertion='$value < time::now()')`
 
 ## Record Fields (Foreign Keys)
-- Import: `from src.schema.fields import record_field`
+- Import: `from reverie.schema.fields import record_field`
 - Create: `record_field('author', table='user')`
 - Any table: `record_field('related_item')`
 - With custom assertion: `record_field('owner', table='user', assertion='$value.id != NONE')`
 - The `table` parameter automatically generates assertion: `$value.table = "table_name"`
 
 ## Array Fields
-- Import: `from src.schema.fields import array_field`
+- Import: `from reverie.schema.fields import array_field`
 - Create: `array_field('tags', default='[]')`
 - Length validation: `array_field('items', assertion='array::len($value) > 0')`
 - Type validation: `array_field('scores', assertion='array::all($value, |$v| type::is::number($v))')`
 - Default empty: `array_field('permissions', default='[]')`
 
 ## Object Fields
-- Import: `from src.schema.fields import object_field`
+- Import: `from reverie.schema.fields import object_field`
 - Create: `object_field('metadata', flexible=True)`
 - Strict schema: `object_field('settings', flexible=False)`
 - Default value: `object_field('config', default='{}')`
 - Nested validation: `object_field('address', assertion='$value.city != NONE AND $value.country != NONE')`
 
 ## Computed Fields
-- Import: `from src.schema.fields import computed_field`
+- Import: `from reverie.schema.fields import computed_field`
 - Create: `computed_field('full_name', 'string::concat(first_name, " ", last_name)', FieldType.STRING)`
 - Count calculation: `computed_field('post_count', 'count(<-authored<-post)', FieldType.INT)`
 - Date calculation: `computed_field('age', 'time::year() - time::year(birth_date)', FieldType.INT)`
@@ -160,20 +160,20 @@
 - Access: Query returns nested structure automatically
 
 ## Generic Field Definition
-- Import: `from src.schema.fields import field, FieldType`
+- Import: `from reverie.schema.fields import field, FieldType`
 - Create: `field('custom_field', FieldType.STRING, assertion='...', default='...', readonly=False)`
 - All parameters: `field(name, field_type, assertion=None, default=None, value=None, permissions=None, readonly=False, flexible=False)`
 
 ## Table Schemas
 
 ### Basic Table Schema
-- Import: `from src.schema.table import table_schema, TableMode`
+- Import: `from reverie.schema.table import table_schema, TableMode`
 - Create: `table_schema('user', mode=TableMode.SCHEMAFULL, fields=[...], indexes=[...], events=[...])`
 - Schemaless mode: `table_schema('logs', mode=TableMode.SCHEMALESS)`
 - Drop table: `table_schema('old_table', drop=True)`
 
 ### Table Modes
-- Import: `from src.schema.table import TableMode`
+- Import: `from reverie.schema.table import TableMode`
 - `TableMode.SCHEMAFULL`: Enforces strict schema validation (recommended)
 - `TableMode.SCHEMALESS`: Allows any fields
 - `TableMode.DROP`: Marks table for deletion in migration
@@ -185,7 +185,7 @@
 - Example public read: `{'select': 'true', 'create': '$auth != NONE'}`
 
 ### Functional Table Composition
-- Import: `from src.schema.table import with_fields, with_indexes, with_events, with_permissions, set_mode`
+- Import: `from reverie.schema.table import with_fields, with_indexes, with_events, with_permissions, set_mode`
 - Add fields: `with_fields(table, string_field('email'), int_field('age'))`
 - Add indexes: `with_indexes(table, unique_index('email_idx', ['email']))`
 - Add events: `with_events(table, event('audit', '$event = "CREATE"', '...'))`
@@ -196,13 +196,13 @@
 ## Indexes
 
 ### Index Types
-- Import: `from src.schema.table import IndexType`
+- Import: `from reverie.schema.table import IndexType`
 - `IndexType.STANDARD`: Regular index for fast lookups
 - `IndexType.UNIQUE`: Enforces uniqueness constraint
 - `IndexType.SEARCH`: Full-text search index
 
 ### Creating Indexes
-- Import: `from src.schema.table import index, unique_index, search_index`
+- Import: `from reverie.schema.table import index, unique_index, search_index`
 - Generic index: `index('name_idx', ['name'], IndexType.STANDARD)`
 - Unique index: `unique_index('email_idx', ['email'])`
 - Search index: `search_index('content_search', ['title', 'body'])`
@@ -212,7 +212,7 @@
 ## Events (Triggers)
 
 ### Event Definition
-- Import: `from src.schema.table import event`
+- Import: `from reverie.schema.table import event`
 - Create: `event('audit_trail', '$event = "UPDATE"', 'CREATE audit_log SET ...')`
 - On insert: `event('new_user', '$event = "CREATE"', 'CREATE notification SET ...')`
 - On update: `event('email_changed', '$before.email != $after.email', 'CREATE email_verification SET ...')`
@@ -222,18 +222,18 @@
 ## Edge Schemas (Graph Relationships)
 
 ### Basic Edge Schema
-- Import: `from src.schema.edge import edge_schema`
+- Import: `from reverie.schema.edge import edge_schema`
 - Create: `edge_schema('likes', from_table='user', to_table='post')`
 - Unconstrained: `edge_schema('generic_relation')`
 - With fields: `edge_schema('follows', from_table='user', to_table='user', fields=[datetime_field('since', default='time::now()')])`
 
 ### Convenience Edge Functions
-- Import: `from src.schema.edge import bidirectional_edge, typed_edge`
+- Import: `from reverie.schema.edge import bidirectional_edge, typed_edge`
 - Self-referential: `bidirectional_edge('follows', 'user', fields=[datetime_field('since')])`
 - Typed edge: `typed_edge('authored', from_table='user', to_table='post', fields=[datetime_field('published_at')])`
 
 ### Edge Composition
-- Import: `from src.schema.edge import with_from_table, with_to_table, with_edge_fields, with_edge_indexes, with_edge_events, with_edge_permissions`
+- Import: `from reverie.schema.edge import with_from_table, with_to_table, with_edge_fields, with_edge_indexes, with_edge_events, with_edge_permissions`
 - Set source: `with_from_table(edge, 'user')`
 - Set target: `with_to_table(edge, 'post')`
 - Add fields: `with_edge_fields(edge, datetime_field('created_at'), int_field('weight'))`
@@ -246,14 +246,14 @@
 ## CRUD Operations
 
 ### Create Records
-- Import: `from src.query.crud import create_record, create_records`
+- Import: `from reverie.query.crud import create_record, create_records`
 - Single record: `created = await create_record('user', User(name='Alice', email='alice@example.com'))`
 - With dict: `created = await create_record('user', {'name': 'Bob', 'email': 'bob@example.com'})`
 - Multiple records: `created_list = await create_records('user', [User(name='Alice'), User(name='Bob')])`
 - Returns created record(s) with ID
 
 ### Read Records
-- Import: `from src.query.crud import get_record, query_records, first, last`
+- Import: `from reverie.query.crud import get_record, query_records, first, last`
 - Get by ID: `user = await get_record('user', 'alice', User)`
 - With RecordID: `user = await get_record('user', RecordID('user', 'alice'), User)`
 - Query with filters: `users = await query_records('user', User, conditions=['age > 18', 'status = "active"'], order_by=('created_at', 'DESC'), limit=10)`
@@ -262,26 +262,26 @@
 - Returns `None` if not found
 
 ### Update Records
-- Import: `from src.query.crud import update_record, merge_record`
+- Import: `from reverie.query.crud import update_record, merge_record`
 - Full update: `updated = await update_record('user', 'alice', User(name='Alice Updated', email='alice@new.com'))`
 - Partial update: `updated = await merge_record('user', 'alice', {'status': 'active'})`
 - Update replaces entire record, merge updates only specified fields
 - Returns updated record
 
 ### Delete Records
-- Import: `from src.query.crud import delete_record, delete_records`
+- Import: `from reverie.query.crud import delete_record, delete_records`
 - Single delete: `await delete_record('user', 'alice')`
 - Bulk delete: `await delete_records('user', 'status = "inactive"')`
-- With operator: `from src.types.operators import eq; await delete_records('user', eq('status', 'inactive'))`
+- With operator: `from reverie.types.operators import eq; await delete_records('user', eq('status', 'inactive'))`
 - Returns nothing (void)
 
 ### Check Existence
-- Import: `from src.query.crud import exists`
+- Import: `from reverie.query.crud import exists`
 - Check if exists: `if await exists('user', 'alice'): print('User exists')`
 - Returns boolean
 
 ### Count Records
-- Import: `from src.query.crud import count_records`
+- Import: `from reverie.query.crud import count_records`
 - Total count: `total = await count_records('user')`
 - With condition: `active = await count_records('user', 'status = "active"')`
 - Returns integer
@@ -289,7 +289,7 @@
 ## Query Builder
 
 ### Basic Query Building
-- Import: `from src.query.builder import Query`
+- Import: `from reverie.query.builder import Query`
 - SELECT all: `query = Query().select().from_table('user')`
 - SELECT fields: `query = Query().select(['name', 'email']).from_table('user')`
 - Build to SurrealQL: `sql = query.to_surql()`
@@ -298,7 +298,7 @@
 - String condition: `query = Query().select().from_table('user').where('age > 18')`
 - Multiple conditions: `query.where('age > 18').where('status = "active"')`
 - Combined with AND: All conditions are ANDed together
-- Import operators: `from src.types.operators import eq, gt, lt, gte, lte, neq, contains, in_list`
+- Import operators: `from reverie.types.operators import eq, gt, lt, gte, lte, neq, contains, in_list`
 - Operator usage: `query.where(gt('age', 18)).where(eq('status', 'active'))`
 
 ### Ordering
@@ -318,38 +318,38 @@
 - Multiple fields: `query.group_by('status', 'role')`
 
 ### INSERT Operations
-- Import: `from src.query.builder import insert`
+- Import: `from reverie.query.builder import insert`
 - Create query: `query = Query().insert('user', {'name': 'Alice', 'email': 'alice@example.com'})`
 - Functional: `query = insert('user', data_dict)`
 - Execute: `result = await client.execute(query.to_surql())`
 
 ### UPDATE Operations
-- Import: `from src.query.builder import update`
+- Import: `from reverie.query.builder import update`
 - Update record: `query = Query().update('user:alice', {'status': 'active'})`
 - Update with condition: `query = Query().update('user', {'status': 'inactive'}).where('last_login < "2024-01-01"')`
 - Functional: `query = update('user:alice', {'status': 'active'})`
 
 ### DELETE Operations
-- Import: `from src.query.builder import delete`
+- Import: `from reverie.query.builder import delete`
 - Delete record: `query = Query().delete('user:alice')`
 - Delete with condition: `query = Query().delete('user').where('deleted_at IS NOT NULL')`
 - Functional: `query = delete('user:alice')`
 
 ### Query Execution
-- Import: `from src.query.executor import fetch_all, fetch_one`
+- Import: `from reverie.query.executor import fetch_all, fetch_one`
 - Execute with model: `results = await fetch_all(query, User, client)`
 - Fetch single: `result = await fetch_one(query, User, client)`
 - Raw execution: `result = await client.execute(query.to_surql())`
 
 ### Functional Query Helpers
-- Import: `from src.query.builder import select, from_table, where, order_by, limit, offset`
+- Import: `from reverie.query.builder import select, from_table, where, order_by, limit, offset`
 - Compose: `query = limit(order_by(where(from_table(select(['name']), 'user'), 'age > 18'), 'name'), 10)`
 - More readable with chaining: Use method chaining instead
 
 ## Query Operators
 
 ### Comparison Operators
-- Import: `from src.types.operators import eq, neq, gt, gte, lt, lte`
+- Import: `from reverie.types.operators import eq, neq, gt, gte, lt, lte`
 - Equal: `eq('status', 'active')` → `status = "active"`
 - Not equal: `neq('status', 'deleted')` → `status != "deleted"`
 - Greater than: `gt('age', 18)` → `age > 18`
@@ -358,13 +358,13 @@
 - Less or equal: `lte('quantity', 10)` → `quantity <= 10`
 
 ### Collection Operators
-- Import: `from src.types.operators import contains, in_list, not_in`
+- Import: `from reverie.types.operators import contains, in_list, not_in`
 - Contains: `contains('tags', 'python')` → `"python" IN tags`
 - In list: `in_list('status', ['active', 'pending'])` → `status IN ["active", "pending"]`
 - Not in: `not_in('role', ['admin', 'moderator'])`
 
 ### Logical Operators
-- Import: `from src.types.operators import and_op, or_op, not_op`
+- Import: `from reverie.types.operators import and_op, or_op, not_op`
 - AND: `and_op(gt('age', 18), eq('status', 'active'))`
 - OR: `or_op(eq('role', 'admin'), eq('role', 'moderator'))`
 - NOT: `not_op(eq('deleted', true))`
@@ -380,27 +380,27 @@
 ## Graph Traversal
 
 ### Basic Traversal
-- Import: `from src.query.graph import traverse`
+- Import: `from reverie.query.graph import traverse`
 - Outgoing: `posts = await traverse('user:alice', '->likes->post', Post)`
 - Incoming: `followers = await traverse('user:alice', '<-follows<-user', User)`
 - Multi-hop: `fof = await traverse('user:alice', '<-follows<-user<-follows<-user', User)`
 - Pattern: `start_record` + traversal_path + target_type
 
 ### Traversal with Depth
-- Import: `from src.query.graph import traverse_with_depth`
+- Import: `from reverie.query.graph import traverse_with_depth`
 - Fixed depth: `posts = await traverse_with_depth('user:alice', 'likes', 'post', 'out', 1, Post)`
 - Direction options: `'out'` (outgoing), `'in'` (incoming), `'both'` (bidirectional)
 - Unlimited depth: `connected = await traverse_with_depth('user:alice', 'follows', 'user', 'both', None, User)`
 - Returns list of target records
 
 ### Get Related Records
-- Import: `from src.query.graph import get_related_records`
+- Import: `from reverie.query.graph import get_related_records`
 - Outgoing relations: `posts = await get_related_records('user:alice', 'likes', 'post', 'out', Post)`
 - Incoming relations: `likers = await get_related_records('post:123', 'likes', 'user', 'in', User)`
 - Without model: `records = await get_related_records('user:alice', 'likes', 'post', 'out')`
 
 ### Count Related
-- Import: `from src.query.graph import count_related`
+- Import: `from reverie.query.graph import count_related`
 - Outgoing count: `like_count = await count_related('user:alice', 'likes', 'out')`
 - Incoming count: `follower_count = await count_related('user:alice', 'follows', 'in')`
 - Returns integer
@@ -408,26 +408,26 @@
 ## Edge Operations
 
 ### Create Edges
-- Import: `from src.query.graph import relate`
+- Import: `from reverie.query.graph import relate`
 - Simple edge: `edge = await relate('likes', 'user:alice', 'post:123')`
 - With properties: `edge = await relate('follows', 'user:alice', 'user:bob', {'since': '2024-01-01', 'weight': 1})`
 - Returns created edge record with ID
 
 ### Delete Edges
-- Import: `from src.query.graph import unrelate`
+- Import: `from reverie.query.graph import unrelate`
 - Remove edge: `await unrelate('likes', 'user:alice', 'post:123')`
 - Specific direction only: Deletes the exact `from->edge->to` relationship
 - Returns nothing (void)
 
 ### Get Edges
-- Import: `from src.query.graph import get_outgoing_edges, get_incoming_edges`
+- Import: `from reverie.query.graph import get_outgoing_edges, get_incoming_edges`
 - Outgoing: `likes = await get_outgoing_edges('user:alice', 'likes')`
 - Incoming: `liked_by = await get_incoming_edges('post:123', 'likes')`
 - With model: `likes = await get_outgoing_edges('user:alice', 'likes', LikeEdge)`
 - Returns list of edge records (not target records)
 
 ### Query Builder Graph Support
-- Import: `from src.query.builder import Query`
+- Import: `from reverie.query.builder import Query`
 - RELATE: `query = Query().relate('likes', 'user:alice', 'post:123', {'created_at': 'time::now()'})`
 - Traverse: `query = Query().select().from_table('user:alice').traverse('->likes->post')`
 - Execute: `result = await client.execute(query.to_surql())`
@@ -435,7 +435,7 @@
 ## Advanced Graph Patterns
 
 ### Shortest Path
-- Import: `from src.query.graph import shortest_path`
+- Import: `from reverie.query.graph import shortest_path`
 - Find path: `path = await shortest_path('user:alice', 'user:charlie', 'follows', max_depth=5)`
 - Returns list of records in the path
 - Note: Simplified implementation for common cases
@@ -457,14 +457,14 @@
 - Ideal for AI/ML applications with embeddings (OpenAI, sentence transformers, etc.)
 
 ### Distance Metrics
-- Import: `from src.schema.table import MTreeDistanceType`
+- Import: `from reverie.schema.table import MTreeDistanceType`
 - `MTreeDistanceType.COSINE`: Cosine similarity (ideal for normalized vectors like embeddings)
 - `MTreeDistanceType.EUCLIDEAN`: Euclidean distance (L2 norm, default)
 - `MTreeDistanceType.MANHATTAN`: Manhattan distance (L1 norm)
 - `MTreeDistanceType.MINKOWSKI`: Minkowski distance
 
 ### Vector Data Types
-- Import: `from src.schema.table import MTreeVectorType`
+- Import: `from reverie.schema.table import MTreeVectorType`
 - `MTreeVectorType.F64`: 64-bit floating point (default, highest precision)
 - `MTreeVectorType.F32`: 32-bit floating point (recommended for embeddings)
 - `MTreeVectorType.I64`: 64-bit integer
@@ -472,7 +472,7 @@
 - `MTreeVectorType.I16`: 16-bit integer
 
 ### Creating MTREE Indexes
-- Import: `from src.schema.table import mtree_index, MTreeDistanceType, MTreeVectorType`
+- Import: `from reverie.schema.table import mtree_index, MTreeDistanceType, MTreeVectorType`
 - Basic: `mtree_index('embedding_idx', 'embedding', 1536)`
 - With distance metric: `mtree_index('embedding_idx', 'embedding', 1536, distance=MTreeDistanceType.COSINE)`
 - With vector type: `mtree_index('embedding_idx', 'embedding', 1536, distance=MTreeDistanceType.COSINE, vector_type=MTreeVectorType.F32)`
@@ -485,7 +485,7 @@
 
 ### OpenAI Embeddings Example
 ```python
-from src.schema import (
+from reverie.schema import (
   table_schema,
   with_fields,
   with_indexes,
@@ -598,7 +598,7 @@ products = with_indexes(
 ### Migration Example
 ```python
 """Migration: Add vector search to documents"""
-from src.schema import (
+from reverie.schema import (
   table_schema,
   with_fields,
   with_indexes,
@@ -659,8 +659,8 @@ def downgrade():
 ### Migration File Template
 ```python
 """Migration: Create user table"""
-from src.schema.fields import string_field, int_field, datetime_field
-from src.schema.table import table_schema, unique_index, TableMode
+from reverie.schema.fields import string_field, int_field, datetime_field
+from reverie.schema.table import table_schema, unique_index, TableMode
 
 def upgrade():
   """Apply migration."""
@@ -702,7 +702,7 @@ def downgrade():
 - Auto-generates timestamp
 
 ### Programmatically
-- Import: `from src.migration.generator import create_migration_file`
+- Import: `from reverie.migration.generator import create_migration_file`
 - Create: `path = create_migration_file('Add user table', 'migrations/')`
 - Returns path to created file
 - Edit file manually after creation
@@ -833,7 +833,7 @@ def downgrade():
 
 ### Data Migrations
 - Use raw SQL in migration for data operations
-- Import: `from src.connection.context import get_db`
+- Import: `from reverie.connection.context import get_db`
 - Execute in upgrade/downgrade: `await (await get_db()).execute('UPDATE ...')`
 - Keep separate from schema changes when possible
 
@@ -913,7 +913,7 @@ def downgrade():
 ## Database Client
 
 ### Creating Client
-- Import: `from src.connection.client import DatabaseClient, get_client`
+- Import: `from reverie.connection.client import DatabaseClient, get_client`
 - From config: `client = DatabaseClient(config)`
 - Context manager: `async with get_client(config) as client: ...`
 - Manual: `client = DatabaseClient(config); await client.connect()`
@@ -949,26 +949,26 @@ def downgrade():
 ## Context Management
 
 ### Using get_db()
-- Import: `from src.connection.context import get_db`
+- Import: `from reverie.connection.context import get_db`
 - Get current client: `client = get_db()`
 - Used internally by CRUD operations
 - Requires client to be set in context first
 
 ### Setting Context Client
-- Import: `from src.connection.context import set_db`
+- Import: `from reverie.connection.context import set_db`
 - Set client: `set_db(client)`
 - Use in application startup
 - Scope: Per async context
 
 ## Error Handling
-- Import: `from src.connection.client import DatabaseError, ConnectionError, QueryError`
+- Import: `from reverie.connection.client import DatabaseError, ConnectionError, QueryError`
 - `ConnectionError`: Connection failures
 - `QueryError`: Query execution failures
 - `DatabaseError`: Base exception for all database errors
 - Catch and handle: `try: ... except QueryError as e: ...`
 
 ## Transactions
-- Import: `from src.connection.transaction import transaction`
+- Import: `from reverie.connection.transaction import transaction`
 - Usage: `async with transaction(client) as tx: ...`
 - Auto-commit on success
 - Auto-rollback on exception
@@ -1094,8 +1094,8 @@ def downgrade():
 
 ## User Authentication System
 ```python
-from src.schema.fields import string_field, datetime_field, bool_field
-from src.schema.table import table_schema, unique_index, TableMode
+from reverie.schema.fields import string_field, datetime_field, bool_field
+from reverie.schema.table import table_schema, unique_index, TableMode
 
 user_schema = table_schema(
   'user',
@@ -1118,9 +1118,9 @@ user_schema = table_schema(
 
 ## Blog Post with Relationships
 ```python
-from src.schema.fields import string_field, record_field, datetime_field, array_field
-from src.schema.table import table_schema, index, TableMode
-from src.schema.edge import typed_edge
+from reverie.schema.fields import string_field, record_field, datetime_field, array_field
+from reverie.schema.table import table_schema, index, TableMode
+from reverie.schema.edge import typed_edge
 
 post_schema = table_schema(
   'post',
@@ -1152,8 +1152,8 @@ authored_edge = typed_edge(
 
 ## Social Graph (Follows)
 ```python
-from src.schema.edge import bidirectional_edge
-from src.schema.fields import datetime_field, int_field
+from reverie.schema.edge import bidirectional_edge
+from reverie.schema.fields import datetime_field, int_field
 
 follows_edge = bidirectional_edge(
   'follows',
@@ -1199,7 +1199,7 @@ async def paginate(
 
 ## Soft Delete Pattern
 ```python
-from src.schema.fields import datetime_field, bool_field
+from reverie.schema.fields import datetime_field, bool_field
 
 # Add to schema
 bool_field('is_deleted', default='false'),
@@ -1217,7 +1217,7 @@ users = await query_records('user', User, conditions=['is_deleted = false'])
 
 ## Audit Trail with Events
 ```python
-from src.schema.table import event
+from reverie.schema.table import event
 
 audit_event = event(
   'audit_user_changes',
@@ -1238,7 +1238,7 @@ user_schema = table_schema('user', events=[audit_event], ...)
 
 ## Nested Object Fields
 ```python
-from src.schema.fields import object_field, string_field
+from reverie.schema.fields import object_field, string_field
 
 # Parent object
 object_field('address', flexible=False),
@@ -1253,7 +1253,7 @@ string_field('address.postal_code'),
 
 ## Full-Text Search
 ```python
-from src.schema.table import search_index
+from reverie.schema.table import search_index
 
 post_schema = table_schema(
   'post',

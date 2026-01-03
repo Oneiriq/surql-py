@@ -12,9 +12,9 @@ import asyncio
 
 from pydantic import BaseModel, EmailStr
 
-from src.connection.client import get_client
-from src.connection.config import ConnectionConfig
-from src.query.crud import create_record
+from reverie.connection.client import get_client
+from reverie.connection.config import ConnectionConfig
+from reverie.query.crud import create_record
 
 # Database configuration
 config = ConnectionConfig(

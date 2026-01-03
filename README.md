@@ -36,8 +36,8 @@ uv add reverie
 ### Define a Schema
 
 ```python
-from src.schema.fields import string_field, int_field, datetime_field
-from src.schema.table import table_schema, unique_index, TableMode
+from reverie.schema.fields import string_field, int_field, datetime_field
+from reverie.schema.table import table_schema, unique_index, TableMode
 
 user_schema = table_schema(
   'user',
@@ -71,9 +71,9 @@ reverie migrate status
 
 ```python
 from pydantic import BaseModel
-from src.connection.client import DatabaseClient, get_client
-from src.connection.config import ConnectionConfig
-from src.query.crud import create_record, query_records
+from reverie.connection.client import DatabaseClient, get_client
+from reverie.connection.config import ConnectionConfig
+from reverie.query.crud import create_record, query_records
 
 class User(BaseModel):
   name: str

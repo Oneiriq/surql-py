@@ -2,7 +2,7 @@
 
 from pydantic import BaseModel
 
-from src.query.builder import Query, ReturnFormat
+from reverie.query.builder import Query, ReturnFormat
 
 
 class User(BaseModel):

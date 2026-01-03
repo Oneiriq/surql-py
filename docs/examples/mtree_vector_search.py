@@ -6,11 +6,11 @@ COSINE similarity.
 
 Driftnet uses MTREE indexes for:
 - chunk.embedding (1024 dimensions, COSINE)
-- entity.embedding (1024 dimensions, COSINE)  
+- entity.embedding (1024 dimensions, COSINE)
 - claim.embedding (1024 dimensions, COSINE)
 """
 
-from src.schema import (
+from reverie.schema import (
   MTreeDistanceType,
   MTreeVectorType,
   array_field,

@@ -12,11 +12,11 @@ import pytest
 import structlog
 from pydantic import BaseModel
 
-from src.connection.client import DatabaseClient
-from src.connection.config import ConnectionConfig
-from src.schema.fields import FieldDefinition, FieldType
-from src.schema.table import IndexDefinition, IndexType, TableDefinition, TableMode
-from src.types.record_id import RecordID
+from reverie.connection.client import DatabaseClient
+from reverie.connection.config import ConnectionConfig
+from reverie.schema.fields import FieldDefinition, FieldType
+from reverie.schema.table import IndexDefinition, IndexType, TableDefinition, TableMode
+from reverie.types.record_id import RecordID
 
 
 # Configure structlog for testing to avoid warnings

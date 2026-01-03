@@ -9,7 +9,7 @@ This example demonstrates:
 - Edge schemas for relationships
 """
 
-from src.schema.fields import (
+from reverie.schema.fields import (
   string_field,
   int_field,
   float_field,
@@ -20,7 +20,7 @@ from src.schema.fields import (
   object_field,
   computed_field,
 )
-from src.schema.table import (
+from reverie.schema.table import (
   TableMode,
   event,
   index,
@@ -30,7 +30,7 @@ from src.schema.table import (
   with_fields,
   with_indexes,
 )
-from src.schema.edge import edge_schema
+from reverie.schema.edge import edge_schema
 
 
 # User schema with comprehensive features

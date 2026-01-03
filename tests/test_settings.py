@@ -6,7 +6,7 @@ from unittest.mock import patch
 import pytest
 from pydantic import ValidationError
 
-from src.settings import Settings, get_settings
+from reverie.settings import Settings, get_settings
 
 
 class TestSettings:

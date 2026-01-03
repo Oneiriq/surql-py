@@ -11,16 +11,16 @@ import asyncio
 from datetime import datetime
 from pathlib import Path
 
-from src.connection.client import get_client
-from src.connection.config import ConnectionConfig
-from src.migration.discovery import discover_migrations
-from src.migration.executor import (
+from reverie.connection.client import get_client
+from reverie.connection.config import ConnectionConfig
+from reverie.migration.discovery import discover_migrations
+from reverie.migration.executor import (
   create_migration_plan,
   execute_migration_plan,
   get_migration_status,
 )
-from src.migration.history import ensure_migration_table, get_applied_migrations
-from src.migration.models import MigrationDirection
+from reverie.migration.history import ensure_migration_table, get_applied_migrations
+from reverie.migration.models import MigrationDirection
 
 # Database configuration
 config = ConnectionConfig(

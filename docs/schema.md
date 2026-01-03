@@ -26,8 +26,8 @@ reverie provides a code-first approach to schema definition using:
 ### Key Concepts
 
 ```python
-from src.schema.fields import string_field, int_field
-from src.schema.table import table_schema, unique_index, TableMode
+from reverie.schema.fields import string_field, int_field
+from reverie.schema.table import table_schema, unique_index, TableMode
 
 # Define a schema using pure functions
 schema = table_schema(
@@ -50,7 +50,7 @@ schema = table_schema(
 reverie supports all SurrealDB field types:
 
 ```python
-from src.schema.fields import (
+from reverie.schema.fields import (
   FieldType,
   string_field,
   int_field,
@@ -203,7 +203,7 @@ computed_field(
 Use dot notation for nested structure:
 
 ```python
-from src.schema.fields import field, FieldType
+from reverie.schema.fields import field, FieldType
 
 fields = [
   field('name.first', FieldType.STRING),
@@ -219,7 +219,7 @@ fields = [
 ### Basic Table Definition
 
 ```python
-from src.schema.table import table_schema, TableMode
+from reverie.schema.table import table_schema, TableMode
 
 # Schemafull (strict)
 user_table = table_schema(
@@ -245,7 +245,7 @@ old_table = table_schema(
 ### Complete Table Example
 
 ```python
-from src.schema.fields import (
+from reverie.schema.fields import (
   string_field,
   int_field,
   datetime_field,
@@ -253,7 +253,7 @@ from src.schema.fields import (
   array_field,
   bool_field,
 )
-from src.schema.table import (
+from reverie.schema.table import (
   table_schema,
   unique_index,
   search_index,
@@ -329,8 +329,8 @@ reverie supports two edge table modes:
 The modern approach uses `TYPE RELATION` syntax where SurrealDB automatically manages in/out fields.
 
 ```python
-from src.schema.edge import edge_schema
-from src.schema.fields import datetime_field
+from reverie.schema.edge import edge_schema
+from reverie.schema.fields import datetime_field
 
 follows_edge = edge_schema(
   'follows',
@@ -368,8 +368,8 @@ likes_edge = edge_schema(
 For compatibility with traditional schemas (like driftnet), use SCHEMAFULL mode with explicit in/out fields:
 
 ```python
-from src.schema.edge import EdgeMode, schemafull_edge
-from src.schema.fields import record_field, string_field, float_field, array_field
+from reverie.schema.edge import EdgeMode, schemafull_edge
+from reverie.schema.fields import record_field, string_field, float_field, array_field
 
 # Driftnet-compatible entity_relation edge
 entity_relation = schemafull_edge(
@@ -413,7 +413,7 @@ entity_relation = edge_schema(
 ### Weighted Edges
 
 ```python
-from src.schema.fields import float_field
+from reverie.schema.fields import float_field
 
 similarity_edge = edge_schema(
   'similar_to',
@@ -460,7 +460,7 @@ tagged_edge = edge_schema(
 ### Index Types
 
 ```python
-from src.schema.table import index, unique_index, search_index, IndexType
+from reverie.schema.table import index, unique_index, search_index, IndexType
 
 # Standard index
 index('name_idx', ['name'], IndexType.STANDARD)
@@ -485,7 +485,7 @@ index('date_user_idx', ['created_at', 'user_id'])
 ### Index Examples
 
 ```python
-from src.schema.table import table_schema, unique_index, search_index, index
+from reverie.schema.table import table_schema, unique_index, search_index, index
 
 product_table = table_schema(
   'product',
@@ -518,7 +518,7 @@ Events are database triggers that execute when conditions are met.
 ### Basic Event
 
 ```python
-from src.schema.table import event
+from reverie.schema.table import event
 
 email_change_event = event(
   'email_changed',
@@ -628,7 +628,7 @@ post_permissions = {
 ### Field-Level Permissions
 
 ```python
-from src.schema.fields import string_field
+from reverie.schema.fields import string_field
 
 # Field with custom permissions
 email_field = string_field(
@@ -647,14 +647,14 @@ reverie emphasizes functional composition for building schemas.
 ### Composing Tables
 
 ```python
-from src.schema.table import (
+from reverie.schema.table import (
   table_schema,
   with_fields,
   with_indexes,
   with_events,
   with_permissions,
 )
-from src.schema.fields import string_field, datetime_field
+from reverie.schema.fields import string_field, datetime_field
 
 # Start with base table
 base_table = table_schema('user', mode=TableMode.SCHEMAFULL)
@@ -880,8 +880,8 @@ table_schema(
 ### E-commerce Product Schema
 
 ```python
-from src.schema.fields import *
-from src.schema.table import *
+from reverie.schema.fields import *
+from reverie.schema.table import *
 
 product_schema = table_schema(
   'product',

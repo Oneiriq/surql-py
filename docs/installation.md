@@ -210,7 +210,7 @@ LOG_LEVEL=INFO
 Create a configuration file in your project:
 
 ```python
-from src.connection.config import ConnectionConfig
+from reverie.connection.config import ConnectionConfig
 
 config = ConnectionConfig(
   url='ws://localhost:8000/rpc',
@@ -227,7 +227,7 @@ config = ConnectionConfig(
 reverie automatically loads configuration from environment variables:
 
 ```python
-from src.settings import get_db_config
+from reverie.settings import get_db_config
 
 # Loads from environment variables
 config = get_db_config()
@@ -265,8 +265,8 @@ Create a test script `test_connection.py`:
 
 ```python
 import asyncio
-from src.connection.client import get_client
-from src.connection.config import ConnectionConfig
+from reverie.connection.client import get_client
+from reverie.connection.config import ConnectionConfig
 
 async def test_connection():
   config = ConnectionConfig(

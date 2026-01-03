@@ -15,8 +15,8 @@ import asyncio
 import sys
 from typing import Any
 
-from src.connection.client import ConnectionError, DatabaseClient, QueryError
-from src.settings import get_db_config
+from reverie.connection.client import ConnectionError, DatabaseClient, QueryError
+from reverie.settings import get_db_config
 
 
 def print_header(text: str) -> None:

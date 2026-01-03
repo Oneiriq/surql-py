@@ -13,10 +13,10 @@ import asyncio
 
 from pydantic import BaseModel
 
-from src.connection.client import get_client
-from src.connection.config import ConnectionConfig
-from src.connection.transaction import transaction
-from src.query.crud import count_records, create_record, query_records
+from reverie.connection.client import get_client
+from reverie.connection.config import ConnectionConfig
+from reverie.connection.transaction import transaction
+from reverie.query.crud import count_records, create_record, query_records
 
 # Database configuration
 config = ConnectionConfig(

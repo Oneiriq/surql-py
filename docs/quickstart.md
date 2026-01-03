@@ -93,8 +93,8 @@ Let's create a blog with users and posts.
 Create `schemas/user.py`:
 
 ```python
-from src.schema.fields import string_field, datetime_field
-from src.schema.table import table_schema, unique_index, TableMode
+from reverie.schema.fields import string_field, datetime_field
+from reverie.schema.table import table_schema, unique_index, TableMode
 
 user_schema = table_schema(
   'user',
@@ -118,8 +118,8 @@ user_schema = table_schema(
 Create `schemas/post.py`:
 
 ```python
-from src.schema.fields import string_field, record_field, datetime_field, bool_field
-from src.schema.table import table_schema, search_index, TableMode
+from reverie.schema.fields import string_field, record_field, datetime_field, bool_field
+from reverie.schema.table import table_schema, search_index, TableMode
 
 post_schema = table_schema(
   'post',
@@ -210,9 +210,9 @@ Create `main.py`:
 
 ```python
 import asyncio
-from src.connection.client import get_client
-from src.connection.config import ConnectionConfig
-from src.settings import get_db_config
+from reverie.connection.client import get_client
+from reverie.connection.config import ConnectionConfig
+from reverie.settings import get_db_config
 
 async def get_db_client():
   """Get database client from configuration."""
@@ -292,7 +292,7 @@ class Post(BaseModel):
 Add to `main.py`:
 
 ```python
-from src.query.crud import create_record, query_records, get_record
+from reverie.query.crud import create_record, query_records, get_record
 
 async def create_user_example():
   """Create a new user."""
@@ -363,7 +363,7 @@ async def query_published_posts():
 ### Update Records
 
 ```python
-from src.query.crud import update_record, merge_record
+from reverie.query.crud import update_record, merge_record
 
 async def update_user_example(user_id: str):
   """Update a user."""
@@ -397,7 +397,7 @@ async def merge_post_example(post_id: str):
 ### Delete Records
 
 ```python
-from src.query.crud import delete_record
+from reverie.query.crud import delete_record
 
 async def delete_post_example(post_id: str):
   """Delete a post."""
@@ -413,8 +413,8 @@ async def delete_post_example(post_id: str):
 Create `schemas/likes.py`:
 
 ```python
-from src.schema.edge import edge_schema
-from src.schema.fields import datetime_field
+from reverie.schema.edge import edge_schema
+from reverie.schema.fields import datetime_field
 
 likes_edge = edge_schema(
   'likes',
@@ -485,9 +485,9 @@ from pydantic import BaseModel, EmailStr, Field
 from typing import Optional
 from datetime import datetime
 
-from src.connection.client import get_client
-from src.settings import get_db_config
-from src.query.crud import (
+from reverie.connection.client import get_client
+from reverie.settings import get_db_config
+from reverie.query.crud import (
   create_record,
   query_records,
   get_record,
@@ -662,7 +662,7 @@ Create a test configuration:
 ```python
 # conftest.py
 import pytest
-from src.connection.config import ConnectionConfig
+from reverie.connection.config import ConnectionConfig
 
 @pytest.fixture
 async def test_db():
@@ -685,7 +685,7 @@ async def test_db():
 Use context managers for automatic cleanup:
 
 ```python
-from src.connection.context import db_context
+from reverie.connection.context import db_context
 
 async def with_context_example():
   async with db_context(get_db_config()) as client:

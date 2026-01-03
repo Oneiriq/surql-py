@@ -5,7 +5,7 @@ from pathlib import Path
 
 import pytest
 
-from src.migration.discovery import (
+from reverie.migration.discovery import (
   MigrationDiscoveryError,
   MigrationLoadError,
   _calculate_checksum,
@@ -15,7 +15,7 @@ from src.migration.discovery import (
   load_migration,
   validate_migration_name,
 )
-from src.migration.models import (
+from reverie.migration.models import (
   DiffOperation,
   Migration,
   MigrationDirection,

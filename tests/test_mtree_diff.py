@@ -2,14 +2,14 @@
 
 import pytest
 
-from src.migration.diff import (
+from reverie.migration.diff import (
   _generate_add_index_diff,
   _generate_drop_index_diff,
   _mtree_index_to_sql,
   diff_indexes,
 )
-from src.schema.fields import array_field, string_field
-from src.schema.table import (
+from reverie.schema.fields import array_field, string_field
+from reverie.schema.table import (
   IndexType,
   MTreeDistanceType,
   MTreeVectorType,
@@ -124,7 +124,7 @@ class TestMTreeIndexToSQL:
 
   def test_mtree_index_to_sql_no_dimension_raises_error(self) -> None:
     """Test that MTREE index without dimension raises error."""
-    from src.schema.table import IndexDefinition
+    from reverie.schema.table import IndexDefinition
 
     idx = IndexDefinition(
       name='bad_idx',
@@ -252,7 +252,7 @@ class TestDiffIndexesWithMTree:
 
   def test_diff_indexes_mixed_index_types(self) -> None:
     """Test diffing with multiple index types including MTREE."""
-    from src.schema.table import search_index, unique_index
+    from reverie.schema.table import search_index, unique_index
 
     old_table = table_schema('products')
     old_table = with_fields(

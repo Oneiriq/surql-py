@@ -3,7 +3,7 @@
 import pytest
 from pydantic import ValidationError
 
-from src.types.operators import (
+from reverie.types.operators import (
   And,
   Contains,
   ContainsAll,
@@ -41,7 +41,7 @@ from src.types.operators import (
   not_inside,
   or_,
 )
-from src.types.record_id import RecordID
+from reverie.types.record_id import RecordID
 
 
 class TestRecordID:

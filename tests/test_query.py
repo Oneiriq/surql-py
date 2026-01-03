@@ -3,7 +3,7 @@
 import pytest
 from pydantic import BaseModel
 
-from src.query.builder import (
+from reverie.query.builder import (
   Query,
   delete,
   insert,
@@ -11,8 +11,8 @@ from src.query.builder import (
   select,
   update,
 )
-from src.query.executor import _extract_result_data
-from src.query.results import (
+from reverie.query.executor import _extract_result_data
+from reverie.query.results import (
   ListResult,
   PageInfo,
   QueryResult,
@@ -28,8 +28,8 @@ from src.query.results import (
   records,
   success,
 )
-from src.types.operators import Gt, eq
-from src.types.record_id import RecordID
+from reverie.types.operators import Gt, eq
+from reverie.types.record_id import RecordID
 
 
 # Test models
