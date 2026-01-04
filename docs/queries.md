@@ -11,6 +11,7 @@ This guide covers querying and manipulating data using reverie's type-safe query
 - [Graph Traversal](#graph-traversal)
 - [Result Handling](#result-handling)
 - [Transactions](#transactions)
+- [Named Connections](#named-connections)
 - [Type Safety](#type-safety)
 - [Advanced Queries](#advanced-queries)
 - [Best Practices](#best-practices)
@@ -786,6 +787,114 @@ async def manual_transaction():
       # Rollback on error
       await client.execute('CANCEL TRANSACTION')
       raise e
+```
+
+## Named Connections
+
+The connection registry enables running queries against different database connections
+for scenarios like read replicas, analytics databases, or multi-tenant architectures.
+
+### Query Builder with Named Connections
+
+```python
+from reverie.connection.registry import get_registry
+from reverie.query.builder import Query
+from reverie.query.executor import fetch_all
+
+async def query_with_registry():
+  """Execute queries using different named connections."""
+  registry = get_registry()
+
+  # Build query
+  query = Query().select().from_table('user').where('is_active = true')
+
+  # Execute on read replica for performance
+  replica = registry.get('replica')
+  users = await fetch_all(query, User, replica)
+
+  return users
+```
+
+### Read/Write Splitting Pattern
+
+```python
+from reverie.connection.registry import get_registry
+from reverie.query.crud import create_record, query_records
+
+async def read_write_split():
+  """Route writes to primary, reads to replica."""
+  registry = get_registry()
+  primary = registry.get('primary')
+  replica = registry.get('replica')
+
+  # Write to primary
+  user = await create_record(
+    'user',
+    User(username='alice', email='alice@example.com', age=30),
+    client=primary,
+  )
+
+  # Read from replica (may have slight delay)
+  all_users = await query_records('user', User, client=replica)
+
+  return user, all_users
+```
+
+### Analytics Queries
+
+```python
+async def run_analytics():
+  """Run heavy queries on dedicated analytics database."""
+  registry = get_registry()
+  analytics = registry.get('analytics')
+
+  # Complex aggregation on analytics db
+  result = await analytics.execute('''
+    SELECT
+      date::floor(created_at, 1d) as day,
+      count() as signups,
+      count() WHERE is_active = true as active_signups
+    FROM user
+    GROUP BY day
+    ORDER BY day DESC
+    LIMIT 30
+  ''')
+
+  return result
+```
+
+### Dynamic Connection Selection
+
+```python
+async def query_tenant_database(tenant_id: str):
+  """Query specific tenant database."""
+  registry = get_registry()
+
+  # Connection name based on tenant
+  connection_name = f'tenant_{tenant_id}'
+
+  try:
+    client = registry.get(connection_name)
+  except RegistryError:
+    # Register on-demand if not exists
+    config = get_tenant_config(tenant_id)
+    client = await registry.register(connection_name, config)
+
+  users = await query_records('user', User, client=client)
+  return users
+```
+
+### Context Override for Testing
+
+```python
+from reverie.connection.context import connection_override
+
+async def test_with_mock_connection(mock_client):
+  """Override connection for testing."""
+  async with connection_override(mock_client):
+    # All operations use mock_client
+    users = await query_records('user', User)
+    assert len(users) == 0  # Uses mock data
 ```
 
 ## Type Safety

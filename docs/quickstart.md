@@ -13,6 +13,7 @@ This tutorial will walk you through creating your first reverie project, definin
 - [Perform CRUD Operations](#perform-crud-operations)
 - [Working with Relationships](#working-with-relationships)
 - [Complete Example](#complete-example)
+- [Multiple Connections](#multiple-connections)
 - [Next Steps](#next-steps)
 
 ## Prerequisites
@@ -692,6 +693,146 @@ async def with_context_example():
     # Client is automatically connected
     user = await create_record('user', user_data, client=client)
     # Client is automatically disconnected
+```
+
+## Multiple Connections
+
+For applications requiring connections to multiple databases (read replicas, analytics,
+different environments), reverie provides a connection registry.
+
+### When to Use Multiple Connections
+
+- **Read replicas** - Route read queries to replicas for performance
+- **Analytics databases** - Separate OLAP workloads from OLTP
+- **Multi-tenant** - Connect to different tenant databases
+- **Blue-green deployments** - Maintain connections to multiple environments
+
+### Register Named Connections
+
+```python
+import asyncio
+from reverie.connection.registry import ConnectionRegistry, get_registry
+from reverie.connection.config import ConnectionConfig
+
+async def setup_connections():
+  """Register multiple database connections."""
+  registry = get_registry()
+
+  # Primary database (writes)
+  await registry.register(
+    'primary',
+    ConnectionConfig(
+      url='ws://localhost:8000/rpc',
+      namespace='app',
+      database='production',
+      username='root',
+      password='root',
+    ),
+    set_default=True,  # Use as default connection
+  )
+
+  # Read replica (reads)
+  await registry.register(
+    'replica',
+    ConnectionConfig(
+      url='ws://replica.internal:8000/rpc',
+      namespace='app',
+      database='production',
+      username='reader',
+      password='reader_pass',
+    ),
+  )
+
+  # Analytics database
+  await registry.register(
+    'analytics',
+    ConnectionConfig(
+      url='ws://analytics.internal:8000/rpc',
+      namespace='app',
+      database='analytics',
+      username='analyst',
+      password='analyst_pass',
+    ),
+  )
+
+  print(f"Registered connections: {registry.list_connections()}")
+  # ['primary', 'replica', 'analytics']
+```
+
+### Use Named Connections
+
+```python
+from reverie.connection.registry import get_registry
+from reverie.query.crud import create_record, query_records
+
+async def use_connections():
+  """Use different connections for different operations."""
+  registry = get_registry()
+
+  # Get default (primary) connection for writes
+  primary = registry.get()  # or registry.get('primary')
+
+  # Create record on primary
+  user = await create_record(
+    'user',
+    User(username='alice', email='alice@example.com', full_name='Alice'),
+    client=primary,
+  )
+
+  # Query from read replica
+  replica = registry.get('replica')
+  users = await query_records('user', User, client=replica)
+
+  # Run analytics queries on analytics db
+  analytics = registry.get('analytics')
+  result = await analytics.execute('''
+    SELECT category, count() as total
+    FROM pageviews
+    GROUP BY category
+  ''')
+
+async def cleanup():
+  """Disconnect all connections on shutdown."""
+  registry = get_registry()
+  await registry.disconnect_all()
+```
+
+### Environment-Based Configuration
+
+Configure named connections via environment variables:
+
+```env
+# Primary database
+REVERIE_PRIMARY_DB_URL=ws://localhost:8000/rpc
+REVERIE_PRIMARY_DB_NS=app
+REVERIE_PRIMARY_DB=production
+REVERIE_PRIMARY_DB_USER=root
+REVERIE_PRIMARY_DB_PASS=root
+
+# Read replica
+REVERIE_REPLICA_DB_URL=ws://replica:8000/rpc
+REVERIE_REPLICA_DB_NS=app
+REVERIE_REPLICA_DB=production
+REVERIE_REPLICA_DB_USER=reader
+REVERIE_REPLICA_DB_PASS=reader_pass
+```
+
+Load from environment:
+
+```python
+from reverie.connection.config import NamedConnectionConfig
+from reverie.connection.registry import get_registry
+
+async def setup_from_env():
+  """Load named connections from environment variables."""
+  registry = get_registry()
+
+  # Load configurations using REVERIE_{NAME}_ prefix
+  primary_config = NamedConnectionConfig.from_env('PRIMARY')
+  replica_config = NamedConnectionConfig.from_env('REPLICA')
+
+  await registry.register(primary_config.name, primary_config.config, set_default=True)
+  await registry.register(replica_config.name, replica_config.config)
 ```
 
 ## Troubleshooting

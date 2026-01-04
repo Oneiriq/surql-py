@@ -510,8 +510,7 @@ def _load_schemas_from_file(file_path: Path) -> dict[str, 'TableDefinition']:
 async def _fetch_db_tables(client: 'DatabaseClient') -> dict[str, 'TableDefinition']:
   """Fetch table definitions from database.
 
-  Queries the database for schema information and parses it into
-  TableDefinition objects for comparison.
+  Delegates to the shared utility function in schema.utils.
 
   Args:
     client: Connected database client
@@ -519,41 +518,9 @@ async def _fetch_db_tables(client: 'DatabaseClient') -> dict[str, 'TableDefiniti
   Returns:
     Dictionary of table name to TableDefinition
   """
-  from reverie.schema.parser import parse_table_info
-  from reverie.schema.table import TableDefinition
+  from reverie.schema.utils import fetch_db_tables
 
-  db_tables: dict[str, TableDefinition] = {}
-
-  # Get list of tables from database
-  db_info = await client.execute('INFO FOR DB;')
-
-  # Parse database info - handle both direct dict and wrapped result
-  result = db_info
-  if isinstance(db_info, list) and len(db_info) > 0:
-    result = db_info[0].get('result', db_info[0]) if isinstance(db_info[0], dict) else db_info
-  if isinstance(result, dict):
-    # SurrealDB may use 'tables' or 'tb' depending on version
-    tb_dict = result.get('tables') or result.get('tb') or {}
-
-    # For each table, get detailed info (skip internal tables)
-    for table_name in tb_dict:
-      if table_name.startswith('_'):
-        continue  # Skip internal tables like _migration_history
-      try:
-        table_info = await client.execute(f'INFO FOR TABLE {table_name};')
-        info_result = table_info
-        if isinstance(table_info, list) and len(table_info) > 0:
-          info_result = (
-            table_info[0].get('result', table_info[0])
-            if isinstance(table_info[0], dict)
-            else table_info
-          )
-        if isinstance(info_result, dict):
-          db_tables[table_name] = parse_table_info(table_name, info_result)
-      except Exception as e:
-        logger.warning('table_fetch_failed', table=table_name, error=str(e))
-
-  return db_tables
+  return await fetch_db_tables(client)
 
 
 def _generate_diff_summary(file_path: Path) -> str | None:

@@ -7,12 +7,23 @@ This module provides a complete query building and ORM system with:
 - High-level CRUD operations
 - Graph traversal utilities
 - Result wrapper classes
+- Batch operation helpers
 """
 
 # Query builder
+# Batch operations
+from reverie.query.batch import (
+  build_relate_query,
+  build_upsert_query,
+  delete_many,
+  insert_many,
+  relate_many,
+  upsert_many,
+)
 from reverie.query.builder import (
   Query,
   ReturnFormat,
+  VectorDistanceType,
   delete,
   from_table,
   insert,
@@ -22,6 +33,7 @@ from reverie.query.builder import (
   relate,
   select,
   update,
+  vector_search_query,
   where,
 )
 
@@ -136,6 +148,8 @@ __all__ = [
   'update',
   'delete',
   'relate',
+  'vector_search_query',
+  'VectorDistanceType',
   # Query expressions
   'Expression',
   'FieldExpression',
@@ -187,6 +201,13 @@ __all__ = [
   'exists',
   'first',
   'last',
+  # Batch operations
+  'upsert_many',
+  'relate_many',
+  'insert_many',
+  'delete_many',
+  'build_upsert_query',
+  'build_relate_query',
   # Graph operations
   'traverse',
   'traverse_with_depth',

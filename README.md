@@ -10,8 +10,17 @@ Reverie is a code-first database toolkit for building modern applications with S
 
 - **Code-First Migrations** - Define and manage database schema changes directly in code with automatic migration generation
 - **Type Safety** - Leverage Python's type hints with Pydantic for validation and reduced runtime errors
-- **Driftnet Compatible** - Full compatibility with driftnet patterns: angle bracket RecordIDs, MTREE vector indexes, SCHEMAFULL edge tables, and result extraction utilities
-- **Vector Search** - Complete MTREE index support with 1024 dimensions, COSINE similarity, and all distance metrics (EUCLIDEAN, MANHATTAN, MINKOWSKI, CHEBYSHEV, HAMMING)
+- **Driftnet Compatible** - Full compatibility with driftnet patterns: angle bracket RecordIDs, MTREE vector indexes with 9 distance metrics, SCHEMAFULL edge tables, and result extraction utilities
+- **Vector Search** - Complete MTREE index support with 9 distance metrics (COSINE, EUCLIDEAN, MANHATTAN, HAMMING, MINKOWSKI, CHEBYSHEV, PEARSON, JACCARD, DOT)
+- **Query Caching** - Memory and Redis-backed caching with `@cache_query` decorator
+- **Live Queries** - Real-time change notifications and streaming support
+- **Authentication** - Multi-level auth (ROOT, NAMESPACE, DATABASE, SCOPE) with token management
+- **Schema Validation** - Validate code schemas against database with CI/CD integration
+- **Schema Visualization** - Generate Mermaid, GraphViz, and ASCII diagrams
+- **Migration Squashing** - Consolidate multiple migrations into optimized versions
+- **Git Hooks** - Pre-commit schema drift detection
+- **Batch Operations** - Efficient bulk inserts, upserts, and relationship creation
+- **Advanced Graph Queries** - GraphQuery builder with shortest path and degree calculation
 - **Result Utilities** - Built-in utilities for extracting data from SurrealDB responses ([`extract_result()`](src/query/results.py), [`extract_one()`](src/query/results.py), [`extract_scalar()`](src/query/results.py), [`has_results()`](src/query/results.py))
 - **Functional Composition** - Pure functions and immutable data structures for predictable, testable code
 - **Async-First** - Built with async/await for high-performance database operations with connection pooling and retry logic
@@ -117,6 +126,8 @@ async with get_client(config) as client:
 - [Schema Definition Guide](docs/schema.md) - Complete schema definition reference
 - [Migration System](docs/migrations.md) - Migration creation and management
 - [Query Builder & ORM](docs/queries.md) - Querying and CRUD operations
+- [Query Caching](docs/caching.md) - Memory and Redis-backed caching strategies
+- [Live Queries & Streaming](docs/streaming.md) - Real-time data notifications
 - [CLI Reference](docs/cli.md) - Command-line interface documentation
 - [API Reference](docs/api/README.md) - Module and function reference
 - [Driftnet Migration Guide](docs/driftnet_migration.md) - Migrating from surrealdb-py to reverie
@@ -146,21 +157,38 @@ reverie/
 │   ├── schema/          # Schema definition layer
 │   │   ├── fields.py    # Field type definitions
 │   │   ├── table.py     # Table schema composition
-│   │   └── edge.py      # Edge/relationship schemas
+│   │   ├── edge.py      # Edge/relationship schemas
+│   │   ├── validator.py # Schema validation
+│   │   └── visualize.py # Schema visualization
 │   ├── migration/       # Migration system
 │   │   ├── generator.py # Migration generation
 │   │   ├── executor.py  # Migration execution
 │   │   ├── discovery.py # Migration file discovery
-│   │   └── history.py   # Migration tracking
+│   │   ├── history.py   # Migration tracking
+│   │   ├── hooks.py     # Git hooks integration
+│   │   ├── squash.py    # Migration squashing
+│   │   └── watcher.py   # Schema change watching
 │   ├── query/           # Query builder and ORM
 │   │   ├── builder.py   # Query builder
 │   │   ├── crud.py      # CRUD operations
 │   │   ├── executor.py  # Query execution
-│   │   └── graph.py     # Graph traversal
+│   │   ├── graph.py     # Graph traversal
+│   │   ├── batch.py     # Batch operations
+│   │   ├── results.py   # Result extraction
+│   │   └── expressions.py # Query expressions
 │   ├── connection/      # Database connection
 │   │   ├── client.py    # Async client wrapper
 │   │   ├── config.py    # Connection configuration
-│   │   └── context.py   # Context management
+│   │   ├── context.py   # Context management
+│   │   ├── auth.py      # Authentication
+│   │   ├── streaming.py # Live queries
+│   │   ├── transaction.py # Transactions
+│   │   └── registry.py  # Connection registry
+│   ├── cache/           # Query caching
+│   │   ├── backends.py  # Cache backends
+│   │   ├── config.py    # Cache configuration
+│   │   ├── decorator.py # Query decorators
+│   │   └── manager.py   # Cache management
 │   ├── types/           # Type definitions
 │   │   ├── record_id.py # RecordID type
 │   │   └── operators.py # Query operators
@@ -182,14 +210,19 @@ reverie migrate down            # Rollback last migration
 reverie migrate status          # Show migration status
 reverie migrate history         # Show applied migrations
 reverie migrate create <name>   # Create new migration
+reverie migrate squash          # Squash migrations
 
 # Schema commands
 reverie schema show             # Show database schema
 reverie schema show <table>     # Show table schema
+reverie schema validate         # Validate against database
+reverie schema visualize        # Generate schema diagram
+reverie schema watch            # Watch for schema changes
 
 # Database commands
 reverie db info                 # Show database information
 reverie db ping                 # Check database connection
+reverie db query <sql>          # Execute raw SurrealQL
 ```
 
 ## Requirements
@@ -262,11 +295,15 @@ This project is licensed under the Apache License 2.0 - see the [LICENSE](LICENS
 - [x] Migration generation and execution
 - [x] CRUD operations and query builder
 - [x] CLI interface
-- [ ] Auto-migration generation from schema changes
-- [ ] Schema validation against database
-- [ ] Advanced graph query helpers
-- [ ] Query result caching
-- [ ] Migration squashing
-- [ ] Schema visualization
+- [x] Auto-migration generation from schema changes
+- [x] Schema validation against database
+- [x] Advanced graph query helpers
+- [x] Query result caching
+- [x] Migration squashing
+- [x] Schema visualization
+- [ ] Advanced query optimization hints
+- [ ] Multi-database migration orchestration
+- [ ] Schema versioning and rollback strategies
+- [ ] Performance profiling tools
 
 ---

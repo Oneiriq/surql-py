@@ -7,7 +7,7 @@ through method chaining. All methods return new Query instances, ensuring immuta
 from __future__ import annotations
 
 from enum import Enum
-from typing import Any, TypeVar
+from typing import Any, Literal, TypeVar
 
 import structlog
 from pydantic import BaseModel, ConfigDict, Field
@@ -18,6 +18,19 @@ from reverie.types.record_id import RecordID
 logger = structlog.get_logger(__name__)
 
 T = TypeVar('T', bound=BaseModel)
+
+# Supported distance metrics for vector search
+VectorDistanceType = Literal[
+  'COSINE',
+  'EUCLIDEAN',
+  'MANHATTAN',
+  'CHEBYSHEV',
+  'MINKOWSKI',
+  'HAMMING',
+  'JACCARD',
+  'PEARSON',
+  'MAHALANOBIS',
+]
 
 
 class ReturnFormat(str, Enum):
@@ -79,6 +92,11 @@ class Query[T: BaseModel](BaseModel):
   join_clauses: list[str] = Field(default_factory=list)
   graph_traversal: str | None = None
   return_format: ReturnFormat | None = None
+  # Vector search fields
+  vector_field: str | None = None
+  vector_value: list[float] = Field(default_factory=list)
+  vector_k: int | None = None
+  vector_distance: VectorDistanceType | None = None
 
   model_config = ConfigDict(frozen=True, arbitrary_types_allowed=True)
 
@@ -330,6 +348,54 @@ class Query[T: BaseModel](BaseModel):
     """
     return self.model_copy(update={'join_clauses': [*self.join_clauses, join_clause]})
 
+  def vector_search(
+    self,
+    field: str,
+    vector: list[float],
+    k: int = 10,
+    distance: VectorDistanceType = 'COSINE',
+  ) -> Query[T]:
+    """Add vector similarity search clause using MTREE operator.
+
+    Performs K-nearest neighbor search using the specified distance metric.
+    Requires an MTREE index on the target field.
+
+    Args:
+      field: The field containing the vector embedding
+      vector: The query vector to compare against
+      k: Number of nearest neighbors to return (default: 10)
+      distance: Distance metric (default: COSINE)
+
+    Returns:
+      New Query instance with vector search configured
+
+    Raises:
+      ValueError: If k is less than 1 or vector is empty
+
+    Examples:
+      >>> query = Query().select().from_table('documents').vector_search(
+      ...     field='embedding',
+      ...     vector=[0.1, 0.2, 0.3],
+      ...     k=10,
+      ...     distance='COSINE'
+      ... )
+      >>> # Generates: SELECT * FROM documents WHERE embedding <|10,COSINE|> [0.1, 0.2, 0.3]
+    """
+    if k < 1:
+      raise ValueError(f'k must be at least 1, got {k}')
+
+    if not vector:
+      raise ValueError('Vector cannot be empty')
+
+    return self.model_copy(
+      update={
+        'vector_field': field,
+        'vector_value': vector,
+        'vector_k': k,
+        'vector_distance': distance,
+      }
+    )
+
   def return_none(self) -> Query[T]:
     """Set RETURN NONE for the query.
 
@@ -450,10 +516,24 @@ class Query[T: BaseModel](BaseModel):
     for join in self.join_clauses:
       parts.append(join)
 
-    # Add WHERE conditions
-    if self.conditions:
-      conditions_str = ' AND '.join(f'({c})' for c in self.conditions)
-      parts.append(f'WHERE {conditions_str}')
+    # Build all WHERE conditions including vector search
+    where_conditions: list[str] = []
+
+    # Add vector search condition if present
+    if self.vector_field and self.vector_value and self.vector_k and self.vector_distance:
+      vector_str = '[' + ', '.join(str(v) for v in self.vector_value) + ']'
+      vector_condition = (
+        f'{self.vector_field} <|{self.vector_k},{self.vector_distance}|> {vector_str}'
+      )
+      where_conditions.append(vector_condition)
+
+    # Add regular conditions
+    for condition in self.conditions:
+      where_conditions.append(f'({condition})')
+
+    # Add WHERE clause if there are any conditions
+    if where_conditions:
+      parts.append(f'WHERE {" AND ".join(where_conditions)}')
 
     # Add GROUP BY
     if self.group_fields:
@@ -714,3 +794,39 @@ def relate(
     Query instance with RELATE operation
   """
   return Query().relate(edge_table, from_record, to_record, data)
+
+
+def vector_search_query(
+  table: str,
+  field: str,
+  vector: list[float],
+  k: int = 10,
+  distance: VectorDistanceType = 'COSINE',
+  fields: list[str] | None = None,
+) -> Query[Any]:
+  """Create a vector similarity search query.
+
+  Convenience function for creating a SELECT query with vector search.
+
+  Args:
+    table: Table name to search
+    field: The field containing the vector embedding
+    vector: The query vector to compare against
+    k: Number of nearest neighbors to return (default: 10)
+    distance: Distance metric (default: COSINE)
+    fields: List of fields to select (default: all fields)
+
+  Returns:
+    Query instance configured for vector search
+
+  Examples:
+    >>> query = vector_search_query(
+    ...     table='documents',
+    ...     field='embedding',
+    ...     vector=[0.1, 0.2, 0.3],
+    ...     k=10,
+    ...     distance='COSINE'
+    ... )
+    >>> # Generates: SELECT * FROM documents WHERE embedding <|10,COSINE|> [0.1, 0.2, 0.3]
+  """
+  return Query().select(fields).from_table(table).vector_search(field, vector, k, distance)

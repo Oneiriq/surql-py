@@ -5,11 +5,13 @@ from pydantic import BaseModel
 
 from reverie.query.builder import (
   Query,
+  VectorDistanceType,
   delete,
   insert,
   relate,
   select,
   update,
+  vector_search_query,
 )
 from reverie.query.executor import _extract_result_data
 from reverie.query.results import (
@@ -882,3 +884,313 @@ class TestResultExtraction:
       {'id': 'user:456'},
     ]
     assert has_results(result) is True
+
+
+class TestVectorSearch:
+  """Test suite for vector_search() method."""
+
+  def test_vector_search_basic(self) -> None:
+    """Test basic vector search with default parameters."""
+    query = (
+      Query[User]()
+      .select()
+      .from_table('documents')
+      .vector_search(field='embedding', vector=[0.1, 0.2, 0.3])
+    )
+
+    assert query.vector_field == 'embedding'
+    assert query.vector_value == [0.1, 0.2, 0.3]
+    assert query.vector_k == 10  # default
+    assert query.vector_distance == 'COSINE'  # default
+
+  def test_vector_search_custom_k(self) -> None:
+    """Test vector search with custom k value."""
+    query = (
+      Query[User]()
+      .select()
+      .from_table('documents')
+      .vector_search(field='embedding', vector=[0.1, 0.2], k=20)
+    )
+
+    assert query.vector_k == 20
+
+  def test_vector_search_euclidean_distance(self) -> None:
+    """Test vector search with EUCLIDEAN distance."""
+    query = (
+      Query[User]()
+      .select()
+      .from_table('documents')
+      .vector_search(field='embedding', vector=[0.1, 0.2], distance='EUCLIDEAN')
+    )
+
+    assert query.vector_distance == 'EUCLIDEAN'
+
+  def test_vector_search_manhattan_distance(self) -> None:
+    """Test vector search with MANHATTAN distance."""
+    query = (
+      Query[User]()
+      .select()
+      .from_table('documents')
+      .vector_search(field='embedding', vector=[0.1, 0.2], distance='MANHATTAN')
+    )
+
+    assert query.vector_distance == 'MANHATTAN'
+
+  def test_vector_search_all_distance_metrics(self) -> None:
+    """Test vector search with all supported distance metrics."""
+    metrics: list[VectorDistanceType] = [
+      'COSINE',
+      'EUCLIDEAN',
+      'MANHATTAN',
+      'CHEBYSHEV',
+      'MINKOWSKI',
+      'HAMMING',
+      'JACCARD',
+      'PEARSON',
+      'MAHALANOBIS',
+    ]
+
+    for metric in metrics:
+      query = (
+        Query[User]()
+        .select()
+        .from_table('documents')
+        .vector_search(field='embedding', vector=[0.1], distance=metric)
+      )
+      assert query.vector_distance == metric
+
+  def test_vector_search_invalid_k(self) -> None:
+    """Test vector search with k < 1 raises error."""
+    with pytest.raises(ValueError) as exc_info:
+      Query[User]().select().from_table('documents').vector_search(
+        field='embedding', vector=[0.1, 0.2], k=0
+      )
+
+    assert 'k must be at least 1' in str(exc_info.value)
+
+  def test_vector_search_negative_k(self) -> None:
+    """Test vector search with negative k raises error."""
+    with pytest.raises(ValueError) as exc_info:
+      Query[User]().select().from_table('documents').vector_search(
+        field='embedding', vector=[0.1, 0.2], k=-5
+      )
+
+    assert 'k must be at least 1' in str(exc_info.value)
+
+  def test_vector_search_empty_vector(self) -> None:
+    """Test vector search with empty vector raises error."""
+    with pytest.raises(ValueError) as exc_info:
+      Query[User]().select().from_table('documents').vector_search(field='embedding', vector=[])
+
+    assert 'Vector cannot be empty' in str(exc_info.value)
+
+  def test_vector_search_immutability(self) -> None:
+    """Test that vector_search() returns a new instance."""
+    query1 = Query[User]().select().from_table('documents')
+    query2 = query1.vector_search(field='embedding', vector=[0.1, 0.2])
+
+    assert query1.vector_field is None
+    assert query1.vector_value == []
+    assert query2.vector_field == 'embedding'
+    assert query2.vector_value == [0.1, 0.2]
+    assert query1 is not query2
+
+  def test_vector_search_method_chaining(self) -> None:
+    """Test vector search works with method chaining."""
+    query = (
+      Query[User]()
+      .select(['id', 'text'])
+      .from_table('documents')
+      .vector_search(field='embedding', vector=[0.1, 0.2, 0.3], k=5)
+      .limit(10)
+    )
+
+    assert query.fields == ['id', 'text']
+    assert query.table_name == 'documents'
+    assert query.vector_field == 'embedding'
+    assert query.vector_k == 5
+    assert query.limit_value == 10
+
+
+class TestVectorSearchSurQL:
+  """Test suite for vector search SurrealQL generation."""
+
+  def test_to_surql_basic_vector_search(self) -> None:
+    """Test SurrealQL generation for basic vector search."""
+    query = (
+      Query[User]()
+      .select()
+      .from_table('documents')
+      .vector_search(field='embedding', vector=[0.1, 0.2, 0.3], k=10, distance='COSINE')
+    )
+
+    sql = query.to_surql()
+    assert 'SELECT * FROM documents' in sql
+    assert 'WHERE embedding <|10,COSINE|> [0.1, 0.2, 0.3]' in sql
+
+  def test_to_surql_vector_search_with_euclidean(self) -> None:
+    """Test SurrealQL generation with EUCLIDEAN distance."""
+    query = (
+      Query[User]()
+      .select()
+      .from_table('documents')
+      .vector_search(field='features', vector=[1.0, 2.0], k=5, distance='EUCLIDEAN')
+    )
+
+    sql = query.to_surql()
+    assert 'WHERE features <|5,EUCLIDEAN|> [1.0, 2.0]' in sql
+
+  def test_to_surql_vector_search_with_fields(self) -> None:
+    """Test SurrealQL generation with specific fields selected."""
+    query = (
+      Query[User]()
+      .select(['id', 'text', 'title'])
+      .from_table('documents')
+      .vector_search(field='embedding', vector=[0.5, 0.5], k=20)
+    )
+
+    sql = query.to_surql()
+    assert 'SELECT id, text, title FROM documents' in sql
+    assert 'WHERE embedding <|20,COSINE|> [0.5, 0.5]' in sql
+
+  def test_to_surql_vector_search_combined_with_where(self) -> None:
+    """Test SurrealQL generation combining vector search with WHERE conditions."""
+    query = (
+      Query[User]()
+      .select()
+      .from_table('documents')
+      .vector_search(field='embedding', vector=[0.1, 0.2], k=10)
+      .where('status = "published"')
+    )
+
+    sql = query.to_surql()
+    assert 'WHERE embedding <|10,COSINE|> [0.1, 0.2] AND (status = "published")' in sql
+
+  def test_to_surql_vector_search_with_multiple_where(self) -> None:
+    """Test SurrealQL generation with vector search and multiple WHERE conditions."""
+    query = (
+      Query[User]()
+      .select()
+      .from_table('documents')
+      .vector_search(field='embedding', vector=[0.1], k=5)
+      .where('status = "active"')
+      .where('category = "news"')
+    )
+
+    sql = query.to_surql()
+    assert 'embedding <|5,COSINE|> [0.1]' in sql
+    assert '(status = "active")' in sql
+    assert '(category = "news")' in sql
+    assert ' AND ' in sql
+
+  def test_to_surql_vector_search_with_order_by(self) -> None:
+    """Test SurrealQL generation with vector search and ORDER BY."""
+    query = (
+      Query[User]()
+      .select()
+      .from_table('documents')
+      .vector_search(field='embedding', vector=[0.1, 0.2], k=10)
+      .order_by('created_at', 'DESC')
+    )
+
+    sql = query.to_surql()
+    assert 'WHERE embedding <|10,COSINE|> [0.1, 0.2]' in sql
+    assert 'ORDER BY created_at DESC' in sql
+
+  def test_to_surql_vector_search_with_limit(self) -> None:
+    """Test SurrealQL generation with vector search and LIMIT."""
+    query = (
+      Query[User]()
+      .select()
+      .from_table('documents')
+      .vector_search(field='embedding', vector=[0.1, 0.2, 0.3], k=100)
+      .limit(25)
+    )
+
+    sql = query.to_surql()
+    assert 'WHERE embedding <|100,COSINE|> [0.1, 0.2, 0.3]' in sql
+    assert 'LIMIT 25' in sql
+
+  def test_to_surql_vector_search_high_dimensional(self) -> None:
+    """Test SurrealQL generation with high-dimensional vectors."""
+    # Simulate a 1024-dimensional embedding (just a few values for testing)
+    vector = [float(i) / 1000.0 for i in range(10)]  # 10 dimensions for brevity
+    query = (
+      Query[User]()
+      .select()
+      .from_table('chunks')
+      .vector_search(field='embedding', vector=vector, k=50, distance='COSINE')
+    )
+
+    sql = query.to_surql()
+    assert 'embedding <|50,COSINE|>' in sql
+
+
+class TestVectorSearchQueryHelper:
+  """Test suite for vector_search_query() helper function."""
+
+  def test_vector_search_query_basic(self) -> None:
+    """Test basic vector_search_query() helper function."""
+    query = vector_search_query(
+      table='documents',
+      field='embedding',
+      vector=[0.1, 0.2, 0.3],
+    )
+
+    assert query.operation == 'SELECT'
+    assert query.table_name == 'documents'
+    assert query.vector_field == 'embedding'
+    assert query.vector_value == [0.1, 0.2, 0.3]
+    assert query.vector_k == 10  # default
+    assert query.vector_distance == 'COSINE'  # default
+    assert query.fields == ['*']
+
+  def test_vector_search_query_with_custom_params(self) -> None:
+    """Test vector_search_query() with custom parameters."""
+    query = vector_search_query(
+      table='images',
+      field='features',
+      vector=[1.0, 2.0, 3.0],
+      k=20,
+      distance='EUCLIDEAN',
+      fields=['id', 'url', 'description'],
+    )
+
+    assert query.table_name == 'images'
+    assert query.vector_field == 'features'
+    assert query.vector_k == 20
+    assert query.vector_distance == 'EUCLIDEAN'
+    assert query.fields == ['id', 'url', 'description']
+
+  def test_vector_search_query_to_surql(self) -> None:
+    """Test vector_search_query() generates correct SurrealQL."""
+    query = vector_search_query(
+      table='documents',
+      field='embedding',
+      vector=[0.1, 0.2, 0.3],
+      k=10,
+      distance='COSINE',
+    )
+
+    sql = query.to_surql()
+    assert sql == 'SELECT * FROM documents WHERE embedding <|10,COSINE|> [0.1, 0.2, 0.3]'
+
+  def test_vector_search_query_chainable(self) -> None:
+    """Test vector_search_query() result is chainable."""
+    query = (
+      vector_search_query(
+        table='documents',
+        field='embedding',
+        vector=[0.1, 0.2],
+        k=10,
+      )
+      .where('published = true')
+      .order_by('score', 'DESC')
+      .limit(5)
+    )
+
+    sql = query.to_surql()
+    assert 'embedding <|10,COSINE|> [0.1, 0.2]' in sql
+    assert '(published = true)' in sql
+    assert 'ORDER BY score DESC' in sql
+    assert 'LIMIT 5' in sql

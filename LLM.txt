@@ -8,6 +8,9 @@
 - Integrates Pydantic for runtime validation and type safety
 - Supports SurrealDB's graph features including edge relationships and graph traversal
 - Supports vector similarity search through MTREE indexes for AI/ML embeddings
+- Includes query result caching with Redis and in-memory backends
+- Provides real-time streaming and live query support via WebSocket
+- Supports multiple named database connections with connection registry
 - **Requirements**: Python 3.12+ and SurrealDB 1.0+
 - **Version**: 0.1.0 (Alpha)
 - **License**: Apache 2.0
@@ -21,6 +24,7 @@
 ## Using uv (Recommended)
 - Install via uv: `uv add reverie`
 - Install with dev dependencies: `uv add reverie --dev`
+- Install with cache backend: `uv add "reverie[cache]"` (includes Redis support)
 - Sync dependencies: `uv sync`
 
 ## From Source
@@ -61,6 +65,16 @@
 - `DB_RETRY_MIN_WAIT`: Minimum wait between retries in seconds (default: `1.0`, min: `0.1`)
 - `DB_RETRY_MAX_WAIT`: Maximum wait between retries in seconds (default: `10.0`, min: `1.0`)
 - `DB_RETRY_MULTIPLIER`: Exponential backoff multiplier (default: `2.0`, min: `1.0`)
+
+## Named Connection Environment Variables
+- Use `REVERIE_{NAME}_` prefix for named connections (also supports legacy `DB_{NAME}_` prefix)
+- Example for "analytics" connection:
+  * `REVERIE_ANALYTICS_URL`: URL for analytics database
+  * `REVERIE_ANALYTICS_NAMESPACE`: Namespace for analytics
+  * `REVERIE_ANALYTICS_DATABASE`: Database name for analytics
+  * `REVERIE_ANALYTICS_USERNAME`: Username for analytics
+  * `REVERIE_ANALYTICS_PASSWORD`: Password for analytics
+- Load via: `NamedConnectionConfig.from_env("analytics")`
 
 ## .env File
 - Create `.env` file in project root for local development
@@ -221,9 +235,16 @@
 
 ## Edge Schemas (Graph Relationships)
 
+### Edge Modes
+- Import: `from reverie.schema.edge import EdgeMode`
+- `EdgeMode.RELATION`: Creates `TYPE RELATION` (default, recommended for graph relationships)
+- `EdgeMode.SCHEMAFULL`: Creates SCHEMAFULL edge table
+- `EdgeMode.SCHEMALESS`: Creates SCHEMALESS edge table
+
 ### Basic Edge Schema
 - Import: `from reverie.schema.edge import edge_schema`
 - Create: `edge_schema('likes', from_table='user', to_table='post')`
+- With mode: `edge_schema('likes', from_table='user', to_table='post', mode=EdgeMode.RELATION)`
 - Unconstrained: `edge_schema('generic_relation')`
 - With fields: `edge_schema('follows', from_table='user', to_table='user', fields=[datetime_field('since', default='time::now()')])`
 
@@ -245,10 +266,20 @@
 
 ## CRUD Operations
 
+### Return Formats
+- Import: `from reverie.query.crud import ReturnFormat`
+- `ReturnFormat.NONE`: Returns nothing (default for delete operations)
+- `ReturnFormat.DIFF`: Returns only changed fields
+- `ReturnFormat.FULL`: Returns complete record after operation (default for create/update)
+- `ReturnFormat.BEFORE`: Returns record state before operation
+- `ReturnFormat.AFTER`: Returns record state after operation
+- Usage: `await create_record('user', data, return_format=ReturnFormat.AFTER)`
+
 ### Create Records
 - Import: `from reverie.query.crud import create_record, create_records`
 - Single record: `created = await create_record('user', User(name='Alice', email='alice@example.com'))`
 - With dict: `created = await create_record('user', {'name': 'Bob', 'email': 'bob@example.com'})`
+- With return format: `created = await create_record('user', data, return_format=ReturnFormat.AFTER)`
 - Multiple records: `created_list = await create_records('user', [User(name='Alice'), User(name='Bob')])`
 - Returns created record(s) with ID
 
@@ -265,6 +296,7 @@
 - Import: `from reverie.query.crud import update_record, merge_record`
 - Full update: `updated = await update_record('user', 'alice', User(name='Alice Updated', email='alice@new.com'))`
 - Partial update: `updated = await merge_record('user', 'alice', {'status': 'active'})`
+- With return format: `updated = await update_record('user', 'alice', data, return_format=ReturnFormat.DIFF)`
 - Update replaces entire record, merge updates only specified fields
 - Returns updated record
 
@@ -285,6 +317,101 @@
 - Total count: `total = await count_records('user')`
 - With condition: `active = await count_records('user', 'status = "active"')`
 - Returns integer
+
+## Query Result Extraction
+
+### Extract Results from Response
+- Import: `from reverie.query.results import extract_result`
+- From list response: `records = extract_result([{'id': 'user:1', 'name': 'Alice'}])`
+- From dict response: `record = extract_result({'result': [{'id': 'user:1'}]})`
+- From nested: `records = extract_result({'ok': True, 'result': [{'data': [...]}]})`
+- Handles various SurrealDB response formats automatically
+
+### Extract Single Record
+- Import: `from reverie.query.results import extract_one`
+- Without model: `record = extract_one(response)`
+- With model: `user = extract_one(response, User)`
+- Returns single record or None if empty
+- Validates with Pydantic model if provided
+
+### Extract Scalar Value
+- Import: `from reverie.query.results import extract_scalar`
+- Get count: `count = extract_scalar(response)`
+- Get single value: `name = extract_scalar(response)`
+- Returns first value from first record
+- Useful for aggregations and single-value queries
+
+### Check for Results
+- Import: `from reverie.query.results import has_results`
+- Check if not empty: `if has_results(response): print('Has data')`
+- Returns boolean
+- Works with all response formats
+
+## Batch Operations
+
+### Batch Upsert
+- Import: `from reverie.query.batch import upsert_many`
+- Insert/update multiple: `results = await upsert_many('user', [User(...), User(...)])`
+- With dicts: `results = await upsert_many('user', [{'name': 'Alice'}, {'name': 'Bob'}])`
+- Conflict resolution: Uses UPSERT to handle existing records
+- Returns list of upserted records
+
+### Batch Relate (Create Edges)
+- Import: `from reverie.query.batch import relate_many`
+- Create multiple edges: `edges = await relate_many('likes', [('user:alice', 'post:1'), ('user:bob', 'post:2')])`
+- With properties: `edges = await relate_many('follows', [('user:alice', 'user:bob')], {'since': '2024-01-01'})`
+- Returns list of created edge records
+
+### Batch Insert
+- Import: `from reverie.query.batch import insert_many`
+- Insert multiple: `results = await insert_many('user', [User(...), User(...)])`
+- Fails if records exist: Unlike upsert, INSERT fails on conflicts
+- Returns list of inserted records
+
+### Batch Delete
+- Import: `from reverie.query.batch import delete_many`
+- Delete by IDs: `await delete_many('user', ['alice', 'bob', 'charlie'])`
+- With RecordID: `await delete_many('user', [RecordID('user', 'alice'), ...])`
+- Returns deleted records (RETURN BEFORE)
+
+## Expression Builders
+
+### Field References
+- Import: `from reverie.query.expressions import field`
+- Reference field: `field('name')` → `name`
+- Nested field: `field('address.city')` → `address.city`
+- In queries: `Query().select([field('name'), field('email')])`
+
+### Literal Values
+- Import: `from reverie.query.expressions import value`
+- String value: `value('hello')` → `"hello"`
+- Number value: `value(42)` → `42`
+- Boolean value: `value(True)` → `true`
+
+### Aggregate Functions
+- Import: `from reverie.query.expressions import count, sum_, avg, min_, max_`
+- Count all: `count()` → `count()`
+- Count field: `count('id')` → `count(id)`
+- Sum: `sum_('price')` → `sum(price)`
+- Average: `avg('rating')` → `avg(rating)`
+- Minimum: `min_('age')` → `min(age)`
+- Maximum: `max_('score')` → `max(score)`
+
+### String Functions
+- Import: `from reverie.query.expressions import concat, string_`
+- Concatenate: `concat(field('first'), value(' '), field('last'))` → `string::concat(first, " ", last)`
+- String operation: `string_('upper', field('name'))` → `string::upper(name)`
+
+### Array Functions
+- Import: `from reverie.query.expressions import array`
+- Create array: `array([value(1), value(2), value(3)])` → `[1, 2, 3]`
+- With fields: `array([field('id'), field('name')])` → `[id, name]`
+
+### Utility Functions
+- Import: `from reverie.query.expressions import time_now, rand_uuid`
+- Current time: `time_now()` → `time::now()`
+- Random UUID: `rand_uuid()` → `rand::uuid()`
+- In defaults: `datetime_field('created_at', default=time_now())`
 
 ## Query Builder
 
@@ -316,6 +443,14 @@
 ### Grouping
 - Single field: `query.select(['status', 'COUNT(*)']).from_table('user').group_by('status')`
 - Multiple fields: `query.group_by('status', 'role')`
+
+### Vector Similarity Search
+- Import: `from reverie.query.builder import Query, VectorDistanceType`
+- Basic search: `query = Query().from_('documents').vector_search('embedding', [0.1, 0.2, ...], k=10)`
+- With distance type: `query.vector_search('embedding', vector, k=5, distance=VectorDistanceType.COSINE)`
+- Distance types: `COSINE`, `EUCLIDEAN`, `MANHATTAN`, `HAMMING`, `MINKOWSKI`, `CHEBYSHEV`, `PEARSON`, `JACCARD`, `DOT`
+- Helper function: `from reverie.query.builder import vector_search_query; query = vector_search_query('documents', 'embedding', vector, k=10)`
+- Generates: `SELECT * FROM documents WHERE embedding <|k,DISTANCE|> [vector]`
 
 ### INSERT Operations
 - Import: `from reverie.query.builder import insert`
@@ -377,6 +512,75 @@
 
 # Graph Operations
 
+## Graph Query Builder
+
+### GraphQuery Class
+- Import: `from reverie.query.graph import GraphQuery`
+- Create: `query = GraphQuery[User]('user:alice')`
+- Generic type support: `GraphQuery[T]` where T is your Pydantic model
+
+### Traversal Methods
+- Outgoing: `query.out('likes', 'post')` → Follow outgoing 'likes' edges to 'post' table
+- Incoming: `query.in_('follows', 'user')` → Follow incoming 'follows' edges from 'user' table
+- Bidirectional: `query.both('friends', 'user')` → Follow edges in both directions
+- Edge target: `query.to('user')` → Specify target table type
+- Chaining: `query.out('follows', 'user').out('likes', 'post')`
+
+### Filtering and Modifiers
+- Filter results: `query.where('age > 18')`
+- Select fields: `query.select(['name', 'email'])`
+- Limit results: `query.limit(10)`
+- Set depth: `query.depth(3)` → Maximum traversal depth
+
+### Execution
+- Build query: `sql = query.build()` → Returns SurrealQL string
+- Fetch results: `results = await query.fetch(client)` → Returns list of T
+- Count results: `count = await query.count(client)` → Returns integer
+- Check existence: `exists = await query.exists(client)` → Returns boolean
+
+### Example Usage
+```python
+from reverie.query.graph import GraphQuery
+from models import User, Post
+
+# Find all posts liked by users that alice follows
+posts = await (
+    GraphQuery[User]('user:alice')
+    .out('follows', 'user')
+    .out('likes', 'post')
+    .where('published = true')
+    .limit(20)
+    .fetch(client)
+)
+```
+
+## Graph Helper Functions
+
+### Find Mutual Connections
+- Import: `from reverie.query.graph import find_mutual_connections`
+- Find mutual: `mutual = await find_mutual_connections('user:alice', 'user:bob', 'follows', User)`
+- Returns list of users that both alice and bob follow
+- Bidirectional detection
+
+### Find Shortest Path
+- Import: `from reverie.query.graph import find_shortest_path`
+- Find path: `path = await find_shortest_path('user:alice', 'user:charlie', 'follows', max_depth=5)`
+- Returns list of record IDs in the path from source to target
+- Path reconstruction included
+
+### Get Neighbors
+- Import: `from reverie.query.graph import get_neighbors`
+- Get N-hop neighbors: `neighbors = await get_neighbors('user:alice', 'follows', depth=2, User)`
+- Direction: `neighbors = await get_neighbors('user:alice', 'follows', depth=1, User, direction='out')`
+- Returns list of neighbors at specified depth
+
+### Compute Degree
+- Import: `from reverie.query.graph import compute_degree`
+- Total degree: `degree = await compute_degree('user:alice', 'follows')`
+- In-degree: `in_deg = await compute_degree('user:alice', 'follows', direction='in')`
+- Out-degree: `out_deg = await compute_degree('user:alice', 'follows', direction='out')`
+- Returns integer count
+
 ## Graph Traversal
 
 ### Basic Traversal
@@ -431,20 +635,6 @@
 - RELATE: `query = Query().relate('likes', 'user:alice', 'post:123', {'created_at': 'time::now()'})`
 - Traverse: `query = Query().select().from_table('user:alice').traverse('->likes->post')`
 - Execute: `result = await client.execute(query.to_surql())`
-
-## Advanced Graph Patterns
-
-### Shortest Path
-- Import: `from reverie.query.graph import shortest_path`
-- Find path: `path = await shortest_path('user:alice', 'user:charlie', 'follows', max_depth=5)`
-- Returns list of records in the path
-- Note: Simplified implementation for common cases
-
-### Multi-hop Traversal Patterns
-- Friends of friends: `'<-follows<-user<-follows<-user'`
-- Posts liked by followers: `'<-follows<-user->likes->post'`
-- Authors of liked posts: `'->likes->post<-authored<-user'`
-- Chain as needed: Up to practical depth limits
 
 # Vector Operations
 
@@ -573,10 +763,10 @@ products = with_indexes(
 - Use `reverie migrate up` to apply MTREE indexes to database
 
 ### Vector Similarity Search
-- After creating MTREE index, use SurrealDB's vector search syntax
-- Raw query example: `SELECT * FROM documents WHERE embedding <|2,1536|> [0.1, 0.2, ...] LIMIT 10`
-- Search returns nearest neighbors based on configured distance metric
-- Note: High-level query helpers for vector search are planned for future releases
+- Use query builder's `vector_search()` method: `Query().from_('documents').vector_search('embedding', vector, k=10, distance=VectorDistanceType.COSINE)`
+- Generates SurrealQL: `SELECT * FROM documents WHERE embedding <|10,COSINE|> [0.1, 0.2, ...]`
+- Search returns k nearest neighbors based on configured distance metric
+- Works with any MTREE indexed field
 
 ### Choosing Distance Metrics
 - **COSINE**: Use for normalized vectors (embeddings from ML models like OpenAI, Cohere, sentence transformers)
@@ -644,6 +834,989 @@ def downgrade():
       indexes=[],  # Remove all indexes
     )
   ]
+```
+
+# Query Result Caching
+
+## Cache Overview
+- Reverie provides a flexible caching system for query results
+- Supports multiple backends: in-memory LRU cache and Redis
+- Automatic cache invalidation by table name
+- TTL (time-to-live) support with customizable expiration
+- Cache statistics and monitoring
+
+## Cache Backends
+
+### Memory Cache (Default)
+- Import: `from reverie.cache.backends import MemoryCache`
+- In-memory LRU cache using `cachetools`
+- Fast, no external dependencies
+- Limited to single process
+- Auto-eviction when max_size reached
+- Example: `cache = MemoryCache(max_size=1000)`
+
+### Redis Cache (Optional)
+- Import: `from reverie.cache.backends import RedisCache`
+- Requires: `pip install "reverie[cache]"` or `pip install redis>=5.0.0`
+- Distributed caching across processes/servers
+- Persistent storage option
+- Better for production deployments
+- Example: `cache = RedisCache(redis_url='redis://localhost:6379/0')`
+
+## Cache Configuration
+
+### CacheConfig
+- Import: `from reverie.cache.config import CacheConfig, CacheBackend`
+- Backend selection: `CacheConfig(backend=CacheBackend.MEMORY)` or `CacheBackend.REDIS`
+- TTL setting: `CacheConfig(default_ttl=300)` (seconds)
+- Max size: `CacheConfig(max_size=1000)` (memory backend only)
+- Redis URL: `CacheConfig(backend=CacheBackend.REDIS, redis_url='redis://localhost:6379/0')`
+- Key prefix: `CacheConfig(key_prefix='myapp')` (for namespacing)
+
+### Configure Global Cache
+- Import: `from reverie.cache import configure_cache`
+- Set up: `configure_cache(CacheConfig(backend=CacheBackend.MEMORY, default_ttl=600))`
+- Call once at application startup
+- All cached queries use this configuration
+
+## Cache Decorator
+
+### @cache_query Decorator
+- Import: `from reverie.cache import cache_query`
+- Basic usage: `@cache_query(ttl=60) async def get_users(): ...`
+- Custom key: `@cache_query(key='user_list', ttl=300) async def get_users(): ...`
+- No TTL: `@cache_query() async def get_static_data(): ...` (uses default)
+- Parameter-based key: Key automatically includes function args/kwargs
+- Works with async functions only
+
+### Decorator Options
+- `ttl`: Time-to-live in seconds (optional, uses default_ttl if not specified)
+- `key`: Custom cache key (optional, auto-generated from function name and args)
+- `table`: Table name for invalidation tracking (optional)
+- Example: `@cache_query(ttl=120, key='active_users', table='user')`
+
+## Manual Cache Management
+
+### CacheManager
+- Import: `from reverie.cache import get_cache_manager`
+- Get instance: `manager = get_cache_manager()`
+- Get or set: `value = await manager.get_or_set('key', async_fn, ttl=300)`
+- Set value: `await manager.set('key', value, ttl=300, table='user')`
+- Get value: `value = await manager.get('key')`
+- Delete key: `await manager.delete('key')`
+
+### Cache Invalidation
+
+#### By Key
+- Import: `from reverie.cache import invalidate`
+- Invalidate key: `await invalidate('user_list')`
+- Pattern matching: `await invalidate('user_*')` (all keys starting with 'user_')
+- Explicit: `await get_cache_manager().delete('specific_key')`
+
+#### By Table
+- Invalidate all cached queries for a table: `await get_cache_manager().invalidate_table('user')`
+- Automatically clears all cache entries associated with the table
+- Useful after bulk updates or schema changes
+
+#### Clear All
+- Import: `from reverie.cache import clear_cache`
+- Clear everything: `await clear_cache()`
+- Reset all cache entries
+- Use with caution in production
+
+## Cache Statistics
+
+### CacheStats
+- Import: `from reverie.cache.config import CacheStats`
+- Get stats: `stats = await get_cache_manager().get_stats()`
+- Access metrics:
+  * `stats.hits`: Number of cache hits
+  * `stats.misses`: Number of cache misses
+  * `stats.size`: Current cache size (number of entries)
+  * `stats.evictions`: Number of evicted entries
+  * `stats.hit_ratio`: Calculate hit/(hit+miss) ratio
+- Monitor cache effectiveness
+
+## Usage Examples
+
+### Basic Setup
+```python
+from reverie.cache import configure_cache, cache_query
+from reverie.cache.config import CacheConfig, CacheBackend
+
+# Configure at startup
+configure_cache(CacheConfig(
+    backend=CacheBackend.MEMORY,
+    default_ttl=300,
+    max_size=1000,
+))
+
+# Cache a query function
+@cache_query(ttl=60)
+async def get_active_users():
+    return await query_records('user', User, conditions=['is_active = true'])
+```
+
+### Redis Backend
+```python
+configure_cache(CacheConfig(
+    backend=CacheBackend.REDIS,
+    redis_url='redis://localhost:6379/0',
+    key_prefix='myapp',
+    default_ttl=600,
+))
+```
+
+### Manual Caching
+```python
+from reverie.cache import get_cache_manager
+
+manager = get_cache_manager()
+
+# Cache manually
+async def get_user_stats(user_id: str):
+    key = f'user_stats:{user_id}'
+    
+    # Try cache first
+    cached = await manager.get(key)
+    if cached:
+        return cached
+    
+    # Fetch and cache
+    stats = await compute_stats(user_id)
+    await manager.set(key, stats, ttl=300, table='user')
+    return stats
+```
+
+### Table-Based Invalidation
+```python
+# After updating users, invalidate all user-related caches
+await update_record('user', 'alice', updated_data)
+await get_cache_manager().invalidate_table('user')
+```
+
+### Performance Monitoring
+```python
+stats = await get_cache_manager().get_stats()
+print(f"Cache hit ratio: {stats.hit_ratio:.2%}")
+print(f"Total hits: {stats.hits}, misses: {stats.misses}")
+```
+
+# Real-Time Streaming
+
+## Streaming Overview
+- Reverie supports SurrealDB's LIVE queries for real-time updates
+- Receive notifications when records are created, updated, or deleted
+- WebSocket-based streaming (requires `ws://` or `wss://` connection)
+- Both callback-based and async iteration patterns supported
+
+## StreamingManager
+
+### Creating Streaming Manager
+- Import: `from reverie.connection.streaming import StreamingManager`
+- Create: `manager = StreamingManager(client)`
+- Pass DatabaseClient instance
+- Manager handles query lifecycle
+
+### Create Live Query
+- Import: `from reverie.connection.streaming import LiveQuery`
+- Create: `live_query = await manager.live('user', callback=on_change)`
+- With conditions: `live_query = await manager.live('user', diff=True, callback=on_change)`
+- Returns LiveQuery object with query UUID
+
+### Stop Live Query
+- Stop streaming: `await manager.kill(live_query.query_id)`
+- Cleanup: `await manager.cleanup()`
+- Automatically called on manager disposal
+
+## LiveQuery
+
+### Callback Pattern
+```python
+from reverie.connection.streaming import StreamingNotification
+
+async def on_user_change(notification: StreamingNotification):
+    print(f"Action: {notification.action}")
+    print(f"Record: {notification.result}")
+
+live_query = await manager.live('user', callback=on_user_change)
+# Keep application running to receive notifications
+```
+
+### Async Iterator Pattern
+```python
+live_query = await manager.live('user')
+
+async for notification in live_query:
+    if notification.action == 'CREATE':
+        print(f"New user: {notification.result}")
+    elif notification.action == 'UPDATE':
+        print(f"Updated user: {notification.result}")
+    elif notification.action == 'DELETE':
+        print(f"Deleted user: {notification.result}")
+```
+
+### Diff Mode
+- Enable: `live_query = await manager.live('user', diff=True)`
+- Returns JSON Patch operations instead of full records
+- Useful for bandwidth optimization
+- Notification.result contains RFC 6902 JSON Patch array
+
+## StreamingNotification
+
+### Notification Properties
+- `action`: Event type (`'CREATE'`, `'UPDATE'`, `'DELETE'`)
+- `result`: Record data or diff (depends on diff mode)
+- `query_id`: UUID of the live query (optional)
+
+### Processing Notifications
+```python
+async def process_notification(notif: StreamingNotification):
+    match notif.action:
+        case 'CREATE':
+            await handle_create(notif.result)
+        case 'UPDATE':
+            await handle_update(notif.result)
+        case 'DELETE':
+            await handle_delete(notif.result)
+```
+
+## Usage Examples
+
+### Monitor Table Changes
+```python
+from reverie.connection.streaming import StreamingManager
+
+async with get_client(config) as client:
+    manager = StreamingManager(client)
+    
+    async def on_change(notification):
+        print(f"{notification.action}: {notification.result}")
+    
+    live_query = await manager.live('user', callback=on_change)
+    
+    # Application continues running
+    await asyncio.sleep(3600)  # Run for 1 hour
+    
+    await manager.kill(live_query.query_id)
+```
+
+### Real-Time Dashboard
+```python
+from collections import defaultdict
+
+stats = defaultdict(int)
+
+async def update_stats(notification):
+    stats[notification.action] += 1
+    print(f"Creates: {stats['CREATE']}, Updates: {stats['UPDATE']}, Deletes: {stats['DELETE']}")
+
+live_query = await manager.live('user', callback=update_stats)
+```
+
+### Conditional Streaming
+```python
+# Only stream active users (requires SurrealDB 2.0+)
+live_query = await manager.live(
+    'user',
+    callback=on_change,
+    # Note: Condition support may vary by SurrealDB version
+)
+```
+
+# Authentication
+
+## Authentication Overview
+- Reverie supports all SurrealDB authentication types
+- Root, Namespace, Database, and Scope authentication
+- JWT token management with automatic refresh
+- Credential validation and type safety
+
+## AuthType Enum
+- Import: `from reverie.connection.auth import AuthType`
+- `AuthType.ROOT`: Root-level access (highest privileges)
+- `AuthType.NAMESPACE`: Namespace-level access
+- `AuthType.DATABASE`: Database-level access
+- `AuthType.SCOPE`: Scope-based authentication (custom user scopes)
+
+## Credential Types
+
+### RootCredentials
+- Import: `from reverie.connection.auth import RootCredentials`
+- Create: `creds = RootCredentials(username='root', password='root')`
+- Full system access
+- Use for administrative operations
+
+### NamespaceCredentials
+- Import: `from reverie.connection.auth import NamespaceCredentials`
+- Create: `creds = NamespaceCredentials(namespace='myapp', username='admin', password='secret')`
+- Access to specific namespace
+- Cannot access other namespaces
+
+### DatabaseCredentials
+- Import: `from reverie.connection.auth import DatabaseCredentials`
+- Create: `creds = DatabaseCredentials(namespace='myapp', database='prod', username='user', password='pass')`
+- Access to specific database within namespace
+- Most common for application auth
+
+### ScopeCredentials
+- Import: `from reverie.connection.auth import ScopeCredentials`
+- Create: `creds = ScopeCredentials(namespace='myapp', database='prod', scope='user', params={'email': 'user@example.com', 'pass': 'password'})`
+- Custom authentication scopes
+- Flexible parameter passing
+- Define scopes in SurrealDB schema
+
+## AuthManager
+
+### Creating AuthManager
+- Import: `from reverie.connection.auth import AuthManager`
+- Create: `auth = AuthManager(client)`
+- Pass DatabaseClient instance
+- Manages authentication state
+
+### Sign In
+- Root: `token = await auth.signin(RootCredentials(username='root', password='root'))`
+- Namespace: `token = await auth.signin(NamespaceCredentials(...))`
+- Database: `token = await auth.signin(DatabaseCredentials(...))`
+- Scope: `token = await auth.signin(ScopeCredentials(...))`
+- Returns JWT token string
+
+### Sign Up (Scope Only)
+- Create user: `token = await auth.signup(ScopeCredentials(namespace='myapp', database='prod', scope='user', params={'email': '...', 'pass': '...'}))`
+- Only works with scope authentication
+- Creates new user in scope
+- Returns JWT token
+
+### Authenticate with Token
+- Use token: `await auth.authenticate(token)`
+- Validates and applies JWT token
+- Use for session restoration
+- Token must be valid and not expired
+
+### Invalidate Session
+- Sign out: `await auth.invalidate()`
+- Clears authentication state
+- Revokes current token
+- Client becomes unauthenticated
+
+### Check Authentication
+- Get token: `token = auth.token`
+- Check if authenticated: `if auth.token: print('Authenticated')`
+- Token property returns current JWT or None
+
+## Usage Examples
+
+### Database Authentication
+```python
+from reverie.connection.auth import AuthManager, DatabaseCredentials
+
+async with get_client(config) as client:
+    auth = AuthManager(client)
+    
+    creds = DatabaseCredentials(
+        namespace='myapp',
+        database='prod',
+        username='app_user',
+        password='secure_password'
+    )
+    
+    token = await auth.signin(creds)
+    print(f"Authenticated with token: {token[:20]}...")
+    
+    # Perform operations as authenticated user
+    users = await query_records('user', User)
+    
+    # Sign out
+    await auth.invalidate()
+```
+
+### Scope-Based User Registration
+```python
+from reverie.connection.auth import ScopeCredentials
+
+# Sign up new user
+creds = ScopeCredentials(
+    namespace='myapp',
+    database='prod',
+    scope='user',
+    params={
+        'email': 'newuser@example.com',
+        'password': 'secure123',
+        'name': 'New User'
+    }
+)
+
+token = await auth.signup(creds)
+
+# User is now authenticated
+```
+
+### Token Storage and Restoration
+```python
+# Save token
+token = await auth.signin(creds)
+save_to_storage(token)  # Your storage mechanism
+
+# Later, restore session
+saved_token = load_from_storage()
+await auth.authenticate(saved_token)
+```
+
+# Connection Management
+
+## Named Connections and Registry
+
+### ConnectionRegistry
+- Import: `from reverie.connection.registry import ConnectionRegistry`
+- Singleton pattern: `registry = ConnectionRegistry()`
+- Manages multiple named database connections
+- Thread-safe with async locks
+
+### Register Named Connection
+- Register: `await registry.register('analytics', analytics_config)`
+- Get connection: `client = registry.get('analytics')`
+- Set default: `await registry.set_default('analytics')`
+- List all: `names = registry.list_connections()`
+- Unregister: `await registry.unregister('analytics')`
+
+### NamedConnectionConfig
+- Import: `from reverie.connection.config import NamedConnectionConfig`
+- From environment: `config = NamedConnectionConfig.from_env('analytics')`
+- Loads from `REVERIE_ANALYTICS_*` or `DB_ANALYTICS_*` env vars
+- Supports all ConnectionConfig options
+
+### Multiple Connection Example
+```python
+from reverie.connection.registry import ConnectionRegistry
+from reverie.connection.config import NamedConnectionConfig
+
+# Load connections from environment
+primary_config = NamedConnectionConfig.from_env('primary')
+analytics_config = NamedConnectionConfig.from_env('analytics')
+cache_config = NamedConnectionConfig.from_env('cache')
+
+# Register connections
+registry = ConnectionRegistry()
+await registry.register('primary', primary_config)
+await registry.register('analytics', analytics_config)
+await registry.register('cache', cache_config)
+await registry.set_default('primary')
+
+# Use specific connection
+analytics_client = registry.get('analytics')
+stats = await analytics_client.execute('SELECT count() FROM events GROUP BY type')
+
+# Default connection
+default_client = registry.get()  # Returns 'primary'
+```
+
+### Named Connection Use Cases
+- **Read Replicas**: Separate connections for read and write operations
+- **Analytics Database**: Dedicated connection for analytics queries
+- **Multi-Tenant**: Different connections per tenant
+- **Microservices**: Service-specific database connections
+
+## Connection Override Context
+
+### connection_override Context Manager
+- Import: `from reverie.connection.context import connection_override`
+- Override connection: `async with connection_override(test_client): result = await execute_query()`
+- Temporary override for specific block
+- Automatically restores previous connection
+- Useful for testing and multi-database operations
+
+### Override Example
+```python
+from reverie.connection.context import connection_override, get_db
+
+# Normal execution uses default client
+result1 = await query_records('user', User)
+
+# Override for specific operations
+async with connection_override(analytics_client):
+    # All queries in this block use analytics_client
+    result2 = await query_records('events', Event)
+    stats = await get_db().execute('SELECT count() FROM events')
+
+# Back to default client
+result3 = await query_records('user', User)
+```
+
+### Testing with Override
+```python
+import pytest
+from reverie.connection.context import connection_override
+
+@pytest.mark.asyncio
+async def test_query_logic():
+    mock_client = create_mock_client()
+    
+    async with connection_override(mock_client):
+        # Test code uses mock_client
+        result = await my_query_function()
+        assert result is not None
+```
+
+## Database Client
+
+### Creating Client
+- Import: `from reverie.connection.client import DatabaseClient, get_client`
+- From config: `client = DatabaseClient(config)`
+- Context manager: `async with get_client(config) as client: ...`
+- Manual: `client = DatabaseClient(config); await client.connect()`
+
+### Connection Lifecycle
+- Connect: `await client.connect()`
+- Check status: `if client.is_connected: ...`
+- Disconnect: `await client.disconnect()`
+- Context manager handles automatically: `async with get_client(config) as client:`
+
+### Client Operations
+- Execute query: `result = await client.execute('SELECT * FROM user')`
+- With parameters: `result = await client.execute('SELECT * FROM user WHERE age > $age', {'age': 18})`
+- Select: `result = await client.select('user')`
+- Create: `result = await client.create('user', data_dict)`
+- Update: `result = await client.update('user:alice', data_dict)`
+- Merge: `result = await client.merge('user:alice', partial_data)`
+- Delete: `result = await client.delete('user:alice')`
+
+## Connection Pooling
+- Configured via `max_connections` in ConnectionConfig
+- Default: 10 concurrent connections
+- Automatic semaphore-based pooling
+- Thread-safe operations
+
+## Retry Logic
+- Automatic retry on connection failures
+- Exponential backoff strategy
+- Configure via: `retry_max_attempts`, `retry_min_wait`, `retry_max_wait`, `retry_multiplier`
+- Default: 3 attempts with 1s-10s backoff, 2x multiplier
+- Applies to connection and query operations
+
+## Context Management
+
+### Using get_db()
+- Import: `from reverie.connection.context import get_db`
+- Get current client: `client = get_db()`
+- Used internally by CRUD operations
+- Requires client to be set in context first
+
+### Setting Context Client
+- Import: `from reverie.connection.context import set_db`
+- Set client: `set_db(client)`
+- Use in application startup
+- Scope: Per async context
+
+## Error Handling
+- Import: `from reverie.connection.client import DatabaseError, ConnectionError, QueryError`
+- `ConnectionError`: Connection failures
+- `QueryError`: Query execution failures
+- `DatabaseError`: Base exception for all database errors
+- Catch and handle: `try: ... except QueryError as e: ...`
+
+## Transactions
+- Import: `from reverie.connection.transaction import Transaction, transaction`
+- Create transaction: `tx = Transaction(client)`
+- Begin: `await tx.begin()`
+- Commit: `await tx.commit()`
+- Cancel/Rollback: `await tx.cancel()`
+- Context manager: `async with transaction(client) as tx: ...`
+- Auto-commit on success, auto-rollback on exception
+- Supports nested operations within transaction scope
+
+# Schema Validation
+
+## Overview
+- Reverie provides schema validation to compare Python schemas against database
+- Detects schema drift between code and deployed database
+- Validates tables, fields, indexes, edges, and constraints
+- Generates detailed validation reports with severity levels
+- Integrates with CI/CD pipelines via CLI
+
+## ValidationSeverity
+- Import: `from reverie.schema.validator import ValidationSeverity`
+- `ValidationSeverity.ERROR`: Critical issues requiring immediate action
+- `ValidationSeverity.WARNING`: Potential problems or inconsistencies
+- `ValidationSeverity.INFO`: Informational messages about schema state
+
+## ValidationResult
+- Import: `from reverie.schema.validator import ValidationResult`
+- Properties:
+  * `severity`: ValidationSeverity enum value
+  * `message`: Human-readable description
+  * `table`: Table name (optional)
+  * `field`: Field name (optional)
+  * `details`: Additional context dictionary (optional)
+
+## validate_schema()
+- Import: `from reverie.schema.validator import validate_schema`
+- Usage: `results = await validate_schema(code_tables, client)`
+- Parameters:
+  * `code_tables`: Dict of table schemas from Python code
+  * `client`: DatabaseClient instance
+- Returns: List of ValidationResult objects
+- Validates:
+  * Missing tables in database
+  * Extra tables not in code
+  * Field mismatches (type, assertion, default, readonly)
+  * Missing or extra fields
+  * Index differences
+  * Edge constraint validation
+
+## format_validation_report()
+- Import: `from reverie.schema.validator import format_validation_report`
+- Usage: `report = format_validation_report(results)`
+- Generates human-readable text report
+- Groups results by severity
+- Color-coded output for terminals
+
+## CLI Integration
+- Command: `reverie schema validate`
+- Options:
+  * `--schema PATH`: Path to schema module
+  * `--format FORMAT`: Output format (table/json)
+  * `--fail-on-error`: Exit with code 1 if errors found
+- Exit codes:
+  * 0: No validation issues
+  * 1: Validation errors found
+  * 2: Command execution error
+
+## Usage Example
+```python
+from reverie.schema.validator import validate_schema, format_validation_report
+from reverie.schema.registry import get_all_tables
+
+# Get schemas from registry
+code_tables = get_all_tables()
+
+# Validate against database
+results = await validate_schema(code_tables, client)
+
+# Generate report
+if results:
+    report = format_validation_report(results)
+    print(report)
+    
+    # Check for errors
+    errors = [r for r in results if r.severity == ValidationSeverity.ERROR]
+    if errors:
+        raise ValueError(f"Schema validation failed with {len(errors)} errors")
+```
+
+# Schema Visualization
+
+## Overview
+- Reverie provides schema visualization to generate diagrams of database structure
+- Supports multiple output formats: Mermaid, GraphViz, ASCII
+- Visualizes tables, fields, indexes, edges, and relationships
+- Useful for documentation and understanding complex schemas
+
+## OutputFormat
+- Import: `from reverie.schema.visualize import OutputFormat`
+- `OutputFormat.MERMAID`: Mermaid.js ER diagram syntax
+- `OutputFormat.GRAPHVIZ`: GraphViz DOT format
+- `OutputFormat.ASCII`: Terminal-friendly ASCII art
+
+## visualize_schema()
+- Import: `from reverie.schema.visualize import visualize_schema`
+- Usage: `diagram = visualize_schema(tables, edges, format=OutputFormat.MERMAID)`
+- Parameters:
+  * `tables`: Dict of table schemas
+  * `edges`: Dict of edge schemas (optional)
+  * `format`: OutputFormat enum value
+  * `show_fields`: Include field details (default: True)
+  * `show_edges`: Include edge relationships (default: True)
+- Returns: String containing diagram in specified format
+
+## visualize_from_registry()
+- Import: `from reverie.schema.visualize import visualize_from_registry`
+- Usage: `diagram = visualize_from_registry(format=OutputFormat.MERMAID)`
+- Automatically retrieves schemas from global SchemaRegistry
+- Convenient for visualizing entire schema
+
+## CLI Integration
+- Command: `reverie schema visualize`
+- Options:
+  * `--schema PATH`: Path to schema module
+  * `--format FORMAT`: Output format (mermaid/graphviz/ascii)
+  * `--output FILE`: Write to file instead of stdout
+  * `--no-fields`: Hide field details
+  * `--no-edges`: Hide edge relationships
+  * `--tables TABLE1,TABLE2`: Visualize specific tables only
+
+## Mermaid Output
+- Generates `erDiagram` syntax
+- Shows tables, fields, types, constraints
+- Displays relationships between tables
+- Can be rendered in GitHub, GitLab, documentation sites
+
+## GraphViz Output
+- Generates DOT format
+- Renders with `dot` command: `dot -Tpng schema.dot -o schema.png`
+- Record-shaped nodes for tables
+- Labeled edges for relationships
+
+## ASCII Output
+- Terminal-friendly box drawing
+- Shows table structure and relationships
+- No external tools required
+- Useful for quick inspection
+
+## Usage Example
+```python
+from reverie.schema.visualize import visualize_from_registry, OutputFormat
+
+# Generate Mermaid diagram
+mermaid = visualize_from_registry(format=OutputFormat.MERMAID)
+with open('schema.mmd', 'w') as f:
+    f.write(mermaid)
+
+# Generate ASCII diagram for terminal
+ascii_diagram = visualize_from_registry(format=OutputFormat.ASCII)
+print(ascii_diagram)
+```
+
+# Schema File Watcher
+
+## Overview
+- Reverie provides automatic schema change detection via file watching
+- Monitors Python schema files for modifications
+- Detects drift between code and database schemas
+- Can automatically generate migrations on changes
+- Integrates with development workflows
+
+## SchemaWatcher
+- Import: `from reverie.migration.watcher import SchemaWatcher`
+- Create: `watcher = SchemaWatcher(schema_path, migrations_path, debounce=1.0)`
+- Parameters:
+  * `schema_path`: Path to schema module or directory
+  * `migrations_path`: Path to migrations directory
+  * `debounce`: Delay in seconds before processing changes (default: 1.0)
+  * `callback`: Optional async function called on schema changes
+
+## Start Watching
+- Start: `await watcher.start()`
+- Monitors file system for changes to `.py` files
+- Debounces rapid successive changes
+- Calls callback when changes detected
+
+## Stop Watching
+- Stop: `await watcher.stop()`
+- Cleanup: `await watcher.cleanup()`
+- Automatically stops file monitoring
+
+## SchemaChange
+- Import: `from reverie.migration.watcher import SchemaChange`
+- Properties:
+  * `type`: Change type (modified, created, deleted)
+  * `table`: Affected table name (optional)
+  * `timestamp`: When change was detected
+  * `diff_summary`: Summary of changes
+
+## CLI Integration
+- Command: `reverie schema watch`
+- Options:
+  * `--schema PATH`: Path to schema module (required)
+  * `--migrations PATH`: Path to migrations directory (default: migrations/)
+  * `--debounce SECONDS`: Debounce delay (default: 1.0)
+  * `--auto-generate`: Automatically generate migrations on changes
+  * `--no-prompt`: Don't prompt for confirmation (report only)
+- Interactive mode prompts to generate migrations
+- Reports changes and drift statistics
+
+## Usage Example
+```python
+from reverie.migration.watcher import SchemaWatcher
+
+async def on_schema_change(change: SchemaChange):
+    print(f"Schema changed: {change.table}")
+    # Optionally auto-generate migration
+    # await generate_migration(change)
+
+watcher = SchemaWatcher(
+    schema_path='myapp/schemas',
+    migrations_path='migrations',
+    debounce=1.0,
+    callback=on_schema_change
+)
+
+await watcher.start()
+# Keep application running...
+await watcher.stop()
+```
+
+# Git Hooks Integration
+
+## Overview
+- Reverie provides Git pre-commit hooks for schema drift detection
+- Prevents commits with unmigrated schema changes
+- Generates pre-commit configuration files
+- Integrates with CI/CD pipelines
+
+## check_schema_drift()
+- Import: `from reverie.migration.hooks import check_schema_drift`
+- Usage: `result = check_schema_drift(schema_path, migrations_path)`
+- Parameters:
+  * `schema_path`: Path to schema module
+  * `migrations_path`: Path to migrations directory
+  * `db_client`: Optional DatabaseClient (if None, compares timestamps)
+- Returns: HookCheckResult with drift information
+- Works without database connection by comparing file timestamps
+
+## HookCheckResult
+- Import: `from reverie.migration.hooks import HookCheckResult`
+- Properties:
+  * `has_drift`: Boolean indicating if drift detected
+  * `message`: Human-readable description
+  * `modified_files`: List of modified schema files
+  * `latest_migration_time`: Timestamp of latest migration
+  * `details`: Additional context
+
+## generate_precommit_config()
+- Import: `from reverie.migration.hooks import generate_precommit_config`
+- Usage: `config = generate_precommit_config(schema_path, migrations_path)`
+- Generates `.pre-commit-config.yaml` content
+- Compatible with pre-commit framework
+- Includes reverie drift check hook
+
+## CLI Integration
+- Command: `reverie schema check`
+- Options:
+  * `--schema PATH`: Path to schema module
+  * `--migrations PATH`: Path to migrations directory
+  * `--fail-on-drift`: Exit with code 1 if drift detected
+  * `--show-diff`: Display detailed drift information
+  * `--format FORMAT`: Output format (table/json)
+- Exit codes:
+  * 0: No drift detected
+  * 1: Drift detected (with `--fail-on-drift`)
+  * 2: Command execution error
+
+- Command: `reverie schema hook-config`
+- Generates pre-commit configuration
+- Options:
+  * `--schema PATH`: Path to schema module
+  * `--migrations PATH`: Path to migrations directory
+  * `--output FILE`: Write to file (default: stdout)
+
+## Pre-Commit Integration
+```yaml
+# .pre-commit-config.yaml
+repos:
+  - repo: local
+    hooks:
+      - id: reverie-schema-check
+        name: Check for schema drift
+        entry: reverie schema check --fail-on-drift
+        language: system
+        pass_filenames: false
+        always_run: true
+```
+
+## Usage Example
+```python
+from reverie.migration.hooks import check_schema_drift, generate_precommit_config
+
+# Check for drift
+result = check_schema_drift('myapp/schemas', 'migrations')
+if result.has_drift:
+    print(f"Schema drift detected: {result.message}")
+    for file in result.modified_files:
+        print(f"  - {file}")
+    exit(1)
+
+# Generate pre-commit config
+config = generate_precommit_config('myapp/schemas', 'migrations')
+with open('.pre-commit-config.yaml', 'w') as f:
+    f.write(config)
+```
+
+# Migration Squashing
+
+## Overview
+- Reverie provides migration squashing to combine multiple migrations
+- Reduces migration file count for better performance
+- Optimizes redundant operations
+- Validates safety before squashing
+
+## squash_migrations()
+- Import: `from reverie.migration.squash import squash_migrations`
+- Usage: `await squash_migrations(directory, from_version, to_version, output_path)`
+- Parameters:
+  * `directory`: Path to migrations directory
+  * `from_version`: Starting migration version (optional)
+  * `to_version`: Ending migration version (optional)
+  * `output_path`: Path for squashed migration file (optional)
+  * `optimize`: Enable statement optimization (default: True)
+  * `keep_originals`: Preserve original files (default: False)
+- Combines multiple up/down migrations into single file
+- Removes redundant operations
+- Preserves logical order
+
+## optimize_statements()
+- Import: `from reverie.migration.squash import optimize_statements`
+- Usage: `optimized = optimize_statements(statements)`
+- Removes redundant operations:
+  * Drop table followed by create table → single create
+  * Add field then remove field → removed
+  * Multiple modifications to same field → latest only
+- Returns optimized list of statements
+
+## validate_squash_safety()
+- Import: `from reverie.migration.squash import validate_squash_safety`
+- Usage: `warnings = validate_squash_safety(migrations)`
+- Checks for:
+  * Data migrations (cannot be safely squashed)
+  * Complex SurrealQL statements
+  * Manual interventions required
+- Returns list of warnings with severity levels
+
+## CLI Integration
+- Command: `reverie migrate squash`
+- Options:
+  * `--migrations PATH`: Migrations directory (default: migrations/)
+  * `--from VERSION`: Starting version (optional)
+  * `--to VERSION`: Ending version (optional)
+  * `--output FILE`: Output file path (optional)
+  * `--dry-run`: Preview without writing
+  * `--no-optimize`: Disable optimization
+  * `--keep-originals`: Preserve original files
+  * `--force`: Bypass safety warnings
+- Exit codes:
+  * 0: Success
+  * 1: Squash failed
+  * 2: User cancelled
+  * 3: High severity warnings without `--force`
+
+## Safety Considerations
+- Data migrations should not be squashed
+- Review squashed output before applying
+- Test squashed migrations in development
+- Keep backups of original migrations
+- Use `--dry-run` to preview changes
+
+## Usage Example
+```python
+from reverie.migration.squash import squash_migrations, validate_squash_safety
+
+# Validate safety first
+from reverie.migration.discovery import discover_migrations
+migrations = discover_migrations('migrations')
+warnings = validate_squash_safety(migrations[5:10])
+
+if warnings:
+    for warning in warnings:
+        print(f"{warning.severity}: {warning.message}")
+
+# Squash migrations 001-010
+await squash_migrations(
+    directory='migrations',
+    from_version='001',
+    to_version='010',
+    output_path='migrations/squashed_001_010.py',
+    optimize=True,
+    keep_originals=True
+)
 ```
 
 # Migration System
@@ -745,6 +1918,7 @@ def downgrade():
 - Rolls back most recent migration
 - Executes downgrade function
 - Requires confirmation by default
+- Use `--yes` flag to skip confirmation
 
 ### Rollback Multiple
 - Command: `reverie migrate down --steps 3`
@@ -771,71 +1945,13 @@ def downgrade():
 - Shows all applied migrations
 - Includes timestamps and execution time
 - Stored in `_migration_history` table
+- Supports `--directory` option for consistency
 
 ### Validate Migrations
 - Command: `reverie migrate validate`
 - Checks migration files for errors
 - Validates file naming
 - Checks for duplicate versions
-
-## Migration Patterns
-
-### Creating Tables
-```python
-def upgrade():
-  return [
-    table_schema('user', mode=TableMode.SCHEMAFULL, fields=[...], indexes=[...])
-  ]
-
-def downgrade():
-  return [table_schema('user', drop=True)]
-```
-
-### Adding Fields
-```python
-def upgrade():
-  return [
-    table_schema('user', fields=[string_field('new_field')])
-  ]
-
-def downgrade():
-  # Remove field by redefining without it
-  return [
-    table_schema('user', fields=[...])  # Original fields only
-  ]
-```
-
-### Adding Indexes
-```python
-def upgrade():
-  return [
-    table_schema('user', indexes=[unique_index('new_idx', ['field'])])
-  ]
-
-def downgrade():
-  return [
-    table_schema('user', indexes=[])  # Remove index
-  ]
-```
-
-### Creating Edges
-```python
-def upgrade():
-  return [
-    edge_schema('follows', from_table='user', to_table='user', fields=[...])
-  ]
-
-def downgrade():
-  return [
-    table_schema('follows', drop=True)  # Edges are tables
-  ]
-```
-
-### Data Migrations
-- Use raw SQL in migration for data operations
-- Import: `from reverie.connection.context import get_db`
-- Execute in upgrade/downgrade: `await (await get_db()).execute('UPDATE ...')`
-- Keep separate from schema changes when possible
 
 # CLI Commands
 
@@ -853,8 +1969,8 @@ def downgrade():
 
 ### reverie migrate down
 - Rollback last applied migration(s)
-- Options: `--directory PATH`, `--steps N` (default: 1), `--dry-run`, `--verbose`
-- Example: `reverie migrate down --steps 2`
+- Options: `--directory PATH`, `--steps N` (default: 1), `--dry-run`, `--yes`, `--verbose`
+- Example: `reverie migrate down --steps 2 --yes`
 
 ### reverie migrate status
 - Show migration status (applied vs pending)
@@ -863,7 +1979,7 @@ def downgrade():
 
 ### reverie migrate history
 - Show applied migrations from database
-- Options: `--format FORMAT` (table/json/yaml), `--verbose`
+- Options: `--directory PATH`, `--format FORMAT` (table/json/yaml), `--verbose`
 - Example: `reverie migrate history`
 
 ### reverie migrate create
@@ -878,9 +1994,15 @@ def downgrade():
 - Example: `reverie migrate validate`
 
 ### reverie migrate generate
-- Generate migration from schema changes (planned feature)
+- Generate migration from schema changes (auto-migration)
 - Usage: `reverie migrate generate "Description"`
-- Currently creates blank migration
+- Options: `--schema PATH`, `--directory PATH`, `--verbose`
+- Compares code schemas to database and generates migration
+
+### reverie migrate squash
+- Combine multiple migrations into one
+- Options: `--migrations PATH`, `--from VERSION`, `--to VERSION`, `--output FILE`, `--dry-run`, `--no-optimize`, `--keep-originals`, `--force`
+- Example: `reverie migrate squash --from 001 --to 010`
 
 ## Schema Commands
 
@@ -890,7 +2012,62 @@ def downgrade():
 - Show all: `reverie schema show`
 - Show table: `reverie schema show user`
 
+### reverie schema diff
+- Show differences between code and database schemas
+- Options: `--schema PATH`, `--table TABLE`, `--format FORMAT`
+- Example: `reverie schema diff --table user`
+
+### reverie schema generate
+- Generate schema definitions from database
+- Options: `--output PATH`, `--tables TABLE1,TABLE2`
+- Example: `reverie schema generate --output schemas/`
+
+### reverie schema tables
+- List all tables in database
+- Options: `--format FORMAT` (table/json/yaml)
+- Example: `reverie schema tables --format json`
+
+### reverie schema inspect
+- Inspect specific table schema
+- Usage: `reverie schema inspect TABLE`
+- Example: `reverie schema inspect user`
+
+### reverie schema export
+- Export schema to file
+- Options: `--output FILE`, `--format FORMAT` (surql/json)
+- Example: `reverie schema export --output schema.surql`
+
+### reverie schema validate
+- Validate code schemas against database
+- Options: `--schema PATH`, `--format FORMAT`, `--fail-on-error`
+- Example: `reverie schema validate --fail-on-error`
+
+### reverie schema check
+- Check for schema drift (for CI/CD)
+- Options: `--schema PATH`, `--migrations PATH`, `--fail-on-drift`, `--show-diff`, `--format FORMAT`
+- Example: `reverie schema check --fail-on-drift`
+
+### reverie schema hook-config
+- Generate Git pre-commit hook configuration
+- Options: `--schema PATH`, `--migrations PATH`, `--output FILE`
+- Example: `reverie schema hook-config --output .pre-commit-config.yaml`
+
+### reverie schema watch
+- Watch schema files and detect changes
+- Options: `--schema PATH`, `--migrations  PATH`, `--debounce SECONDS`, `--auto-generate`, `--no-prompt`
+- Example: `reverie schema watch --schema myapp/schemas --auto-generate`
+
+### reverie schema visualize
+- Generate visual diagram of schema
+- Options: `--schema PATH`, `--format FORMAT` (mermaid/graphviz/ascii), `--output FILE`, `--no-fields`, `--no-edges`, `--tables TABLE1,TABLE2`
+- Example: `reverie schema visualize --format mermaid --output schema.mmd`
+
 ## Database Commands
+
+### reverie db init
+- Initialize database with required tables
+- Options: `--drop-existing`
+- Example: `reverie db init`
 
 ### reverie db ping
 - Check database connection
@@ -902,77 +2079,28 @@ def downgrade():
 - Usage: `reverie db info`
 - Shows connection details and statistics
 
+### reverie db reset
+- Reset database (drop all tables)
+- Options: `--yes` (skip confirmation)
+- Example: `reverie db reset --yes`
+- WARNING: Destructive operation
+
+### reverie db query
+- Execute raw SurrealQL query
+- Usage: `reverie db query "SELECT * FROM user"`
+- Options: `--format FORMAT` (table/json/yaml)
+- Example: `reverie db query "SELECT count() FROM user"`
+
+### reverie db version
+- Show SurrealDB server version
+- Usage: `reverie db version`
+- Example: `reverie db version`
+
 ## Output Formats
 - `table`: Human-readable table (default)
 - `json`: JSON format for scripting
 - `yaml`: YAML format
 - Use with: `--format json`
-
-# Connection Management
-
-## Database Client
-
-### Creating Client
-- Import: `from reverie.connection.client import DatabaseClient, get_client`
-- From config: `client = DatabaseClient(config)`
-- Context manager: `async with get_client(config) as client: ...`
-- Manual: `client = DatabaseClient(config); await client.connect()`
-
-### Connection Lifecycle
-- Connect: `await client.connect()`
-- Check status: `if client.is_connected: ...`
-- Disconnect: `await client.disconnect()`
-- Context manager handles automatically: `async with get_client(config) as client:`
-
-### Client Operations
-- Execute query: `result = await client.execute('SELECT * FROM user')`
-- With parameters: `result = await client.execute('SELECT * FROM user WHERE age > $age', {'age': 18})`
-- Select: `result = await client.select('user')`
-- Create: `result = await client.create('user', data_dict)`
-- Update: `result = await client.update('user:alice', data_dict)`
-- Merge: `result = await client.merge('user:alice', partial_data)`
-- Delete: `result = await client.delete('user:alice')`
-
-## Connection Pooling
-- Configured via `max_connections` in ConnectionConfig
-- Default: 10 concurrent connections
-- Automatic semaphore-based pooling
-- Thread-safe operations
-
-## Retry Logic
-- Automatic retry on connection failures
-- Exponential backoff strategy
-- Configure via: `retry_max_attempts`, `retry_min_wait`, `retry_max_wait`, `retry_multiplier`
-- Default: 3 attempts with 1s-10s backoff, 2x multiplier
-- Applies to connection and query operations
-
-## Context Management
-
-### Using get_db()
-- Import: `from reverie.connection.context import get_db`
-- Get current client: `client = get_db()`
-- Used internally by CRUD operations
-- Requires client to be set in context first
-
-### Setting Context Client
-- Import: `from reverie.connection.context import set_db`
-- Set client: `set_db(client)`
-- Use in application startup
-- Scope: Per async context
-
-## Error Handling
-- Import: `from reverie.connection.client import DatabaseError, ConnectionError, QueryError`
-- `ConnectionError`: Connection failures
-- `QueryError`: Query execution failures
-- `DatabaseError`: Base exception for all database errors
-- Catch and handle: `try: ... except QueryError as e: ...`
-
-## Transactions
-- Import: `from reverie.connection.transaction import transaction`
-- Usage: `async with transaction(client) as tx: ...`
-- Auto-commit on success
-- Auto-rollback on exception
-- Currently uses SurrealDB transaction support
 
 # Best Practices
 
@@ -1001,11 +2129,17 @@ def downgrade():
 - Index frequently queried fields
 - Use search indexes for full-text search
 - Don't over-index (overhead on writes)
+- Add MTREE indexes for vector fields used in similarity search
 
 ### Table Mode
 - Use SCHEMAFULL for production: Enforces data integrity
 - Use SCHEMALESS only when truly needed: Flexibility vs safety tradeoff
 - Prefer typed schemas with validation
+
+### Edge Modes
+- Use EdgeMode.RELATION for graph relationships (recommended)
+- Use SCHEMAFULL for edges with complex properties
+- Use SCHEMALESS for flexible edge attributes
 
 ## Query Optimization
 
@@ -1033,6 +2167,12 @@ def downgrade():
 - Order by indexed fields when possible
 - Use GROUP BY for aggregations: `select(['status', 'COUNT(*)']).group_by('status')`
 - Combine with HAVING for filtered aggregations
+
+### Use Caching
+- Cache expensive queries with `@cache_query` decorator
+- Invalidate cache when data changes
+- Monitor cache hit ratio
+- Use Redis for distributed caching
 
 ## Migration Strategies
 
@@ -1068,6 +2208,18 @@ def downgrade():
 - Create tables before foreign key references
 - Drop dependents before dropping tables
 
+### Squash Old Migrations
+- Periodically squash old migrations
+- Improves migration performance
+- Reduces migration count
+- Test squashed migrations thoroughly
+
+### Schema Drift Detection
+- Use `reverie schema check` in CI/CD
+- Add pre-commit hooks for drift detection
+- Watch schema files during development
+- Regularly validate schemas
+
 ## Error Handling
 
 ### Catch Specific Exceptions
@@ -1090,195 +2242,22 @@ def downgrade():
 - Ensure atomicity with `async with transaction(client):`
 - Rollback on any failure
 
-# Common Patterns
-
-## User Authentication System
-```python
-from reverie.schema.fields import string_field, datetime_field, bool_field
-from reverie.schema.table import table_schema, unique_index, TableMode
-
-user_schema = table_schema(
-  'user',
-  mode=TableMode.SCHEMAFULL,
-  fields=[
-    string_field('username', assertion='string::len($value) >= 3'),
-    string_field('email', assertion='string::is::email($value)'),
-    string_field('password_hash'),
-    bool_field('is_active', default='true'),
-    bool_field('is_verified', default='false'),
-    datetime_field('created_at', default='time::now()', readonly=True),
-    datetime_field('last_login'),
-  ],
-  indexes=[
-    unique_index('username_idx', ['username']),
-    unique_index('email_idx', ['email']),
-  ],
-)
-```
-
-## Blog Post with Relationships
-```python
-from reverie.schema.fields import string_field, record_field, datetime_field, array_field
-from reverie.schema.table import table_schema, index, TableMode
-from reverie.schema.edge import typed_edge
-
-post_schema = table_schema(
-  'post',
-  mode=TableMode.SCHEMAFULL,
-  fields=[
-    string_field('title', assertion='string::len($value) > 0'),
-    string_field('slug', assertion='string::len($value) > 0'),
-    string_field('content'),
-    record_field('author', table='user'),
-    array_field('tags', default='[]'),
-    datetime_field('published_at'),
-    datetime_field('created_at', default='time::now()'),
-  ],
-  indexes=[
-    unique_index('slug_idx', ['slug']),
-    index('author_idx', ['author']),
-  ],
-)
-
-authored_edge = typed_edge(
-  'authored',
-  from_table='user',
-  to_table='post',
-  fields=[
-    datetime_field('created_at', default='time::now()'),
-  ],
-)
-```
-
-## Social Graph (Follows)
-```python
-from reverie.schema.edge import bidirectional_edge
-from reverie.schema.fields import datetime_field, int_field
-
-follows_edge = bidirectional_edge(
-  'follows',
-  'user',
-  fields=[
-    datetime_field('since', default='time::now()'),
-    int_field('weight', default='1'),
-  ],
-)
-
-# Query patterns
-# Get followers: await traverse('user:alice', '<-follows<-user', User)
-# Get following: await traverse('user:alice', '->follows->user', User)
-# Count followers: await count_related('user:alice', 'follows', 'in')
-```
-
-## Pagination Helper
-```python
-async def paginate(
-  table: str,
-  model: type[T],
-  page: int = 1,
-  page_size: int = 20,
-  order_by: tuple[str, str] = ('created_at', 'DESC'),
-):
-  offset = (page - 1) * page_size
-  items = await query_records(
-    table,
-    model,
-    order_by=order_by,
-    limit=page_size,
-    offset=offset,
-  )
-  total = await count_records(table)
-  return {
-    'items': items,
-    'page': page,
-    'page_size': page_size,
-    'total': total,
-    'pages': (total + page_size - 1) // page_size,
-  }
-```
-
-## Soft Delete Pattern
-```python
-from reverie.schema.fields import datetime_field, bool_field
-
-# Add to schema
-bool_field('is_deleted', default='false'),
-datetime_field('deleted_at'),
-
-# Soft delete
-await merge_record('user', 'alice', {
-  'is_deleted': True,
-  'deleted_at': datetime.now().isoformat(),
-})
-
-# Query only active
-users = await query_records('user', User, conditions=['is_deleted = false'])
-```
-
-## Audit Trail with Events
-```python
-from reverie.schema.table import event
-
-audit_event = event(
-  'audit_user_changes',
-  '$event IN ["CREATE", "UPDATE", "DELETE"]',
-  '''
-  CREATE audit_log SET
-    table = "user",
-    record_id = $value.id,
-    event = $event,
-    before = $before,
-    after = $after,
-    timestamp = time::now()
-  '''
-)
-
-user_schema = table_schema('user', events=[audit_event], ...)
-```
-
-## Nested Object Fields
-```python
-from reverie.schema.fields import object_field, string_field
-
-# Parent object
-object_field('address', flexible=False),
-# Nested fields
-string_field('address.street'),
-string_field('address.city'),
-string_field('address.country'),
-string_field('address.postal_code'),
-
-# Query returns: {'address': {'street': '...', 'city': '...', ...}}
-```
-
-## Full-Text Search
-```python
-from reverie.schema.table import search_index
-
-post_schema = table_schema(
-  'post',
-  fields=[
-    string_field('title'),
-    string_field('content'),
-  ],
-  indexes=[
-    search_index('content_search', ['title', 'content']),
-  ],
-)
-
-# Search query (raw SQL needed for full-text)
-# await client.execute("SELECT * FROM post WHERE title @@ 'search term' OR content @@ 'search term'")
-```
+### Monitor Performance
+- Track query execution time
+- Monitor cache effectiveness
+- Log slow queries
+- Use database statistics
 
 # Architecture
 
 ## Project Structure
-- `src/schema/`: Schema definition layer with `fields.py`, `table.py`, `edge.py`
-- `src/migration/`: Migration system with `generator.py`, `executor.py`, `discovery.py`, `history.py`
-- `src/query/`: Query builder and ORM with `builder.py`, `crud.py`, `executor.py`, `graph.py`
-- `src/connection/`: Database connection with `client.py`, `config.py`, `context.py`
-- `src/types/`: Type definitions with `record_id.py`, `operators.py`
-- `src/cli/`: CLI commands with `migrate.py`, `schema.py`, `db.py`
+- `src/reverie/schema/`: Schema definition layer with `fields.py`, `table.py`, `edge.py`, `validator.py`, `visualize.py`, `utils.py`
+- `src/reverie/migration/`: Migration system with `generator.py`, `executor.py`, `discovery.py`, `history.py`, `diff.py`, `squash.py`, `hooks.py`, `watcher.py`
+- `src/reverie/query/`: Query builder and ORM with `builder.py`, `crud.py`, `executor.py`, `graph.py`, `batch.py`, `results.py`, `expressions.py`
+- `src/reverie/connection/`: Database connection with `client.py`, `config.py`, `context.py`, `registry.py`, `auth.py`, `streaming.py`, `transaction.py`
+- `src/reverie/cache/`: Caching system with `backends.py`, `config.py`, `decorator.py`, `manager.py`
+- `src/reverie/types/`: Type definitions with `record_id.py`, `operators.py`
+- `src/reverie/cli/`: CLI commands with `migrate.py`, `schema.py`, `db.py`, `common.py`
 - `tests/`: Test suite with unit and integration tests
 - `docs/`: Documentation with guides and examples
 - `migrations/`: User migration files (created by user)
@@ -1292,28 +2271,58 @@ post_schema = table_schema(
 
 ### src.schema.table
 - Table schema composition
-- Exports: `TableMode`, `TableDefinition`, `IndexDefinition`, `EventDefinition`, `table_schema`, `index`, `unique_index`, `search_index`, `event`
+- Exports: `TableMode`, `TableDefinition`, `IndexDefinition`, `EventDefinition`, `table_schema`, `index`, `unique_index`, `search_index`, `mtree_index`, `event`
 - Functional composition helpers: `with_fields`, `with_indexes`, etc.
 
 ### src.schema.edge
 - Edge/relationship schemas for graph
-- Exports: `EdgeDefinition`, `edge_schema`, `bidirectional_edge`, `typed_edge`
+- Exports: `EdgeMode`, `EdgeDefinition`, `edge_schema`, `bidirectional_edge`, `typed_edge`
 - Composition helpers: `with_edge_fields`, etc.
+
+### src.schema.validator
+- Schema validation against database
+- Exports: `ValidationSeverity`, `ValidationResult`, `validate_schema`, `format_validation_report`
+- Compares code schemas to deployed database
+
+### src.schema.visualize
+- Schema visualization and diagramming
+- Exports: `OutputFormat`, `visualize_schema`, `visualize_from_registry`
+- Supports Mermaid, GraphViz, ASCII formats
+
+### src.schema.utils
+- Shared schema utilities
+- Exports: `fetch_db_tables`, `parse_table_info`
+- Used by validator and watcher modules
 
 ### src.query.builder
 - Immutable query builder with fluent API
-- Exports: `Query` class with methods `select()`, `from_table()`, `where()`, `order_by()`, `limit()`, etc.
+- Exports: `Query` class with methods `select()`, `from_table()`, `where()`, `order_by()`, `limit()`, `vector_search()`, etc.
 - Generates SurrealQL via `to_surql()`
 
 ### src.query.crud
 - High-level CRUD operations
-- Exports: `create_record`, `get_record`, `update_record`, `delete_record`, `query_records`, etc.
+- Exports: `ReturnFormat`, `create_record`, `get_record`, `update_record`, `delete_record`, `query_records`, etc.
 - Type-safe with Pydantic models
 
 ### src.query.graph
 - Graph traversal and edge operations
-- Exports: `traverse`, `relate`, `unrelate`, `get_related_records`, `count_related`, etc.
+- Exports: `GraphQuery`, `traverse`, `relate`, `unrelate`, `get_related_records`, `count_related`, `find_mutual_connections`, `find_shortest_path`, `get_neighbors`, `compute_degree`, etc.
 - SurrealDB graph features wrapper
+
+### src.query.batch
+- Batch operations for bulk processing
+- Exports: `upsert_many`, `relate_many`, `insert_many`, `delete_many`
+- Efficient bulk operations
+
+### src.query.results
+- Query result extraction utilities
+- Exports: `extract_result`, `extract_one`, `extract_scalar`, `has_results`
+- Handles various SurrealDB response formats
+
+### src.query.expressions
+- Expression builders for queries
+- Exports: `field`, `value`, `count`, `sum_`, `avg`, `min_`, `max_`, `concat`, `string_`, `array`, `time_now`, `rand_uuid`
+- Type-safe expression construction
 
 ### src.connection.client
 - Async database client wrapper
@@ -1323,8 +2332,48 @@ post_schema = table_schema(
 
 ### src.connection.config
 - Connection configuration
-- Exports: `ConnectionConfig` Pydantic settings class
-- Environment variable loading with `DB_` prefix
+- Exports: `ConnectionConfig`, `NamedConnectionConfig` Pydantic settings classes
+- Environment variable loading with `DB_` and `REVERIE_` prefixes
+
+### src.connection.registry
+- Named connection management
+- Exports: `ConnectionRegistry` singleton
+- Manages multiple database connections
+
+### src.connection.auth
+- Authentication management
+- Exports: `AuthType`, `AuthManager`, `RootCredentials`, `NamespaceCredentials`, `DatabaseCredentials`, `ScopeCredentials`
+- JWT token handling
+
+### src.connection.streaming
+- Real-time streaming support
+- Exports: `StreamingManager`, `LiveQuery`, `StreamingNotification`
+- WebSocket-based live queries
+
+### src.connection.transaction
+- Transaction management
+- Exports: `Transaction`, `transaction` context manager
+- BEGIN/COMMIT/CANCEL support
+
+### src.cache.backends
+- Cache backend implementations
+- Exports: `CacheBackend`, `MemoryCache`, `RedisCache`
+- LRU and distributed caching
+
+### src.cache.config
+- Cache configuration
+- Exports: `CacheConfig`, `CacheBackend`, `CacheStats`
+- TTL and size limits
+
+### src.cache.decorator
+- Cache decorator
+- Exports: `cache_query` decorator
+- Automatic query result caching
+
+### src.cache.manager
+- Cache management
+- Exports: `CacheManager`
+- Cache operations and invalidation
 
 ### src.migration.executor
 - Migration execution engine
@@ -1335,6 +2384,26 @@ post_schema = table_schema(
 - Migration file discovery
 - Scans directory for migration files
 - Validates naming and ordering
+
+### src.migration.generator
+- Migration file generation
+- Auto-generates migrations from schema changes
+- Creates timestamped migration files
+
+### src.migration.squash
+- Migration squashing
+- Exports: `squash_migrations`, `optimize_statements`, `validate_squash_safety`
+- Combines and optimizes migrations
+
+### src.migration.hooks
+- Git hooks integration
+- Exports: `check_schema_drift`, `get_staged_schema_files`, `generate_precommit_config`
+- Pre-commit drift detection
+
+### src.migration.watcher
+- Schema file watching
+- Exports: `SchemaWatcher`, `SchemaChange`, `is_schema_file`, `detect_schema_drift`
+- Automatic change detection
 
 ## Design Principles
 
@@ -1371,17 +2440,20 @@ post_schema = table_schema(
 ### Code-First Approach
 - Schema defined in Python code
 - Type safety from schema to query
-- Migrations generated from schema changes (planned)
+- Migrations generated from schema changes
 - Single source of truth in code
 
 ## Dependencies
 - `pydantic>=2.12.0`: Data validation and settings
-- `surrealdb>=1.0.7`: SurrealDB Python client
+- `surrealdb>=1.0.7,<2.0.0`: SurrealDB Python client (v2.x only)
 - `tenacity>=9.1.2`: Retry logic with exponential backoff
 - `typer>=0.21.0`: CLI framework
 - `structlog>=25.5.0`: Structured logging
 - `python-ulid>=3.1.0`: ULID generation
-- Dev: `mypy`, `pytest`, `ruff`, `pytest-cov`
+- `cachetools>=5.0.0`: Memory cache LRU (required)
+- `watchdog>=4.0.0`: File system watching for schema changes (required)
+- `redis>=5.0.0`: Redis cache backend (optional, via [cache] extra)
+- Dev: `mypy`, `pytest`, `ruff`, `pytest-cov`, `pytest-asyncio`, `types-cachetools`
 
 ## Testing
 - Unit tests: `tests/test_*.py`
@@ -1389,6 +2461,7 @@ post_schema = table_schema(
 - With coverage: `pytest --cov=src`
 - Test structure: Mirrors `src/` directory
 - Uses pytest fixtures for database setup
+- Total: 800+ tests covering all modules
 
 ## Development Workflow
 - Format code: `ruff format src/`
@@ -1396,9 +2469,12 @@ post_schema = table_schema(
 - Type check: `mypy src/`
 - Run tests: `pytest`
 - Coverage report: `pytest --cov=src --cov-report=html`
+- Or use PowerShell helpers: `rvfmt`, `rvlint`, `rvtype`, `rvtest`, `rvcov`
 
 ## Extension Points
 - Custom field types: Extend `FieldDefinition` and create builder functions
 - Custom operators: Implement `Operator` class with `to_surql()` method
 - Custom migration generators: Extend `src.migration.generator`
 - Custom CLI commands: Add to `src.cli/` and register in `__main__.py`
+- Custom cache backends: Implement `CacheBackend` abstract class
+- Custom visualizers: Implement diagram generator with `generate()` method
