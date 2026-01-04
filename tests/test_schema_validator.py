@@ -1043,8 +1043,15 @@ class TestValidateCLICommand:
   """Test suite for schema validate CLI command."""
 
   def setup_method(self) -> None:
-    """Set up test resources."""
-    self.runner = CliRunner(env={'NO_COLOR': '1'})
+    """Set up test resources with wide terminal for consistent help output."""
+    self.runner = CliRunner(
+      env={
+        'NO_COLOR': '1',
+        'COLUMNS': '200',
+        'TERM': 'dumb',
+        'FORCE_COLOR': '0',
+      }
+    )
 
   def test_validate_help(self) -> None:
     """Test validate command help."""
@@ -1332,8 +1339,15 @@ class TestValidateCLIExitCodes:
   """Test suite for validate command exit codes."""
 
   def setup_method(self) -> None:
-    """Set up test resources."""
-    self.runner = CliRunner(env={'NO_COLOR': '1'})
+    """Set up test resources with wide terminal for consistent help output."""
+    self.runner = CliRunner(
+      env={
+        'NO_COLOR': '1',
+        'COLUMNS': '200',
+        'TERM': 'dumb',
+        'FORCE_COLOR': '0',
+      }
+    )
 
   def test_exit_code_success(self, tmp_path: Path) -> None:
     """Test exit code 0 for valid schema."""
@@ -1408,8 +1422,15 @@ class TestSchemaAppStructure:
   """Test suite for schema CLI app structure."""
 
   def setup_method(self) -> None:
-    """Set up test resources."""
-    self.runner = CliRunner(env={'NO_COLOR': '1'})
+    """Set up test resources with wide terminal for consistent help output."""
+    self.runner = CliRunner(
+      env={
+        'NO_COLOR': '1',
+        'COLUMNS': '200',
+        'TERM': 'dumb',
+        'FORCE_COLOR': '0',
+      }
+    )
 
   def test_schema_app_has_validate_command(self) -> None:
     """Test that schema app has validate command."""

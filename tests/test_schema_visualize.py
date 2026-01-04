@@ -705,8 +705,15 @@ class TestVisualizeCLICommand:
   """Test suite for 'reverie schema visualize' CLI command."""
 
   def setup_method(self) -> None:
-    """Set up test resources."""
-    self.runner = CliRunner(env={'NO_COLOR': '1'})
+    """Set up test resources with wide terminal for consistent help output."""
+    self.runner = CliRunner(
+      env={
+        'NO_COLOR': '1',
+        'COLUMNS': '200',
+        'TERM': 'dumb',
+        'FORCE_COLOR': '0',
+      }
+    )
 
   def test_visualize_help(self) -> None:
     """Test visualize command help."""
@@ -961,8 +968,15 @@ class TestVisualizeCLISchemaApp:
   """Test suite for schema app command structure."""
 
   def setup_method(self) -> None:
-    """Set up test resources."""
-    self.runner = CliRunner(env={'NO_COLOR': '1'})
+    """Set up test resources with wide terminal for consistent help output."""
+    self.runner = CliRunner(
+      env={
+        'NO_COLOR': '1',
+        'COLUMNS': '200',
+        'TERM': 'dumb',
+        'FORCE_COLOR': '0',
+      }
+    )
 
   def test_schema_app_has_visualize_command(self) -> None:
     """Test that schema app has visualize command."""

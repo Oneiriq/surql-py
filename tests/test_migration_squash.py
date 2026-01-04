@@ -30,8 +30,20 @@ from reverie.migration.squash import (
 
 @pytest.fixture
 def cli_runner() -> CliRunner:
-  """Provide CLI runner with NO_COLOR for consistent output."""
-  return CliRunner(env={'NO_COLOR': '1'})
+  """Provide CLI runner with wide terminal for consistent help text output.
+
+  This fixture ensures consistent behavior between local development
+  and CI environments by forcing a wide terminal width and disabling
+  Rich formatting features that can cause truncation.
+  """
+  return CliRunner(
+    env={
+      'NO_COLOR': '1',
+      'COLUMNS': '200',
+      'TERM': 'dumb',
+      'FORCE_COLOR': '0',
+    }
+  )
 
 
 @pytest.fixture

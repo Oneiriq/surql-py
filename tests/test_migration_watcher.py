@@ -846,8 +846,15 @@ class TestSchemaCheckCommand:
   """Test suite for schema check CLI command."""
 
   def setup_method(self) -> None:
-    """Set up test resources."""
-    self.runner = CliRunner(env={'NO_COLOR': '1'})
+    """Set up test resources with wide terminal for consistent help output."""
+    self.runner = CliRunner(
+      env={
+        'NO_COLOR': '1',
+        'COLUMNS': '200',
+        'TERM': 'dumb',
+        'FORCE_COLOR': '0',
+      }
+    )
 
   def test_check_help(self) -> None:
     """Test check command help."""
@@ -988,8 +995,15 @@ class TestSchemaHookConfigCommand:
   """Test suite for schema hook-config CLI command."""
 
   def setup_method(self) -> None:
-    """Set up test resources."""
-    self.runner = CliRunner(env={'NO_COLOR': '1'})
+    """Set up test resources with wide terminal for consistent help output."""
+    self.runner = CliRunner(
+      env={
+        'NO_COLOR': '1',
+        'COLUMNS': '200',
+        'TERM': 'dumb',
+        'FORCE_COLOR': '0',
+      }
+    )
 
   def test_hook_config_help(self) -> None:
     """Test hook-config command help."""
@@ -1052,8 +1066,15 @@ class TestSchemaWatchCommand:
   """Test suite for schema watch CLI command."""
 
   def setup_method(self) -> None:
-    """Set up test resources."""
-    self.runner = CliRunner(env={'NO_COLOR': '1'})
+    """Set up test resources with wide terminal for consistent help output."""
+    self.runner = CliRunner(
+      env={
+        'NO_COLOR': '1',
+        'COLUMNS': '200',
+        'TERM': 'dumb',
+        'FORCE_COLOR': '0',
+      }
+    )
 
   def test_watch_help(self) -> None:
     """Test watch command help."""

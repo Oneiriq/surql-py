@@ -11,6 +11,7 @@ from unittest.mock import AsyncMock, Mock
 import pytest
 import structlog
 from pydantic import BaseModel
+from typer.testing import CliRunner
 
 # Configure structlog BEFORE importing reverie modules to avoid warnings
 # This must run before any structlog loggers are created
@@ -270,11 +271,27 @@ def event_loop():
 
 
 @pytest.fixture
-def mock_cli_runner():
+def mock_cli_runner() -> CliRunner:
   """Provide mock CLI runner for testing commands."""
-  from typer.testing import CliRunner
-
   return CliRunner()
+
+
+@pytest.fixture
+def cli_runner_wide() -> CliRunner:
+  """Provide CLI runner with wide terminal for help text tests.
+
+  This fixture ensures consistent behavior between local development
+  and CI environments by forcing a wide terminal width and disabling
+  Rich formatting features that can cause truncation.
+  """
+  return CliRunner(
+    env={
+      'NO_COLOR': '1',
+      'COLUMNS': '200',
+      'TERM': 'dumb',
+      'FORCE_COLOR': '0',
+    }
+  )
 
 
 # Helper functions for tests
