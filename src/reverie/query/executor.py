@@ -31,7 +31,7 @@ async def execute_query[T: BaseModel](
     client: Database client. If None, uses context client.
 
   Returns:
-    Raw query results
+    Raw query results (or execution plan if EXPLAIN hint is present)
 
   Raises:
     QueryError: If query execution fails
@@ -39,12 +39,24 @@ async def execute_query[T: BaseModel](
   Examples:
     >>> query = Query().select().from_table('user')
     >>> results = await execute_query(query)
+
+    >>> # With EXPLAIN hint, returns execution plan
+    >>> query = Query().select().from_table('user').explain()
+    >>> plan = await execute_query(query)
   """
   db = client or get_db()
 
   surql = query.to_surql()
 
-  logger.info('executing_query', operation=query.operation, table=query.table_name)
+  # Check for EXPLAIN hint
+  has_explain = _has_explain_hint(query)
+
+  logger.info(
+    'executing_query',
+    operation=query.operation,
+    table=query.table_name,
+    has_explain=has_explain,
+  )
   logger.debug('query_sql', sql=surql)
 
   try:
@@ -359,3 +371,17 @@ def _extract_result_data(result: Any) -> Any:
     return result['result']
 
   return result
+
+
+def _has_explain_hint(query: Query[Any]) -> bool:
+  """Check if query has an EXPLAIN hint.
+
+  Args:
+    query: Query instance to check
+
+  Returns:
+    True if query has EXPLAIN hint
+  """
+  from reverie.query.hints import ExplainHint
+
+  return any(isinstance(hint, ExplainHint) for hint in query.hints)

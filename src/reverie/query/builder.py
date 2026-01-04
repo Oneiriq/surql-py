@@ -7,13 +7,16 @@ through method chaining. All methods return new Query instances, ensuring immuta
 from __future__ import annotations
 
 from enum import Enum
-from typing import Any, Literal, TypeVar
+from typing import TYPE_CHECKING, Any, Literal, TypeVar
 
 import structlog
 from pydantic import BaseModel, ConfigDict, Field
 
 from reverie.types.operators import Operator, _quote_value
 from reverie.types.record_id import RecordID
+
+if TYPE_CHECKING:
+  from reverie.query.hints import QueryHint
 
 logger = structlog.get_logger(__name__)
 
@@ -97,6 +100,8 @@ class Query[T: BaseModel](BaseModel):
   vector_value: list[float] = Field(default_factory=list)
   vector_k: int | None = None
   vector_distance: VectorDistanceType | None = None
+  # Query optimization hints
+  hints: list[Any] = Field(default_factory=list)
 
   model_config = ConfigDict(frozen=True, arbitrary_types_allowed=True)
 
@@ -467,11 +472,172 @@ class Query[T: BaseModel](BaseModel):
     """
     return self.model_copy(update={'return_format': ReturnFormat.AFTER})
 
-  def to_surql(self) -> str:
-    """Convert query to SurrealQL string.
+  def add_hint(self, hint: QueryHint) -> Query[T]:
+    """Add optimization hint to query.
+
+    Args:
+      hint: Query optimization hint
 
     Returns:
-      SurrealQL query string
+      New Query instance with hint added
+
+    Examples:
+      >>> from reverie.query.hints import IndexHint
+      >>> query = (Query()
+      ...   .select(['name', 'email'])
+      ...   .from_table('user')
+      ...   .add_hint(IndexHint(table='user', index='email_idx'))
+      ... )
+    """
+    return self.model_copy(update={'hints': [*self.hints, hint]})
+
+  def with_hints(self, *hints: QueryHint) -> Query[T]:
+    """Add multiple optimization hints to query.
+
+    Args:
+      hints: Variable number of query hints
+
+    Returns:
+      New Query instance with hints added
+
+    Examples:
+      >>> from reverie.query.hints import TimeoutHint, ParallelHint
+      >>> query = (Query()
+      ...   .select()
+      ...   .from_table('user')
+      ...   .with_hints(
+      ...     TimeoutHint(seconds=30),
+      ...     ParallelHint(enabled=True, max_workers=4)
+      ...   )
+      ... )
+    """
+    return self.model_copy(update={'hints': [*self.hints, *hints]})
+
+  def force_index(self, index: str) -> Query[T]:
+    """Convenience method to force index usage.
+
+    Args:
+      index: Index name to force
+
+    Returns:
+      New Query instance with index hint
+
+    Raises:
+      ValueError: If table name is not set
+
+    Examples:
+      >>> Query().select().from_table('user').force_index('email_idx')
+    """
+    from reverie.query.hints import IndexHint
+
+    if not self.table_name:
+      raise ValueError('Table name required for index hint')
+
+    hint = IndexHint(table=self.table_name, index=index, force=True)
+    return self.add_hint(hint)
+
+  def use_index(self, index: str) -> Query[T]:
+    """Convenience method to suggest index usage.
+
+    Args:
+      index: Index name to suggest
+
+    Returns:
+      New Query instance with index hint
+
+    Raises:
+      ValueError: If table name is not set
+
+    Examples:
+      >>> Query().select().from_table('user').use_index('email_idx')
+    """
+    from reverie.query.hints import IndexHint
+
+    if not self.table_name:
+      raise ValueError('Table name required for index hint')
+
+    hint = IndexHint(table=self.table_name, index=index, force=False)
+    return self.add_hint(hint)
+
+  def with_timeout(self, seconds: float) -> Query[T]:
+    """Convenience method to set query timeout.
+
+    Args:
+      seconds: Timeout in seconds
+
+    Returns:
+      New Query instance with timeout hint
+
+    Examples:
+      >>> Query().select().from_table('user').with_timeout(30.0)
+    """
+    from reverie.query.hints import TimeoutHint
+
+    hint = TimeoutHint(seconds=seconds)
+    return self.add_hint(hint)
+
+  def parallel(self, max_workers: int | None = None) -> Query[T]:
+    """Convenience method to enable parallel execution.
+
+    Args:
+      max_workers: Optional maximum parallel workers
+
+    Returns:
+      New Query instance with parallel hint
+
+    Examples:
+      >>> Query().select().from_table('user').parallel(max_workers=4)
+      >>> Query().select().from_table('user').parallel()
+    """
+    from reverie.query.hints import ParallelHint
+
+    hint = ParallelHint(enabled=True, max_workers=max_workers)
+    return self.add_hint(hint)
+
+  def with_fetch(
+    self, strategy: Literal['eager', 'lazy', 'batch'], batch_size: int | None = None
+  ) -> Query[T]:
+    """Convenience method to set fetch strategy.
+
+    Args:
+      strategy: Fetch strategy ('eager', 'lazy', or 'batch')
+      batch_size: Batch size (required for 'batch' strategy)
+
+    Returns:
+      New Query instance with fetch hint
+
+    Examples:
+      >>> Query().select().from_table('user').with_fetch('eager')
+      >>> Query().select().from_table('user').with_fetch('batch', batch_size=100)
+    """
+    from reverie.query.hints import FetchHint
+
+    hint = FetchHint(strategy=strategy, batch_size=batch_size)
+    return self.add_hint(hint)
+
+  def explain(self, full: bool = False) -> Query[T]:
+    """Convenience method to add EXPLAIN hint.
+
+    Args:
+      full: Whether to include full execution plan
+
+    Returns:
+      New Query instance with explain hint
+
+    Examples:
+      >>> Query().select().from_table('user').explain()
+      >>> Query().select().from_table('user').explain(full=True)
+    """
+    from reverie.query.hints import ExplainHint
+
+    hint = ExplainHint(full=full)
+    return self.add_hint(hint)
+
+  def to_surql(self) -> str:
+    """Convert query to SurrealQL string with hints.
+
+    Returns:
+      SurrealQL query string with optimization hints
 
     Raises:
       ValueError: If query is invalid or incomplete
@@ -480,22 +646,37 @@ class Query[T: BaseModel](BaseModel):
       >>> query = Query().select(['name']).from_table('user').where('age > 18')
       >>> query.to_surql()
       'SELECT name FROM user WHERE age > 18'
+
+      >>> from reverie.query.hints import TimeoutHint
+      >>> query = Query().select().from_table('user').with_timeout(30.0)
+      >>> sql = query.to_surql()
+      >>> assert '/* TIMEOUT 30.0s */' in sql
     """
     if not self.operation:
       raise ValueError('Query operation not specified')
 
+    # Build base query SQL
     if self.operation == 'SELECT':
-      return self._build_select()
+      base_sql = self._build_select()
     elif self.operation == 'INSERT':
-      return self._build_insert()
+      base_sql = self._build_insert()
     elif self.operation == 'UPDATE':
-      return self._build_update()
+      base_sql = self._build_update()
     elif self.operation == 'DELETE':
-      return self._build_delete()
+      base_sql = self._build_delete()
     elif self.operation == 'RELATE':
-      return self._build_relate()
+      base_sql = self._build_relate()
     else:
       raise ValueError(f'Unsupported operation: {self.operation}')
+
+    # Add hints if present
+    if self.hints:
+      from reverie.query.hints import render_hints
+
+      hint_str = render_hints(self.hints)
+      return f'{hint_str}\n{base_sql}'
+
+    return base_sql
 
   def _build_select(self) -> str:
     """Build SELECT query string."""

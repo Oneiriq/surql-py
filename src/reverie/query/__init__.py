@@ -10,9 +10,7 @@ This module provides a complete query building and ORM system with:
 - Batch operation helpers
 """
 
-# Query builder
-# Batch operations
-from reverie.query.batch import (
+from reverie.query.batch import (  # Batch operations
   build_relate_query,
   build_upsert_query,
   delete_many,
@@ -20,7 +18,7 @@ from reverie.query.batch import (
   relate_many,
   upsert_many,
 )
-from reverie.query.builder import (
+from reverie.query.builder import (  # Query builder
   Query,
   ReturnFormat,
   VectorDistanceType,
@@ -36,9 +34,7 @@ from reverie.query.builder import (
   vector_search_query,
   where,
 )
-
-# CRUD operations
-from reverie.query.crud import (
+from reverie.query.crud import (  # CRUD operations
   count_records,
   create_record,
   create_records,
@@ -53,9 +49,7 @@ from reverie.query.crud import (
   query_records_wrapped,
   update_record,
 )
-
-# Query executor
-from reverie.query.executor import (
+from reverie.query.executor import (  # Query executor
   execute_query,
   execute_raw,
   execute_raw_typed,
@@ -65,9 +59,7 @@ from reverie.query.executor import (
   fetch_record,
   fetch_records,
 )
-
-# Query expressions
-from reverie.query.expressions import (
+from reverie.query.expressions import (  # Query expressions
   Expression,
   FieldExpression,
   FunctionExpression,
@@ -96,26 +88,30 @@ from reverie.query.expressions import (
   upper,
   value,
 )
-
-# Graph operations
-from reverie.query.graph import (
+from reverie.query.graph import (  # Graph operations
   count_related,
   get_incoming_edges,
   get_outgoing_edges,
   get_related_records,
+  relate as create_relation,
   shortest_path,
   traverse,
   traverse_with_depth,
-)
-from reverie.query.graph import (
-  relate as create_relation,
-)
-from reverie.query.graph import (
   unrelate as remove_relation,
 )
-
-# Result wrappers and utilities
-from reverie.query.results import (
+from reverie.query.hints import (  # Query optimization hints
+  ExplainHint,
+  FetchHint,
+  HintRenderer,
+  IndexHint,
+  ParallelHint,
+  QueryHint,
+  TimeoutHint,
+  merge_hints,
+  render_hints,
+  validate_hint,
+)
+from reverie.query.results import (  # Result wrappers and utilities
   AggregateResult,
   CountResult,
   ListResult,
@@ -150,6 +146,17 @@ __all__ = [
   'relate',
   'vector_search_query',
   'VectorDistanceType',
+  # Query hints
+  'QueryHint',
+  'IndexHint',
+  'ParallelHint',
+  'TimeoutHint',
+  'FetchHint',
+  'ExplainHint',
+  'HintRenderer',
+  'validate_hint',
+  'merge_hints',
+  'render_hints',
   # Query expressions
   'Expression',
   'FieldExpression',

@@ -11,6 +11,7 @@ import typer
 from rich.console import Console
 
 from reverie.cli import db_app, migrate_app, schema_app
+from reverie.cli.orchestrate import app as orchestrate_app
 from reverie.settings import get_settings
 
 # Initialize console
@@ -29,6 +30,7 @@ app = typer.Typer(
 app.add_typer(migrate_app, name='migrate')
 app.add_typer(schema_app, name='schema')
 app.add_typer(db_app, name='db')
+app.add_typer(orchestrate_app, name='orchestrate')
 
 
 @app.command()
