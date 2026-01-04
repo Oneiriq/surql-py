@@ -5,7 +5,7 @@ allowing developers to guide query execution for better performance.
 """
 
 from enum import Enum
-from typing import Any, Literal
+from typing import Literal
 
 from pydantic import BaseModel, ConfigDict, Field, model_validator
 

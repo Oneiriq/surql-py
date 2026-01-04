@@ -93,10 +93,14 @@ from reverie.query.graph import (  # Graph operations
   get_incoming_edges,
   get_outgoing_edges,
   get_related_records,
-  relate as create_relation,
   shortest_path,
   traverse,
   traverse_with_depth,
+)
+from reverie.query.graph import (
+  relate as create_relation,
+)
+from reverie.query.graph import (
   unrelate as remove_relation,
 )
 from reverie.query.hints import (  # Query optimization hints

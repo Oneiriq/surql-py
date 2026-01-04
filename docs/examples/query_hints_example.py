@@ -8,7 +8,6 @@ import asyncio
 
 from reverie.query import Query
 from reverie.query.hints import (
-    ExplainHint,
     FetchHint,
     IndexHint,
     ParallelHint,

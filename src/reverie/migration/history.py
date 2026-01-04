@@ -15,6 +15,10 @@ from reverie.migration.models import MigrationHistory
 logger = structlog.get_logger(__name__)
 
 
+# Flag to enable/disable automatic snapshot creation
+AUTO_SNAPSHOT_ENABLED = False
+
+
 class MigrationHistoryError(Exception):
   """Raised when migration history operations fail."""
 
@@ -392,3 +396,79 @@ def _parse_datetime(value: Any) -> datetime:
       return datetime.now(UTC)
   else:
     return datetime.now(UTC)
+
+
+async def create_snapshot_on_migration(
+  client: DatabaseClient,
+  version: str,
+  migration_count: int,
+) -> None:
+  """Create and store a schema snapshot after migration.
+
+  This function is called automatically after successful migrations
+  if AUTO_SNAPSHOT_ENABLED is True.
+
+  Args:
+    client: Database client
+    version: Migration version
+    migration_count: Total migrations applied
+
+  Examples:
+    >>> await create_snapshot_on_migration(client, '20260109_120000', 5)
+  """
+  if not AUTO_SNAPSHOT_ENABLED:
+    return
+
+  try:
+    # Import here to avoid circular dependency
+    from reverie.migration.versioning import create_snapshot, store_snapshot
+
+    logger.info('creating_automatic_snapshot', version=version)
+
+    snapshot = await create_snapshot(client, version, migration_count)
+    await store_snapshot(client, snapshot)
+
+    logger.info('automatic_snapshot_created', version=version)
+
+  except Exception as e:
+    # Don't fail migration if snapshot creation fails
+    logger.warning(
+      'automatic_snapshot_failed',
+      version=version,
+      error=str(e),
+    )
+
+
+def enable_auto_snapshots() -> None:
+  """Enable automatic snapshot creation after migrations.
+
+  Examples:
+    >>> enable_auto_snapshots()
+  """
+  global AUTO_SNAPSHOT_ENABLED
+  AUTO_SNAPSHOT_ENABLED = True
+  logger.info('auto_snapshots_enabled')
+
+
+def disable_auto_snapshots() -> None:
+  """Disable automatic snapshot creation after migrations.
+
+  Examples:
+    >>> disable_auto_snapshots()
+  """
+  global AUTO_SNAPSHOT_ENABLED
+  AUTO_SNAPSHOT_ENABLED = False
+  logger.info('auto_snapshots_disabled')
+
+
+def is_auto_snapshot_enabled() -> bool:
+  """Check if automatic snapshots are enabled.
+
+  Returns:
+    True if auto-snapshots are enabled
+
+  Examples:
+    >>> if is_auto_snapshot_enabled():
+    ...   print('Auto-snapshots are active')
+  """
+  return AUTO_SNAPSHOT_ENABLED

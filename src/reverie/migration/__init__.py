@@ -57,10 +57,14 @@ from reverie.migration.generator import (
 from reverie.migration.history import (
   MigrationHistoryError,
   create_migration_table,
+  create_snapshot_on_migration,
+  disable_auto_snapshots,
+  enable_auto_snapshots,
   ensure_migration_table,
   get_applied_migrations,
   get_applied_versions,
   get_migration_history,
+  is_auto_snapshot_enabled,
   is_migration_applied,
   record_migration,
   remove_migration_record,
@@ -75,6 +79,30 @@ from reverie.migration.models import (
   MigrationState,
   MigrationStatus,
   SchemaDiff,
+)
+
+# Rollback
+from reverie.migration.rollback import (
+  RollbackIssue,
+  RollbackPlan,
+  RollbackResult,
+  RollbackSafety,
+  analyze_rollback_safety,
+  create_rollback_plan,
+  execute_rollback,
+  plan_rollback_to_version,
+)
+
+# Versioning
+from reverie.migration.versioning import (
+  SchemaSnapshot,
+  VersionGraph,
+  VersionNode,
+  compare_snapshots,
+  create_snapshot,
+  list_snapshots,
+  load_snapshot,
+  store_snapshot,
 )
 
 __all__ = [
@@ -105,6 +133,10 @@ __all__ = [
   'get_applied_versions',
   'is_migration_applied',
   'get_migration_history',
+  'create_snapshot_on_migration',
+  'enable_auto_snapshots',
+  'disable_auto_snapshots',
+  'is_auto_snapshot_enabled',
   'MigrationHistoryError',
   # Executor
   'execute_migration',
@@ -130,4 +162,22 @@ __all__ = [
   'diff_events',
   'diff_permissions',
   'diff_edges',
+  # Versioning
+  'SchemaSnapshot',
+  'VersionNode',
+  'VersionGraph',
+  'create_snapshot',
+  'store_snapshot',
+  'load_snapshot',
+  'list_snapshots',
+  'compare_snapshots',
+  # Rollback
+  'RollbackSafety',
+  'RollbackIssue',
+  'RollbackPlan',
+  'RollbackResult',
+  'create_rollback_plan',
+  'execute_rollback',
+  'analyze_rollback_safety',
+  'plan_rollback_to_version',
 ]
