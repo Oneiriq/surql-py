@@ -7,6 +7,7 @@ Complete reference for the reverie command-line interface.
 - [Overview](#overview)
 - [Global Options](#global-options)
 - [Migration Commands](#migration-commands)
+- [Orchestration Commands](#orchestration-commands)
 - [Schema Commands](#schema-commands)
 - [Database Commands](#database-commands)
 - [Common Workflows](#common-workflows)

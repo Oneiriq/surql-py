@@ -765,8 +765,83 @@ async def check_history():
     print(result)
 ```
 
+## Schema Versioning and Rollback
+
+reverie provides advanced versioning and rollback capabilities for managing schema evolution safely.
+
+### Version Tracking
+
+Track schema state at each migration:
+
+```python
+from reverie.migration.versioning import create_snapshot, store_snapshot
+
+async def track_schema_version():
+  async with get_client(config) as client:
+    # Create snapshot after migration
+    snapshot = await create_snapshot(
+      client=client,
+      version='20260109_120000',
+      migration_count=5,
+    )
+    
+    # Store for later comparison
+    await store_snapshot(client, snapshot)
+```
+
+### Safe Rollbacks
+
+Plan and execute rollbacks with safety analysis:
+
+```python
+from reverie.migration.rollback import create_rollback_plan, execute_rollback
+
+async def safe_rollback():
+  async with get_client(config) as client:
+    # Create rollback plan
+    plan = await create_rollback_plan(
+      client=client,
+      migrations=all_migrations,
+      target_version='20260108_120000',
+    )
+    
+    # Check safety level
+    print(f'Safety: {plan.overall_safety.value}')
+    
+    # Review issues
+    for issue in plan.issues:
+      print(f'{issue.safety.value}: {issue.description}')
+    
+    # Execute if safe
+    if plan.is_safe:
+      result = await execute_rollback(client, plan)
+```
+
+### CLI Commands
+
+```shell
+# Create snapshot
+reverie migrate snapshot
+
+# List snapshots
+reverie migrate list-snapshots
+
+# Plan rollback
+reverie migrate plan-rollback 20260108_120000
+
+# Execute rollback
+reverie migrate rollback 20260108_120000
+
+# Compare snapshots
+reverie migrate compare 20260108_120000 20260109_120000
+```
+
+For comprehensive versioning and rollback documentation, see:
+- [Schema Versioning and Rollback Guide](versioning_rollback.md)
+
 ## Next Steps
 
 - Learn about [Query Building](queries.md) to work with your migrated schema
 - Explore [CLI Reference](cli.md) for all migration commands
+- Review [Schema Versioning and Rollback](versioning_rollback.md) for safe rollback strategies
 - Check out [Examples](examples/migration_example.py) for migration patterns

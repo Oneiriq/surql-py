@@ -13,6 +13,7 @@ This guide covers querying and manipulating data using reverie's type-safe query
 - [Transactions](#transactions)
 - [Named Connections](#named-connections)
 - [Type Safety](#type-safety)
+- [Query Optimization Hints](#query-optimization-hints)
 - [Advanced Queries](#advanced-queries)
 - [Best Practices](#best-practices)
 

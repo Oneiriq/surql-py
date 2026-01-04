@@ -18,6 +18,9 @@ Reverie is a code-first database toolkit for building modern applications with S
 - **Schema Validation** - Validate code schemas against database with CI/CD integration
 - **Schema Visualization** - Generate Mermaid, GraphViz, and ASCII diagrams
 - **Migration Squashing** - Consolidate multiple migrations into optimized versions
+- **Query Optimization Hints** - Guide query execution with index hints, parallel processing, timeouts, and fetch strategies
+- **Multi-Database Orchestration** - Deploy migrations across multiple environments with sequential, parallel, rolling, and canary strategies
+- **Schema Versioning & Rollback** - Track schema evolution with snapshots and safely rollback to previous versions with safety analysis
 - **Git Hooks** - Pre-commit schema drift detection
 - **Batch Operations** - Efficient bulk inserts, upserts, and relationship creation
 - **Advanced Graph Queries** - GraphQuery builder with shortest path and degree calculation
@@ -301,9 +304,9 @@ This project is licensed under the Apache License 2.0 - see the [LICENSE](LICENS
 - [x] Query result caching
 - [x] Migration squashing
 - [x] Schema visualization
-- [ ] Advanced query optimization hints
-- [ ] Multi-database migration orchestration
-- [ ] Schema versioning and rollback strategies
+- [x] Advanced query optimization hints
+- [x] Multi-database migration orchestration
+- [x] Schema versioning and rollback strategies
 - [ ] Performance profiling tools
 
 ---

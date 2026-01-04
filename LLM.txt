@@ -11,6 +11,7 @@
 - Includes query result caching with Redis and in-memory backends
 - Provides real-time streaming and live query support via WebSocket
 - Supports multiple named database connections with connection registry
+- **Advanced features**: Query optimization hints, multi-database orchestration, schema versioning and rollback
 - **Requirements**: Python 3.12+ and SurrealDB 1.0+
 - **Version**: 0.1.0 (Alpha)
 - **License**: Apache 2.0
@@ -834,6 +835,224 @@ def downgrade():
       indexes=[],  # Remove all indexes
     )
   ]
+```
+
+# Query Optimization Hints
+
+## Overview
+- Query hints guide SurrealDB's query planner to optimize query execution
+- Rendered as SQL comments in SurrealQL for compatibility
+- Five hint types: IndexHint, ParallelHint, TimeoutHint, FetchHint, ExplainHint
+- Applied via fluent API methods on Query builder
+- Later hints override earlier hints of the same type
+
+## Hint Types
+
+### IndexHint
+- Import: `from reverie.query.hints import IndexHint`
+- Force/suggest specific index usage
+- Create: `IndexHint(table='user', index='email_idx', force=False)`
+- Query methods: `query.use_index('email_idx')` or `query.force_index('email_idx')`
+- Output: `/* USE INDEX user.email_idx */` or `/* FORCE INDEX user.email_idx */`
+- Use when: You know optimal index, query planner chooses suboptimal index
+
+### ParallelHint
+- Import: `from reverie.query.hints import ParallelHint`
+- Enable/configure parallel query execution
+- Create: `ParallelHint(enabled=True, max_workers=4)`
+- Query method: `query.parallel()` or `query.parallel(max_workers=8)`
+- Output: `/* PARALLEL ON */`, `/* PARALLEL 8 */`, or `/* PARALLEL OFF */`
+- Use when: Processing large datasets, complex aggregations
+- Sweet spot: 4-8 workers typically optimal
+
+### TimeoutHint
+- Import: `from reverie.query.hints import TimeoutHint`
+- Set custom query timeout
+- Create: `TimeoutHint(seconds=30.0)`
+- Query method: `query.with_timeout(30.0)`
+- Output: `/* TIMEOUT 30.0s */`
+- Use when: Prevent long-running queries, set stricter timeouts for user queries
+- Common values: Interactive (5-10s), Reports (30-60s), Batch (300+s)
+
+### FetchHint
+- Import: `from reverie.query.hints import FetchHint`
+- Control how records are fetched from database
+- Strategies: `eager` (load all), `lazy` (on demand), `batch` (in chunks)
+- Create: `FetchHint(strategy='batch', batch_size=1000)`
+- Query method: `query.with_fetch('batch', batch_size=1000)`
+- Output: `/* FETCH BATCH 1000 */`, `/* FETCH EAGER */`, `/* FETCH LAZY */`
+- Eager: Best for small result sets (<1000 rows), high memory, low latency
+- Batch: Best for medium/large datasets, medium memory/latency
+- Lazy: Best for very large datasets, low memory, high latency
+
+### ExplainHint
+- Import: `from reverie.query.hints import ExplainHint`
+- Request query execution plan for performance analysis
+- Create: `ExplainHint()` or `ExplainHint(full=True)`
+- Query method: `query.explain()` or `query.explain(full=True)`
+- Output: `/* EXPLAIN */` or `/* EXPLAIN FULL */`
+- Use when: Debugging slow queries, understanding index usage, verifying optimizations
+
+## Using Hints with Query Builder
+
+### Single Hint
+```python
+from reverie.query import Query
+
+query = (
+  Query()
+    .select(['name', 'email'])
+    .from_table('user')
+    .where('age >= 18')
+    .use_index('age_idx')
+)
+# Generates: /* USE INDEX user.age_idx */ SELECT name, email FROM user WHERE age >= 18
+```
+
+### Multiple Hints
+```python
+query = (
+  Query()
+    .select()
+    .from_table('large_table')
+    .where('status = "active"')
+    .use_index('status_idx')
+    .with_timeout(30.0)
+    .parallel(max_workers=4)
+    .with_fetch('batch', batch_size=1000)
+)
+# Generates all hints as comments before query
+```
+
+### with_hints() Method
+```python
+from reverie.query.hints import IndexHint, TimeoutHint, ParallelHint
+
+query = (
+  Query()
+    .select()
+    .from_table('analytics_data')
+    .where('date >= $start_date')
+    .with_hints(
+      IndexHint(table='analytics_data', index='date_idx'),
+      TimeoutHint(seconds=60.0),
+      ParallelHint(enabled=True, max_workers=6),
+    )
+)
+```
+
+## Hint Validation and Merging
+
+### validate_hint()
+- Import: `from reverie.query.hints import validate_hint`
+- Validate hint applicable to query context
+- Usage: `errors = validate_hint(hint, table='user')`
+- Returns: List of validation error messages (empty if valid)
+- Checks: Index hint table matches query table
+
+### merge_hints()
+- Import: `from reverie.query.hints import merge_hints`
+- Merge multiple hints, resolving conflicts
+- Usage: `merged = merge_hints([hint1, hint2, hint3])`
+- Behavior: Later hints override earlier hints of same type
+- Returns: Merged list with duplicates resolved
+
+### render_hints()
+- Import: `from reverie.query.hints import render_hints`
+- Render hints to SurrealQL comment string
+- Usage: `sql = render_hints([TimeoutHint(seconds=30), ParallelHint(enabled=True)])`
+- Returns: Space-separated hint comments
+
+## Best Practices
+
+### Profile Before Optimizing
+- Always measure performance before adding hints
+- Use `explain()` to understand current query behavior
+- Only add hints if performance is unacceptable
+
+### Test Hint Combinations
+- Different combinations have varying effects
+- Test worker counts: 2, 4, 8 with different batch sizes
+- Measure and compare durations
+
+### Conservative Timeouts
+- Set timeouts that allow legitimate queries to complete
+- Too strict may fail valid queries
+- Be generous for batch operations
+
+### Document Why Hints Are Used
+- Add comments explaining optimization choices
+- Example: "This query scans millions of records, so we force date index, enable parallel, use batch fetch"
+
+### Hint Override Behavior
+- Later hints override earlier hints of same type
+- Final query uses last specified timeout, not first
+
+## Usage Examples
+
+### User Search Optimization
+```python
+async def search_users_optimized(search_term: str):
+  query = (
+    Query()
+      .select(['id', 'username', 'email'])
+      .from_table('user')
+      .where('username CONTAINS $search OR email CONTAINS $search')
+      .force_index('username_email_idx')
+      .with_timeout(5.0)
+      .with_fetch('batch', batch_size=100)
+      .limit(100)
+  )
+  async with get_client(config) as client:
+    return await query.execute(client, {'search': search_term})
+```
+
+### Large Dataset Processing
+```python
+async def process_event_logs(start_date: str):
+  query = (
+    Query()
+      .select(['event_type', 'count() as total'])
+      .from_table('events')
+      .where('created_at >= $start_date')
+      .group_by(['event_type'])
+      .use_index('created_at_idx')
+      .parallel(max_workers=8)
+      .with_fetch('batch', batch_size=10000)
+      .with_timeout(600.0)
+  )
+  async with get_client(config) as client:
+    return await query.execute(client, {'start_date': start_date})
+```
+
+### Query Performance Analysis
+```python
+async def analyze_slow_query():
+  # Step 1: Run with EXPLAIN
+  analysis = (
+    Query()
+      .select()
+      .from_table('orders')
+      .where('total > 1000 AND status = "pending"')
+      .explain(full=True)
+  )
+  
+  async with get_client(config) as client:
+    plan = await analysis.execute(client)
+    
+    # Step 2: Apply optimizations based on plan
+    optimized = (
+      Query()
+        .select()
+        .from_table('orders')
+        .where('total > 1000 AND status = "pending"')
+        .use_index('total_status_idx')
+        .with_timeout(15.0)
+        .parallel(max_workers=4)
+    )
+    
+    result = await optimized.execute(client)
+    return result
 ```
 
 # Query Result Caching
@@ -1953,6 +2172,192 @@ def downgrade():
 - Validates file naming
 - Checks for duplicate versions
 
+# Multi-Database Migration Orchestration
+
+## Overview
+- Deploy migrations across multiple database instances in a controlled, automated way
+- Essential for multi-environment deployments, horizontal scaling, multi-tenant architectures
+- Four deployment strategies: Sequential, Parallel, Rolling, Canary
+- Health checking system validates environment readiness
+- Auto-rollback on failures with safety features
+
+## Core Concepts
+
+### Environment
+- Represents a single database instance or cluster
+- Import: `from reverie.orchestration import EnvironmentConfig`
+- Create: `EnvironmentConfig(name='production', connection=conn_config, priority=1, tags={'production'}, require_approval=True, allow_destructive=False)`
+- Properties: `name`, `connection`, `priority` (lower = higher priority), `tags`, `require_approval`, `allow_destructive`
+
+### Environment Registry
+- Import: `from reverie.orchestration import EnvironmentRegistry`
+- Singleton pattern manages all configured environments
+- Register: `registry.register_environment(name='staging', connection=config, priority=50)`
+- Get: `client = registry.get('analytics')`
+- List: `names = registry.list_connections()`
+- Set default: `await registry.set_default('analytics')`
+
+### Migration Coordinator
+- Import: `from reverie.orchestration import MigrationCoordinator`
+- Orchestrates deployments across environments
+- Create: `coordinator = MigrationCoordinator(registry)`
+- Deploy: `results = await coordinator.deploy_to_environments(environments=['staging', 'production'], migrations=migrations, strategy='sequential')`
+
+## Environment Configuration
+
+### Configuration File Format
+- Create `environments.json`:
+```json
+{
+  "environments": [
+    {
+      "name": "production",
+      "connection": {
+        "db_url": "ws://prod.example.com:8000/rpc",
+        "db_ns": "production",
+        "db": "main",
+        "password": "${PROD_PASSWORD}"
+      },
+      "priority": 1,
+      "tags": ["production", "critical"],
+      "require_approval": true,
+      "allow_destructive": false
+    }
+  ]
+}
+```
+
+### Loading Configuration
+- From file: `from reverie.orchestration import configure_environments; configure_environments(Path('environments.json'))`
+- Programmatically: `from reverie.orchestration import register_environment; register_environment(name='production', connection=ConnectionConfig(...), priority=1)`
+- Use environment variables for sensitive data: `"password": "${PROD_PASSWORD}"`
+
+## Deployment Strategies
+
+### Sequential Strategy
+- Deploy one at a time in priority order
+- Use cases: Multi-stage deployments (dev → staging → production), maximum safety
+- Behavior: Deploys in priority order (lowest first), waits for each, stops on first failure
+- CLI: `reverie orchestrate deploy -e dev,staging,production --strategy sequential`
+
+### Parallel Strategy
+- Deploy to all environments simultaneously
+- Use cases: Independent environments (different tenants, regions), fast deployments
+- Behavior: Deploys to all at once, configurable concurrency limit
+- CLI: `reverie orchestrate deploy -e tenant1,tenant2,tenant3 --strategy parallel --max-concurrent 3`
+
+### Rolling Strategy
+- Deploy in batches, waiting for each batch to complete
+- Use cases: Database replicas, maintaining service availability
+- Behavior: Divides into batches, deploys one batch at a time
+- CLI: `reverie orchestrate deploy -e db1,db2,db3,db4 --strategy rolling --batch-size 2`
+
+### Canary Strategy
+- Deploy to small percentage first, then to rest
+- Use cases: High-risk deployments, testing in production with limited impact
+- Behavior: Deploys to specified percentage first, waits for verification
+- CLI: `reverie orchestrate deploy -e prod1,prod2,prod3,prod4,prod5 --strategy canary --canary-percent 20`
+
+### Strategy Comparison
+- Sequential: Slowest speed, highest safety, multi-stage deployments
+- Parallel: Fastest speed, lowest safety, independent environments
+- Rolling: Medium speed, high safety, replica sets
+- Canary: Medium speed, highest safety, high-risk production deploys
+
+## Health Checking
+- Checks: Connectivity, authentication, migration table existence, database state
+- CLI validate: `reverie orchestrate validate`
+- CLI deploy: `reverie orchestrate deploy -e production --verify-health`
+- Programmatic: `from reverie.orchestration import HealthCheck; status = await HealthCheck().check_environment(env_config)`
+
+## Best Practices
+- Use configuration files stored in version control
+- Always test with dry run: `reverie orchestrate deploy -e production --dry-run`
+- Use environment priorities to control deployment order
+- Enable health checks in production
+- Secure sensitive credentials with environment variables
+- Keep production separate in isolated config files
+
+# Schema Versioning and Rollback
+
+## Overview
+- Track schema evolution through snapshots at each migration
+- Compare versions to identify differences
+- Plan rollbacks with safety analysis (SAFE, DATA_LOSS, UNSAFE)
+- Execute safe rollbacks to previous schema versions
+- Auto-snapshot functionality for automatic snapshot creation
+
+## Core Concepts
+
+### Schema Snapshot
+- Import: `from reverie.migration.versioning import SchemaSnapshot`
+- Captures complete database schema at specific version
+- Properties: `version`, `created_at`, `tables`, `edges`, `indexes`, `checksum`, `migration_count`
+- Create: `snapshot = await create_snapshot(client, version='20260109_120000', migration_count=5)`
+
+### Rollback Plan
+- Import: `from reverie.migration.rollback import create_rollback_plan`
+- Plan for safely rolling back to previous version
+- Create: `plan = await create_rollback_plan(client, migrations, target_version='20260108_120000')`
+- Properties: `from_version`, `to_version`, `migration_count`, `overall_safety`, `issues`, `requires_approval`
+
+## Schema Snapshots
+
+### Creating and Storing
+- Create: `snapshot = await create_snapshot(client, version, migration_count)`
+- Store: `await store_snapshot(client, snapshot)`
+- Load: `snapshot = await load_snapshot(client, version)`
+- List: `snapshots = await list_snapshots(client)`
+- Compare: `diff = compare_snapshots(snapshot1, snapshot2)`
+
+## Safety Levels
+
+### SAFE
+- No data loss expected
+- Operations: Add/remove indexes, add fields with defaults, add tables
+
+### DATA_LOSS
+- Some data may be lost
+- Operations: Remove fields (data lost), change field types, modify constraints
+
+### UNSAFE
+- Significant data loss likely
+- Operations: Remove entire tables, drop multiple critical fields
+
+### Safety Level Matrix
+- Add table: Up=Safe, Down=UNSAFE (table drop)
+- Add field: Up=Safe, Down=DATA_LOSS (field data lost)
+- Add index: Up=Safe, Down=SAFE (index drop)
+- Modify field type: Up=DATA_LOSS, Down=DATA_LOSS
+
+## Rollback Planning and Execution
+
+### Creating Rollback Plan
+- Plan: `plan = await create_rollback_plan(client, migrations, target_version)`
+- Analyzes: Migrations to rollback, safety issues, data loss risks
+- Check safety: `if plan.overall_safety == RollbackSafety.SAFE: ...`
+
+### Executing Rollbacks
+- Execute: `result = await execute_rollback(client, plan)`
+- Force unsafe: `result = await execute_rollback(client, plan, force=True)`
+- Result properties: `success`, `rolled_back_count`, `actual_duration_ms`, `errors`
+
+## Auto-Snapshots
+- Enable: `from reverie.migration.history import enable_auto_snapshots; enable_auto_snapshots()`
+- Disable: `disable_auto_snapshots()`
+- Behavior: Automatically creates snapshot after each successful migration
+- Benefits: No manual steps, complete history, easy rollback
+
+## Best Practices
+- Create snapshots before major changes
+- Always review rollback plans before executing
+- Backup data before unsafe rollbacks
+- Test rollbacks in development first
+- Use auto-snapshots in production
+- Document rollback procedures in migration docstrings
+- Monitor rollback execution
+- Keep snapshot history limited (periodic cleanup)
+
 # CLI Commands
 
 ## Global Options
@@ -2003,6 +2408,71 @@ def downgrade():
 - Combine multiple migrations into one
 - Options: `--migrations PATH`, `--from VERSION`, `--to VERSION`, `--output FILE`, `--dry-run`, `--no-optimize`, `--keep-originals`, `--force`
 - Example: `reverie migrate squash --from 001 --to 010`
+
+### reverie migrate snapshot create
+- Create schema snapshot at current version
+- Options: `--directory PATH`, `--verbose`
+- Example: `reverie migrate snapshot create`
+
+### reverie migrate snapshot list
+- List all stored schema snapshots
+- Options: `--format FORMAT` (table/json), `--verbose`
+- Example: `reverie migrate snapshot list`
+
+### reverie migrate rollback plan
+- Plan rollback to a target version
+- Options: `--to VERSION` (required), `--directory PATH`, `--verbose`
+- Example: `reverie migrate rollback plan --to 20260108_120000`
+
+### reverie migrate rollback execute
+- Execute rollback to a target version
+- Options: `--to VERSION` (required), `--directory PATH`, `--force`, `--verbose`
+- Example: `reverie migrate rollback execute --to 20260108_120000`
+- Force unsafe: `reverie migrate rollback execute --to 20260107_120000 --force`
+
+### reverie migrate version show
+- Show current schema version
+- Options: `--directory PATH`, `--verbose`
+- Example: `reverie migrate version show`
+
+### reverie migrate version compare
+- Compare two schema versions
+- Usage: `reverie migrate version compare VERSION1 VERSION2`
+- Example: `reverie migrate version compare 20260108_120000 20260109_120000`
+
+## Orchestration Commands
+
+### reverie orchestrate deploy
+- Deploy migrations to multiple environments
+- Usage: `reverie orchestrate deploy -e ENVIRONMENTS [OPTIONS]`
+- Options:
+  * `--environments, -e`: Comma-separated environment names (required)
+  * `--strategy`: Deployment strategy (sequential/parallel/rolling/canary, default: sequential)
+  * `--batch-size`: Batch size for rolling strategy (default: 1)
+  * `--canary-percent`: Canary percentage for canary strategy (default: 10.0)
+  * `--max-concurrent`: Max concurrent for parallel strategy (default: 5)
+  * `--dry-run`: Simulate deployment without executing
+  * `--skip-health-check`: Skip health verification
+  * `--no-rollback`: Disable auto-rollback on failure
+  * `--config`: Config file path (default: environments.json)
+  * `--migrations-dir, -m`: Migrations directory (default: migrations)
+- Examples:
+  * Basic: `reverie orchestrate deploy -e staging,production`
+  * Rolling: `reverie orchestrate deploy -e db1,db2,db3,db4 --strategy rolling --batch-size 2`
+  * Canary: `reverie orchestrate deploy -e prod1,prod2,prod3 --strategy canary --canary-percent 33`
+  * Dry run: `reverie orchestrate deploy -e production --dry-run`
+
+### reverie orchestrate status
+- Check deployment status of environments
+- Usage: `reverie orchestrate status -e ENVIRONMENTS [OPTIONS]`
+- Options: `--environments, -e` (required), `--config`
+- Example: `reverie orchestrate status -e staging,production`
+
+### reverie orchestrate validate
+- Validate environment configuration and connectivity
+- Usage: `reverie orchestrate validate [OPTIONS]`
+- Options: `--config` (default: environments.json)
+- Example: `reverie orchestrate validate`
 
 ## Schema Commands
 
