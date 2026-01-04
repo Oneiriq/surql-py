@@ -57,7 +57,7 @@ touch .env main.py
 
 Your project structure should look like:
 
-```
+```shell
 my-blog/
 ├── .env
 ├── main.py
@@ -230,7 +230,8 @@ reverie migrate status
 ```
 
 Output:
-```
+
+```shell
 Migration Status
 ┌─────────────────────────────────────────┬────────┐
 │ Version                                 │ Status │
@@ -247,7 +248,8 @@ reverie migrate up
 ```
 
 Output:
-```
+
+```shell
 Discovering migrations in migrations
 Found 1 pending migration(s):
   • 20260102_120000: Create user and post tables
@@ -585,7 +587,7 @@ python main.py
 
 Expected output:
 
-```
+```shell
 Creating user...
 Created user: user:alice
 
