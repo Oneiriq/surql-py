@@ -26,11 +26,11 @@ class TestSettings:
   def test_settings_with_custom_values(self) -> None:
     """Test settings loading with custom environment variables."""
     env_vars = {
-      'ENVIRONMENT': 'production',
-      'DEBUG': 'false',
-      'LOG_LEVEL': 'WARNING',
-      'APP_NAME': 'custom-app',
-      'VERSION': '1.0.0',
+      'REVERIE_ENVIRONMENT': 'production',
+      'REVERIE_DEBUG': 'false',
+      'REVERIE_LOG_LEVEL': 'WARNING',
+      'REVERIE_APP_NAME': 'custom-app',
+      'REVERIE_VERSION': '1.0.0',
     }
 
     with patch.dict(os.environ, env_vars, clear=True):
@@ -57,7 +57,7 @@ class TestSettings:
   )
   def test_debug_parsing(self, debug_value: str, expected: bool) -> None:
     """Test various debug value formats are parsed correctly."""
-    with patch.dict(os.environ, {'DEBUG': debug_value}, clear=True):
+    with patch.dict(os.environ, {'REVERIE_DEBUG': debug_value}, clear=True):
       settings = Settings()
       assert settings.debug is expected
 
@@ -66,7 +66,7 @@ class TestSettings:
     # Clear the cache first
     get_settings.cache_clear()
 
-    with patch.dict(os.environ, {'APP_NAME': 'test-app'}, clear=True):
+    with patch.dict(os.environ, {'REVERIE_APP_NAME': 'test-app'}, clear=True):
       settings1 = get_settings()
       settings2 = get_settings()
 
@@ -76,14 +76,16 @@ class TestSettings:
 
   def test_invalid_environment_raises_validation_error(self) -> None:
     """Test that invalid environment value raises ValidationError."""
-    with patch.dict(os.environ, {'ENVIRONMENT': 'invalid'}, clear=True):
+    # Settings uses REVERIE_ prefix for environment variables
+    with patch.dict(os.environ, {'REVERIE_ENVIRONMENT': 'invalid'}, clear=True):
       with pytest.raises(ValidationError) as exc_info:
-        Settings()
-      assert 'environment' in str(exc_info.value)
+        Settings(_env_file=None)
+      assert 'environment' in str(exc_info.value).lower()
 
   def test_invalid_log_level_raises_validation_error(self) -> None:
     """Test that invalid log level value raises ValidationError."""
-    with patch.dict(os.environ, {'LOG_LEVEL': 'INVALID'}, clear=True):
+    # Settings uses REVERIE_ prefix for environment variables
+    with patch.dict(os.environ, {'REVERIE_LOG_LEVEL': 'INVALID'}, clear=True):
       with pytest.raises(ValidationError) as exc_info:
-        Settings()
-      assert 'log_level' in str(exc_info.value)
+        Settings(_env_file=None)
+      assert 'log_level' in str(exc_info.value).lower()

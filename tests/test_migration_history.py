@@ -595,14 +595,14 @@ class TestParseDatetime:
     result = _parse_datetime('invalid-date-string')
     assert isinstance(result, datetime)
     # Should be close to current time (within a few seconds)
-    now = datetime.utcnow()
+    now = datetime.now(UTC)
     assert abs((result - now).total_seconds()) < 5
 
   def test_parse_datetime_from_none(self):
     """Test parsing datetime from None falls back to current time."""
     result = _parse_datetime(None)
     assert isinstance(result, datetime)
-    now = datetime.utcnow()
+    now = datetime.now(UTC)
     assert abs((result - now).total_seconds()) < 5
 
   def test_parse_datetime_from_int(self):

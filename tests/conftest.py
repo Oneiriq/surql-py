@@ -12,31 +12,32 @@ import pytest
 import structlog
 from pydantic import BaseModel
 
-from reverie.connection.client import DatabaseClient
-from reverie.connection.config import ConnectionConfig
-from reverie.schema.fields import FieldDefinition, FieldType
-from reverie.schema.table import IndexDefinition, IndexType, TableDefinition, TableMode
-from reverie.types.record_id import RecordID
+# Configure structlog BEFORE importing reverie modules to avoid warnings
+# This must run before any structlog loggers are created
+structlog.configure(
+  processors=[
+    structlog.contextvars.merge_contextvars,
+    structlog.processors.add_log_level,
+    structlog.processors.TimeStamper(fmt='iso'),
+    structlog.dev.ConsoleRenderer(),
+  ],
+  wrapper_class=structlog.make_filtering_bound_logger(20),
+  context_class=dict,
+  logger_factory=structlog.PrintLoggerFactory(),
+  cache_logger_on_first_use=False,
+)
 
-
-# Configure structlog for testing to avoid warnings
-@pytest.fixture(scope='session', autouse=True)
-def configure_structlog():
-  """Configure structlog for testing to suppress default processor warnings."""
-  structlog.configure(
-    processors=[
-      structlog.contextvars.merge_contextvars,
-      structlog.processors.add_log_level,
-      structlog.processors.TimeStamper(fmt='iso'),
-      structlog.processors.ExceptionRenderer(),
-      structlog.dev.ConsoleRenderer(),
-    ],
-    wrapper_class=structlog.make_filtering_bound_logger(20),
-    context_class=dict,
-    logger_factory=structlog.PrintLoggerFactory(),
-    cache_logger_on_first_use=False,
-  )
-
+# Import reverie modules AFTER structlog is configured
+from reverie.connection.client import DatabaseClient  # noqa: E402
+from reverie.connection.config import ConnectionConfig  # noqa: E402
+from reverie.schema.fields import FieldDefinition, FieldType  # noqa: E402
+from reverie.schema.table import (  # noqa: E402
+  IndexDefinition,
+  IndexType,
+  TableDefinition,
+  TableMode,
+)
+from reverie.types.record_id import RecordID  # noqa: E402
 
 # Test data models
 
@@ -69,9 +70,21 @@ class Product(BaseModel):
 
 
 @pytest.fixture
-def db_config() -> ConnectionConfig:
+def clean_env(monkeypatch: pytest.MonkeyPatch):
+  """Clear all REVERIE_ environment variables for test isolation."""
+  import os
+
+  for key in list(os.environ.keys()):
+    if key.startswith('REVERIE_'):
+      monkeypatch.delenv(key, raising=False)
+  yield
+
+
+@pytest.fixture
+def db_config(clean_env) -> ConnectionConfig:  # noqa: ARG001
   """Provide test database configuration."""
   return ConnectionConfig(
+    _env_file=None,
     url='ws://localhost:8000/rpc',
     namespace='test',
     database='test_db',

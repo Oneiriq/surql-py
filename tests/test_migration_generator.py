@@ -5,6 +5,7 @@ from unittest.mock import patch
 
 import pytest
 
+from reverie.migration.diff import _generate_add_field_diff
 from reverie.migration.generator import (
   MigrationGenerationError,
   _calculate_schema_diffs,
@@ -615,3 +616,161 @@ class TestMigrationGenerationError:
     error = MigrationGenerationError('Test')
 
     assert isinstance(error, Exception)
+
+
+class TestAddFieldBackfillSQL:
+  """Test suite for backfill SQL generation when adding fields with defaults."""
+
+  def test_field_with_default_includes_backfill_sql(self) -> None:
+    """Test that adding a field with a default generates backfill UPDATE."""
+    field = FieldDefinition(
+      name='is_active',
+      type=FieldType.BOOL,
+      default='true',
+    )
+
+    diff = _generate_add_field_diff('user', field)
+
+    # Forward SQL should contain both DEFINE FIELD and UPDATE
+    assert 'DEFINE FIELD is_active ON TABLE user TYPE bool' in diff.forward_sql
+    assert 'DEFAULT true' in diff.forward_sql
+    assert 'UPDATE user SET is_active = true WHERE is_active IS NONE;' in diff.forward_sql
+
+  def test_field_without_default_no_backfill_sql(self) -> None:
+    """Test that adding a field without a default does NOT generate backfill."""
+    field = FieldDefinition(
+      name='name',
+      type=FieldType.STRING,
+    )
+
+    diff = _generate_add_field_diff('user', field)
+
+    # Forward SQL should only contain DEFINE FIELD, no UPDATE
+    assert 'DEFINE FIELD name ON TABLE user TYPE string;' in diff.forward_sql
+    assert 'UPDATE' not in diff.forward_sql
+    assert 'WHERE' not in diff.forward_sql
+
+  def test_field_with_string_default_includes_backfill(self) -> None:
+    """Test backfill SQL with string default value."""
+    field = FieldDefinition(
+      name='status',
+      type=FieldType.STRING,
+      default="'pending'",
+    )
+
+    diff = _generate_add_field_diff('order', field)
+
+    assert "DEFAULT 'pending'" in diff.forward_sql
+    assert "UPDATE order SET status = 'pending' WHERE status IS NONE;" in diff.forward_sql
+
+  def test_field_with_numeric_default_includes_backfill(self) -> None:
+    """Test backfill SQL with numeric default value."""
+    field = FieldDefinition(
+      name='score',
+      type=FieldType.INT,
+      default='0',
+    )
+
+    diff = _generate_add_field_diff('player', field)
+
+    assert 'DEFAULT 0' in diff.forward_sql
+    assert 'UPDATE player SET score = 0 WHERE score IS NONE;' in diff.forward_sql
+
+  def test_backfill_sql_format(self) -> None:
+    """Test the exact format of backfill SQL (newline separated)."""
+    field = FieldDefinition(
+      name='enabled',
+      type=FieldType.BOOL,
+      default='false',
+    )
+
+    diff = _generate_add_field_diff('feature', field)
+
+    # Should be two statements separated by newline
+    lines = diff.forward_sql.strip().split('\n')
+    assert len(lines) == 2
+    assert lines[0].startswith('DEFINE FIELD')
+    assert lines[1].startswith('UPDATE feature SET')
+
+  def test_backward_sql_unchanged(self) -> None:
+    """Test that backward SQL remains simple REMOVE FIELD."""
+    field = FieldDefinition(
+      name='count',
+      type=FieldType.INT,
+      default='100',
+    )
+
+    diff = _generate_add_field_diff('stats', field)
+
+    # Backward SQL should just be REMOVE FIELD (no cleanup needed)
+    assert diff.backward_sql == 'REMOVE FIELD count ON TABLE stats;'
+
+
+class TestGenerateMigrationWithBackfill:
+  """Test suite for end-to-end migration generation with backfill SQL."""
+
+  def test_generate_migration_add_field_with_default(self, temp_migration_dir: Path) -> None:
+    """Test generated migration includes backfill for field with default."""
+    old_tables = {
+      'user': TableDefinition(
+        name='user',
+        mode=TableMode.SCHEMAFULL,
+        fields=[FieldDefinition(name='name', type=FieldType.STRING)],
+      )
+    }
+    new_tables = {
+      'user': TableDefinition(
+        name='user',
+        mode=TableMode.SCHEMAFULL,
+        fields=[
+          FieldDefinition(name='name', type=FieldType.STRING),
+          FieldDefinition(name='is_active', type=FieldType.BOOL, default='true'),
+        ],
+      )
+    }
+
+    with patch('reverie.migration.generator._generate_version', return_value='20260102_120000'):
+      filepath = generate_migration(
+        temp_migration_dir,
+        'Add is_active field',
+        old_tables=old_tables,
+        new_tables=new_tables,
+      )
+
+    content = filepath.read_text()
+    assert 'DEFINE FIELD is_active ON TABLE user TYPE bool' in content
+    assert 'DEFAULT true' in content
+    assert 'UPDATE user SET is_active = true WHERE is_active IS NONE;' in content
+
+  def test_generate_migration_add_field_without_default(self, temp_migration_dir: Path) -> None:
+    """Test generated migration does NOT include backfill for field without default."""
+    old_tables = {
+      'user': TableDefinition(
+        name='user',
+        mode=TableMode.SCHEMAFULL,
+        fields=[FieldDefinition(name='name', type=FieldType.STRING)],
+      )
+    }
+    new_tables = {
+      'user': TableDefinition(
+        name='user',
+        mode=TableMode.SCHEMAFULL,
+        fields=[
+          FieldDefinition(name='name', type=FieldType.STRING),
+          FieldDefinition(name='email', type=FieldType.STRING),
+        ],
+      )
+    }
+
+    with patch('reverie.migration.generator._generate_version', return_value='20260102_120000'):
+      filepath = generate_migration(
+        temp_migration_dir,
+        'Add email field',
+        old_tables=old_tables,
+        new_tables=new_tables,
+      )
+
+    content = filepath.read_text()
+    assert 'DEFINE FIELD email ON TABLE user TYPE string;' in content
+    # Should NOT have any UPDATE backfill statement
+    assert 'UPDATE user SET email' not in content

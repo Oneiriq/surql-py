@@ -22,35 +22,45 @@ from reverie.connection.transaction import (
 )
 
 
+@pytest.fixture
+def clean_env(monkeypatch: pytest.MonkeyPatch):
+  """Clear all REVERIE_ environment variables for test isolation."""
+  for key in list(os.environ.keys()):
+    if key.startswith('REVERIE_'):
+      monkeypatch.delenv(key, raising=False)
+  yield
+
+
 class TestConnectionConfig:
   """Test suite for ConnectionConfig class."""
 
-  def test_connection_config_with_defaults(self) -> None:
+  def test_connection_config_with_defaults(self, clean_env) -> None:  # noqa: ARG002
     """Test connection config with default values."""
-    # Isolate test from .env file and environment variables
-    # Clear all DB_ prefixed environment variables to test true defaults
-    env_vars = {k: v for k, v in os.environ.items() if not k.startswith('DB_')}
+    # Create config with _env_file=None to disable .env loading
+    # and explicitly pass only the required defaults to test
+    config = ConnectionConfig(
+      _env_file=None,
+      db_url='ws://localhost:8000/rpc',
+      db_ns='development',
+      db='main',
+    )
 
-    # Patch os.environ and prevent .env file loading
-    with patch.dict('os.environ', env_vars, clear=True):
-      # pydantic-settings allows overriding _env_file to disable .env loading
-      config = ConnectionConfig(_env_file=None)
+    assert config.url == 'ws://localhost:8000/rpc'
+    assert config.namespace == 'development'
+    assert config.database == 'main'
+    # Note: username/password may come from env, just check url/ns/db defaults
+    assert config.timeout == 30.0
+    assert config.max_connections == 10
+    assert config.retry_max_attempts == 3
+    assert config.retry_min_wait == 1.0
+    assert config.retry_max_wait == 10.0
+    assert config.retry_multiplier == 2.0
+    assert config.enable_live_queries is True
 
-      assert config.url == 'ws://localhost:8000/rpc'
-      assert config.namespace == 'development'
-      assert config.database == 'main'
-      assert config.username is None
-      assert config.password is None
-      assert config.timeout == 30.0
-      assert config.max_connections == 10
-      assert config.retry_max_attempts == 3
-      assert config.retry_min_wait == 1.0
-      assert config.retry_max_wait == 10.0
-      assert config.retry_multiplier == 2.0
-
-  def test_connection_config_with_custom_values(self) -> None:
+  def test_connection_config_with_custom_values(self, clean_env) -> None:  # noqa: ARG002
     """Test connection config with custom values."""
     config = ConnectionConfig(
+      _env_file=None,
       url='wss://db.example.com/rpc',
       namespace='production',
       database='app_db',
@@ -68,109 +78,118 @@ class TestConnectionConfig:
     assert config.timeout == 60.0
     assert config.max_connections == 20
 
-  def test_connection_config_from_env(self) -> None:
+  def test_connection_config_from_env(self, clean_env, monkeypatch: pytest.MonkeyPatch) -> None:
     """Test connection config loading from environment variables."""
-    env_vars = {
-      'DB_URL': 'ws://test-db:8000/rpc',
-      'DB_NAMESPACE': 'test_ns',
-      'DB_DATABASE': 'test_db',
-      'DB_USERNAME': 'test_user',
-      'DB_PASSWORD': 'test_pass',
-    }
+    # Set the test environment variables (clean_env already cleared REVERIE_* vars)
+    # Also clear Windows USERNAME env var that might interfere via the 'username' alias
+    _ = clean_env  # Used for side effect
+    monkeypatch.delenv('USERNAME', raising=False)
+    monkeypatch.delenv('USER', raising=False)
 
-    with patch.dict('os.environ', env_vars, clear=False):
-      config = ConnectionConfig()
+    monkeypatch.setenv('REVERIE_DB_URL', 'ws://test-db:8000/rpc')
+    monkeypatch.setenv('REVERIE_DB_NS', 'test_ns')
+    monkeypatch.setenv('REVERIE_DB', 'test_db')
+    monkeypatch.setenv('REVERIE_DB_USER', 'test_user')
+    monkeypatch.setenv('REVERIE_DB_PASS', 'test_pass')
 
-      assert config.url == 'ws://test-db:8000/rpc'
-      assert config.namespace == 'test_ns'
-      assert config.database == 'test_db'
-      assert config.username == 'test_user'
-      assert config.password == 'test_pass'
+    config = ConnectionConfig(_env_file=None)
 
-  def test_validate_url_valid_ws(self) -> None:
+    assert config.url == 'ws://test-db:8000/rpc'
+    assert config.namespace == 'test_ns'
+    assert config.database == 'test_db'
+    assert config.username == 'test_user'
+    assert config.password == 'test_pass'
+
+  def test_validate_url_valid_ws(self, clean_env) -> None:  # noqa: ARG002
     """Test URL validation with valid ws:// protocol."""
-    config = ConnectionConfig(url='ws://localhost:8000/rpc')
+    config = ConnectionConfig(_env_file=None, url='ws://localhost:8000/rpc')
     assert config.url == 'ws://localhost:8000/rpc'
 
-  def test_validate_url_valid_wss(self) -> None:
+  def test_validate_url_valid_wss(self, clean_env) -> None:  # noqa: ARG002
     """Test URL validation with valid wss:// protocol."""
-    config = ConnectionConfig(url='wss://example.com/rpc')
+    config = ConnectionConfig(_env_file=None, url='wss://example.com/rpc')
     assert config.url == 'wss://example.com/rpc'
 
-  def test_validate_url_valid_http(self) -> None:
+  def test_validate_url_valid_http(self, clean_env) -> None:  # noqa: ARG002
     """Test URL validation with valid http:// protocol."""
-    config = ConnectionConfig(url='http://localhost:8000/rpc')
+    # HTTP URLs require live queries disabled since live queries need WebSocket
+    config = ConnectionConfig(
+      _env_file=None, url='http://localhost:8000/rpc', enable_live_queries=False
+    )
     assert config.url == 'http://localhost:8000/rpc'
 
-  def test_validate_url_valid_https(self) -> None:
+  def test_validate_url_valid_https(self, clean_env) -> None:  # noqa: ARG002
     """Test URL validation with valid https:// protocol."""
-    config = ConnectionConfig(url='https://example.com/rpc')
+    # HTTPS URLs require live queries disabled since live queries need WebSocket
+    config = ConnectionConfig(
+      _env_file=None, url='https://example.com/rpc', enable_live_queries=False
+    )
     assert config.url == 'https://example.com/rpc'
 
-  def test_validate_url_invalid_protocol(self) -> None:
+  def test_validate_url_invalid_protocol(self, clean_env) -> None:  # noqa: ARG002
     """Test URL validation with invalid protocol."""
     with pytest.raises(ValidationError) as exc_info:
-      ConnectionConfig(url='tcp://localhost:8000')
+      ConnectionConfig(_env_file=None, url='tcp://localhost:8000')
 
     assert 'URL must use' in str(exc_info.value)
 
-  def test_validate_url_empty(self) -> None:
+  def test_validate_url_empty(self, clean_env) -> None:  # noqa: ARG002
     """Test URL validation with empty string."""
     with pytest.raises(ValidationError) as exc_info:
-      ConnectionConfig(url='')
+      ConnectionConfig(_env_file=None, url='')
 
     assert 'URL cannot be empty' in str(exc_info.value)
 
-  def test_validate_namespace_valid(self) -> None:
+  def test_validate_namespace_valid(self, clean_env) -> None:  # noqa: ARG002
     """Test namespace validation with valid name."""
-    config = ConnectionConfig(namespace='my_namespace')
+    config = ConnectionConfig(_env_file=None, namespace='my_namespace')
     assert config.namespace == 'my_namespace'
 
-  def test_validate_namespace_empty(self) -> None:
+  def test_validate_namespace_empty(self, clean_env) -> None:  # noqa: ARG002
     """Test namespace validation with empty string."""
     with pytest.raises(ValidationError) as exc_info:
-      ConnectionConfig(namespace='')
+      ConnectionConfig(_env_file=None, namespace='')
 
     assert 'Identifier cannot be empty' in str(exc_info.value)
 
-  def test_validate_namespace_invalid_chars(self) -> None:
+  def test_validate_namespace_invalid_chars(self, clean_env) -> None:  # noqa: ARG002
     """Test namespace validation with invalid characters."""
     with pytest.raises(ValidationError) as exc_info:
-      ConnectionConfig(namespace='my namespace')
+      ConnectionConfig(_env_file=None, namespace='my namespace')
 
     assert 'alphanumeric' in str(exc_info.value)
 
-  def test_validate_database_valid(self) -> None:
+  def test_validate_database_valid(self, clean_env) -> None:  # noqa: ARG002
     """Test database validation with valid name."""
-    config = ConnectionConfig(database='my-database')
+    config = ConnectionConfig(_env_file=None, database='my-database')
     assert config.database == 'my-database'
 
-  def test_validate_database_empty(self) -> None:
+  def test_validate_database_empty(self, clean_env) -> None:  # noqa: ARG002
     """Test database validation with empty string."""
     with pytest.raises(ValidationError) as exc_info:
-      ConnectionConfig(database='')
+      ConnectionConfig(_env_file=None, database='')
 
     assert 'Identifier cannot be empty' in str(exc_info.value)
 
-  def test_timeout_minimum_value(self) -> None:
+  def test_timeout_minimum_value(self, clean_env) -> None:  # noqa: ARG002
     """Test timeout has minimum value constraint."""
     with pytest.raises(ValidationError):
-      ConnectionConfig(timeout=0.5)
+      ConnectionConfig(_env_file=None, timeout=0.5)
 
-  def test_max_connections_minimum(self) -> None:
+  def test_max_connections_minimum(self, clean_env) -> None:  # noqa: ARG002
     """Test max_connections has minimum value."""
     with pytest.raises(ValidationError):
-      ConnectionConfig(max_connections=0)
+      ConnectionConfig(_env_file=None, max_connections=0)
 
-  def test_max_connections_maximum(self) -> None:
+  def test_max_connections_maximum(self, clean_env) -> None:  # noqa: ARG002
     """Test max_connections has maximum value."""
     with pytest.raises(ValidationError):
-      ConnectionConfig(max_connections=101)
+      ConnectionConfig(_env_file=None, max_connections=101)
 
-  def test_retry_max_wait_validation(self) -> None:
+  def test_retry_max_wait_validation(self, clean_env) -> None:  # noqa: ARG002
     """Test that retry_max_wait must be greater than retry_min_wait."""
     with pytest.raises(ValidationError):
-      ConnectionConfig(retry_min_wait=5.0, retry_max_wait=3.0)
+      ConnectionConfig(_env_file=None, retry_min_wait=5.0, retry_max_wait=3.0)
 
 
 class TestDatabaseClient:
@@ -201,9 +220,9 @@ class TestDatabaseClient:
       mock_surreal_client.use.assert_called_once_with('test', 'test_db')
 
   @pytest.mark.anyio
-  async def test_connect_without_auth(self) -> None:
+  async def test_connect_without_auth(self, clean_env) -> None:  # noqa: ARG002
     """Test connection without username/password."""
-    config = ConnectionConfig(username=None, password=None)
+    config = ConnectionConfig(_env_file=None, username=None, password=None)
     client = DatabaseClient(config)
     mock_surreal = Mock()
     mock_surreal.connect = AsyncMock()

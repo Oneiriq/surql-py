@@ -4,7 +4,7 @@ This module provides functions for auto-generating migration files by
 comparing schema definitions and generating appropriate SQL statements.
 """
 
-from datetime import datetime
+from datetime import UTC, datetime
 from pathlib import Path
 
 import structlog
@@ -215,7 +215,7 @@ def _generate_migration_content(
   # Generate file content
   content = f'''"""Migration: {description}
 
-Generated: {datetime.utcnow().isoformat()}
+Generated: {datetime.now(UTC).isoformat()}
 Author: {author}
 """
 
@@ -257,9 +257,18 @@ def _format_statements(statements: list[str]) -> str:
   if not statements:
     return ''
 
+  # Expand multi-line statements into separate entries
+  expanded_statements = []
+  for stmt in statements:
+    # Split on newlines to handle multi-statement diffs (e.g., DEFINE + UPDATE backfill)
+    for line in stmt.split('\n'):
+      line = line.strip()
+      if line:
+        expanded_statements.append(line)
+
   # Format each statement with proper indentation and quotes
   formatted = []
-  for stmt in statements:
+  for stmt in expanded_statements:
     # Escape single quotes in statement
     escaped = stmt.replace("'", "\\'")
     formatted.append(f"    '{escaped}',")
@@ -280,7 +289,7 @@ def _generate_version() -> str:
     >>> len(version)
     15
   """
-  now = datetime.utcnow()
+  now = datetime.now(UTC)
   return now.strftime('%Y%m%d_%H%M%S')
 
 
@@ -340,7 +349,7 @@ def create_blank_migration(
     # Generate blank template
     content = f'''"""Migration: {description}
 
-Generated: {datetime.utcnow().isoformat()}
+Generated: {datetime.now(UTC).isoformat()}
 Author: {author}
 """
 

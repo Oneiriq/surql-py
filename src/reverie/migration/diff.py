@@ -275,8 +275,20 @@ def _generate_drop_table_diffs(table: TableDefinition) -> list[SchemaDiff]:
 
 
 def _generate_add_field_diff(table_name: str, field: FieldDefinition) -> SchemaDiff:
-  """Generate diff for adding a field."""
+  """Generate diff for adding a field.
+
+  When a field has a default value, includes a backfill UPDATE statement
+  to apply the default to existing records where the field is NONE.
+  """
   forward_sql = _field_to_sql(table_name, field)
+
+  # Add backfill SQL for fields with defaults to update existing records
+  if field.default:
+    backfill_sql = (
+      f'UPDATE {table_name} SET {field.name} = {field.default} WHERE {field.name} IS NONE;'
+    )
+    forward_sql = f'{forward_sql}\n{backfill_sql}'
+
   backward_sql = f'REMOVE FIELD {field.name} ON TABLE {table_name};'
 
   return SchemaDiff(

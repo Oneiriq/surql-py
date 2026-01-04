@@ -4,7 +4,7 @@ This module provides functions for tracking migration history in the database,
 including creating the migration history table and recording applied migrations.
 """
 
-from datetime import datetime
+from datetime import UTC, datetime
 from typing import Any
 
 import structlog
@@ -125,7 +125,7 @@ async def record_migration(
     data: dict[str, Any] = {
       'version': version,
       'description': description,
-      'applied_at': datetime.utcnow().isoformat(),
+      'applied_at': datetime.now(UTC).isoformat(),
       'checksum': checksum,
     }
 
@@ -389,6 +389,6 @@ def _parse_datetime(value: Any) -> datetime:
       return datetime.fromisoformat(value.replace('Z', '+00:00'))
     except Exception:
       # Fallback to current time if parsing fails
-      return datetime.utcnow()
+      return datetime.now(UTC)
   else:
-    return datetime.utcnow()
+    return datetime.now(UTC)

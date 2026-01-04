@@ -13,17 +13,33 @@ class Settings(BaseSettings):
   """Application settings loaded from environment variables."""
 
   model_config = SettingsConfigDict(
+    env_prefix='REVERIE_',
     env_file='.env',
     env_file_encoding='utf-8',
     case_sensitive=False,
     extra='ignore',
   )
 
-  environment: Literal['development', 'staging', 'production'] = 'development'
-  debug: bool = True
-  log_level: Literal['DEBUG', 'INFO', 'WARNING', 'ERROR', 'CRITICAL'] = 'INFO'
-  app_name: str = 'reverie'
-  version: str = '0.1.0'
+  environment: Literal['development', 'staging', 'production'] = Field(
+    default='development',
+    description='Application environment',
+  )
+  debug: bool = Field(
+    default=True,
+    description='Debug mode enabled',
+  )
+  log_level: Literal['DEBUG', 'INFO', 'WARNING', 'ERROR', 'CRITICAL'] = Field(
+    default='INFO',
+    description='Logging level',
+  )
+  app_name: str = Field(
+    default='reverie',
+    description='Application name',
+  )
+  version: str = Field(
+    default='0.1.0',
+    description='Application version',
+  )
 
   database: ConnectionConfig = Field(
     default_factory=ConnectionConfig,

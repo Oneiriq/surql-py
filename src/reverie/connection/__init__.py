@@ -5,8 +5,20 @@ This module provides:
 - Async database client with connection pooling
 - Transaction support with ACID guarantees
 - Connection context management for dependency injection
+- Multi-connection registry
+- Authentication management
+- Real-time streaming and live queries
 """
 
+from reverie.connection.auth import (
+  AuthManager,
+  AuthType,
+  DatabaseCredentials,
+  NamespaceCredentials,
+  RootCredentials,
+  ScopeCredentials,
+  TokenAuth,
+)
 from reverie.connection.client import (
   ConnectionError,
   DatabaseClient,
@@ -14,7 +26,7 @@ from reverie.connection.client import (
   QueryError,
   get_client,
 )
-from reverie.connection.config import ConnectionConfig
+from reverie.connection.config import ConnectionConfig, NamedConnectionConfig
 from reverie.connection.context import (
   ContextError,
   clear_db,
@@ -24,6 +36,8 @@ from reverie.connection.context import (
   has_db,
   set_db,
 )
+from reverie.connection.registry import ConnectionRegistry, RegistryError, get_registry
+from reverie.connection.streaming import LiveQuery, StreamingError, StreamingManager
 from reverie.connection.transaction import (
   Transaction,
   TransactionError,
@@ -34,6 +48,7 @@ from reverie.connection.transaction import (
 __all__ = [
   # Configuration
   'ConnectionConfig',
+  'NamedConnectionConfig',
   # Client
   'DatabaseClient',
   'get_client',
@@ -43,6 +58,8 @@ __all__ = [
   'QueryError',
   'TransactionError',
   'ContextError',
+  'RegistryError',
+  'StreamingError',
   # Transaction
   'Transaction',
   'TransactionState',
@@ -54,4 +71,18 @@ __all__ = [
   'has_db',
   'connection_scope',
   'connection_override',
+  # Registry
+  'ConnectionRegistry',
+  'get_registry',
+  # Auth
+  'AuthManager',
+  'AuthType',
+  'RootCredentials',
+  'NamespaceCredentials',
+  'DatabaseCredentials',
+  'ScopeCredentials',
+  'TokenAuth',
+  # Streaming
+  'StreamingManager',
+  'LiveQuery',
 ]

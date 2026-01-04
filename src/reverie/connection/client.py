@@ -57,6 +57,13 @@ class DatabaseClient:
       url=config.url,
     )
 
+    # Import here to avoid circular imports
+    from reverie.connection.auth import AuthManager
+    from reverie.connection.streaming import StreamingManager
+
+    self._auth = AuthManager()
+    self._streaming: StreamingManager | None = None
+
   @property
   def is_connected(self) -> bool:
     """Check if client is currently connected."""
@@ -100,6 +107,12 @@ class DatabaseClient:
 
           await self._client.use(self._config.namespace, self._config.database)
           self._connected = True
+
+          # Initialize streaming if WebSocket and enabled
+          if self._config.enable_live_queries:
+            from reverie.connection.streaming import StreamingManager
+
+            self._streaming = StreamingManager(self._client)
 
           self._log.info('connected_to_database')
 
