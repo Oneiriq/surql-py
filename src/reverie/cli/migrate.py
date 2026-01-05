@@ -1078,8 +1078,12 @@ async def _execute_rollback_async(
     display_info(f'Safety: {plan.overall_safety.value.upper()}')
 
     # Require confirmation if not safe
-    if plan.has_data_loss and not force and not confirm_destructive(
-      f'This rollback may cause data loss. Proceed with {plan.migration_count} migration(s)?'
+    if (
+      plan.has_data_loss
+      and not force
+      and not confirm_destructive(
+        f'This rollback may cause data loss. Proceed with {plan.migration_count} migration(s)?'
+      )
     ):
       display_info('Rollback cancelled')
       return

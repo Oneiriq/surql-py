@@ -56,7 +56,7 @@ def sample_migration() -> Migration:
 class TestHealthCheck:
   """Tests for HealthCheck."""
 
-  @pytest.mark.asyncio
+  @pytest.mark.anyio
   async def test_check_connectivity_success(self) -> None:
     """Test successful connectivity check."""
     connection = ConnectionConfig(db_url='ws://localhost:8000/rpc', db_ns='test', db='main')
@@ -73,7 +73,7 @@ class TestHealthCheck:
       result = await health.check_connectivity(env)
       assert result is True
 
-  @pytest.mark.asyncio
+  @pytest.mark.anyio
   async def test_check_connectivity_failure(self) -> None:
     """Test failed connectivity check."""
     from reverie.connection.client import ConnectionError as ClientConnectionError
@@ -92,7 +92,7 @@ class TestHealthCheck:
       result = await health.check_connectivity(env)
       assert result is False
 
-  @pytest.mark.asyncio
+  @pytest.mark.anyio
   async def test_check_migration_table_exists(self) -> None:
     """Test migration table existence check."""
     connection = ConnectionConfig(db_url='ws://localhost:8000/rpc', db_ns='test', db='main')
@@ -108,7 +108,7 @@ class TestHealthCheck:
       result = await health.check_migration_table(env)
       assert result is True
 
-  @pytest.mark.asyncio
+  @pytest.mark.anyio
   async def test_check_migration_table_not_exists(self) -> None:
     """Test migration table not existing."""
     from reverie.connection.client import QueryError
@@ -126,7 +126,7 @@ class TestHealthCheck:
       result = await health.check_migration_table(env)
       assert result is False
 
-  @pytest.mark.asyncio
+  @pytest.mark.anyio
   async def test_check_environment_healthy(self) -> None:
     """Test checking environment health."""
     connection = ConnectionConfig(db_url='ws://localhost:8000/rpc', db_ns='test', db='main')
@@ -145,7 +145,7 @@ class TestHealthCheck:
       assert status.is_healthy is True
       assert status.can_connect is True
 
-  @pytest.mark.asyncio
+  @pytest.mark.anyio
   async def test_check_environment_unhealthy(self) -> None:
     """Test checking unhealthy environment."""
     from reverie.connection.client import ConnectionError as ClientConnectionError
@@ -165,7 +165,7 @@ class TestHealthCheck:
       assert status.can_connect is False
       assert status.error is not None
 
-  @pytest.mark.asyncio
+  @pytest.mark.anyio
   async def test_verify_all_environments(self) -> None:
     """Test verifying multiple environments."""
     env1 = EnvironmentConfig(
@@ -193,7 +193,7 @@ class TestHealthCheck:
 class TestMigrationCoordinator:
   """Tests for MigrationCoordinator."""
 
-  @pytest.mark.asyncio
+  @pytest.mark.anyio
   async def test_deploy_sequential_dry_run(
     self,
     test_registry: EnvironmentRegistry,
@@ -215,7 +215,7 @@ class TestMigrationCoordinator:
     assert 'env1' in results
     assert all(r.status == DeploymentStatus.SUCCESS for r in results.values())
 
-  @pytest.mark.asyncio
+  @pytest.mark.anyio
   async def test_deploy_parallel_dry_run(
     self,
     test_registry: EnvironmentRegistry,
@@ -235,7 +235,7 @@ class TestMigrationCoordinator:
     assert len(results) == 3
     assert all(r.status == DeploymentStatus.SUCCESS for r in results.values())
 
-  @pytest.mark.asyncio
+  @pytest.mark.anyio
   async def test_deploy_rolling_dry_run(
     self,
     test_registry: EnvironmentRegistry,
@@ -256,7 +256,7 @@ class TestMigrationCoordinator:
     assert len(results) == 3
     assert all(r.status == DeploymentStatus.SUCCESS for r in results.values())
 
-  @pytest.mark.asyncio
+  @pytest.mark.anyio
   async def test_deploy_canary_dry_run(
     self,
     test_registry: EnvironmentRegistry,
@@ -277,7 +277,7 @@ class TestMigrationCoordinator:
     assert len(results) == 3
     assert all(r.status == DeploymentStatus.SUCCESS for r in results.values())
 
-  @pytest.mark.asyncio
+  @pytest.mark.anyio
   async def test_deploy_environment_not_found(
     self,
     test_registry: EnvironmentRegistry,
@@ -295,7 +295,7 @@ class TestMigrationCoordinator:
         dry_run=True,
       )
 
-  @pytest.mark.asyncio
+  @pytest.mark.anyio
   async def test_deploy_invalid_strategy(
     self,
     test_registry: EnvironmentRegistry,
@@ -313,7 +313,7 @@ class TestMigrationCoordinator:
         dry_run=True,
       )
 
-  @pytest.mark.asyncio
+  @pytest.mark.anyio
   async def test_get_deployment_status(self, test_registry: EnvironmentRegistry) -> None:
     """Test getting deployment status."""
     coordinator = MigrationCoordinator(test_registry)
@@ -337,7 +337,7 @@ class TestMigrationCoordinator:
       assert statuses['env0'] is True
       assert statuses['env1'] is False
 
-  @pytest.mark.asyncio
+  @pytest.mark.anyio
   async def test_deploy_with_health_check(
     self,
     test_registry: EnvironmentRegistry,
@@ -367,7 +367,7 @@ class TestMigrationCoordinator:
       assert len(results) == 1
       assert results['env0'].status == DeploymentStatus.SUCCESS
 
-  @pytest.mark.asyncio
+  @pytest.mark.anyio
   async def test_deploy_unhealthy_environment(
     self,
     test_registry: EnvironmentRegistry,
@@ -400,7 +400,7 @@ class TestMigrationCoordinator:
 class TestCoordinatorEdgeCases:
   """Tests for edge cases in coordinator."""
 
-  @pytest.mark.asyncio
+  @pytest.mark.anyio
   async def test_deploy_no_migrations(
     self,
     test_registry: EnvironmentRegistry,
@@ -419,7 +419,7 @@ class TestCoordinatorEdgeCases:
     assert len(results) == 1
     assert results['env0'].migrations_applied == 0
 
-  @pytest.mark.asyncio
+  @pytest.mark.anyio
   async def test_deploy_no_environments(
     self,
     test_registry: EnvironmentRegistry,

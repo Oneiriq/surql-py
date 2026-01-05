@@ -310,7 +310,7 @@ async def _validate_async(config_path: Path) -> None:
 
   except Exception as e:
     display_error(f'Validation error: {e}')
-    raise typer.Exit(1)
+    raise typer.Exit(1) from e
 
 
 def _display_deployment_results(results: dict[str, DeploymentResult]) -> None:

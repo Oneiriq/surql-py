@@ -65,6 +65,19 @@ from reverie.schema.table import (
   with_indexes,
   with_permissions,
 )
+from reverie.schema.themes import (
+  DARK_THEME,
+  FOREST_THEME,
+  MINIMAL_THEME,
+  MODERN_THEME,
+  ASCIITheme,
+  ColorScheme,
+  GraphVizTheme,
+  MermaidTheme,
+  Theme,
+  get_theme,
+  list_themes,
+)
 
 __all__ = [
   # Field types and definitions
@@ -123,4 +136,16 @@ __all__ = [
   'SchemaParseError',
   'parse_table_info',
   'parse_db_info',
+  # Themes
+  'ColorScheme',
+  'GraphVizTheme',
+  'MermaidTheme',
+  'ASCIITheme',
+  'Theme',
+  'MODERN_THEME',
+  'DARK_THEME',
+  'FOREST_THEME',
+  'MINIMAL_THEME',
+  'get_theme',
+  'list_themes',
 ]

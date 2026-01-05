@@ -102,7 +102,7 @@ class TestDeployCommand:
       ],
     )
     assert result.exit_code == 1
-    assert 'Configuration file not found' in result.stdout
+    assert 'Configuration file not found' in result.output
 
   def test_deploy_missing_migrations_dir(
     self,
@@ -126,7 +126,7 @@ class TestDeployCommand:
       ],
     )
     assert result.exit_code == 1
-    assert 'Migrations directory not found' in result.stdout
+    assert 'Migrations directory not found' in result.output
 
 
 class TestStatusCommand:
@@ -156,7 +156,7 @@ class TestStatusCommand:
       ],
     )
     assert result.exit_code == 1
-    assert 'Configuration file not found' in result.stdout
+    assert 'Configuration file not found' in result.output
 
 
 class TestValidateCommand:
@@ -184,7 +184,7 @@ class TestValidateCommand:
       ],
     )
     assert result.exit_code == 1
-    assert 'Configuration file not found' in result.stdout
+    assert 'Configuration file not found' in result.output
 
 
 class TestCLIOutputFormatting:
@@ -243,7 +243,7 @@ class TestCLIEdgeCases:
       ],
     )
     assert result.exit_code == 1
-    assert 'Invalid strategy' in result.stdout
+    assert 'Invalid strategy' in result.output
 
   def test_empty_environments_list(
     self,

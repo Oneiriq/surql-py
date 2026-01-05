@@ -1,9 +1,11 @@
 """Tests for migration rollback functionality."""
 
+from datetime import UTC, datetime
 from pathlib import Path
 from unittest.mock import AsyncMock, patch
 
 import pytest
+from pydantic import ValidationError
 
 from reverie.migration.models import Migration, MigrationHistory
 from reverie.migration.rollback import (
@@ -91,8 +93,8 @@ class TestRollbackIssue:
       description='Test',
     )
 
-    with pytest.raises(Exception):
-      issue.safety = RollbackSafety.UNSAFE  # type: ignore
+    with pytest.raises(ValidationError):
+      issue.safety = RollbackSafety.UNSAFE
 
 
 class TestRollbackPlan:
@@ -175,7 +177,7 @@ class TestRollbackResult:
 class TestSafetyAnalysis:
   """Tests for migration safety analysis."""
 
-  @pytest.mark.asyncio
+  @pytest.mark.anyio
   async def test_analyze_safe_migration(self, safe_migration: Migration) -> None:
     """Test analyzing a safe migration."""
     mock_client = AsyncMock()
@@ -184,7 +186,7 @@ class TestSafetyAnalysis:
     # Index removal is safe
     assert len(issues) == 0
 
-  @pytest.mark.asyncio
+  @pytest.mark.anyio
   async def test_analyze_unsafe_migration(self, unsafe_migration: Migration) -> None:
     """Test analyzing an unsafe migration (drops table)."""
     mock_client = AsyncMock()
@@ -194,7 +196,7 @@ class TestSafetyAnalysis:
     assert any(issue.safety == RollbackSafety.UNSAFE for issue in issues)
     assert any('table' in issue.description.lower() for issue in issues)
 
-  @pytest.mark.asyncio
+  @pytest.mark.anyio
   async def test_analyze_data_loss_migration(self, data_loss_migration: Migration) -> None:
     """Test analyzing a migration that causes data loss."""
     mock_client = AsyncMock()
@@ -219,23 +221,33 @@ class TestSafetyAnalysis:
 class TestCreateRollbackPlan:
   """Tests for create_rollback_plan function."""
 
-  @pytest.mark.asyncio
+  @pytest.mark.anyio
   async def test_create_plan_simple(self, safe_migration: Migration) -> None:
     """Test creating a simple rollback plan."""
     mock_client = AsyncMock()
 
+    # Create target migration that we're rolling back to
+    target_migration = Migration(
+      version='20260108_120000',
+      description='Initial setup',
+      path=Path('migrations/20260108_120000_initial.py'),
+      up=lambda: ['DEFINE TABLE user SCHEMAFULL;'],
+      down=lambda: ['REMOVE TABLE user;'],
+    )
+
     # Mock get_applied_migrations to return history
-    with patch('reverie.migration.rollback.get_applied_migrations') as mock_get:
+    with patch('reverie.migration.history.get_applied_migrations') as mock_get:
       mock_get.return_value = [
         MigrationHistory(
           version='20260109_120000',
           description='Test',
-          applied_at=pytest.approx,
+          applied_at=datetime.now(UTC),
           checksum='abc',
         )
       ]
 
-      migrations = [safe_migration]
+      # Include both migrations: target and current
+      migrations = [target_migration, safe_migration]
       plan = await create_rollback_plan(
         mock_client, migrations, '20260108_120000', '20260109_120000'
       )
@@ -247,28 +259,28 @@ class TestCreateRollbackPlan:
         RollbackSafety.UNSAFE,
       ]
 
-  @pytest.mark.asyncio
+  @pytest.mark.anyio
   async def test_create_plan_no_migrations(self) -> None:
     """Test creating plan when no migrations applied."""
     mock_client = AsyncMock()
 
-    with patch('reverie.migration.rollback.get_applied_migrations') as mock_get:
+    with patch('reverie.migration.history.get_applied_migrations') as mock_get:
       mock_get.return_value = []
 
       with pytest.raises(ValueError, match='No migrations have been applied'):
         await create_rollback_plan(mock_client, [], '20260108_120000')
 
-  @pytest.mark.asyncio
+  @pytest.mark.anyio
   async def test_create_plan_target_not_found(self, safe_migration: Migration) -> None:
     """Test creating plan with invalid target version."""
     mock_client = AsyncMock()
 
-    with patch('reverie.migration.rollback.get_applied_migrations') as mock_get:
+    with patch('reverie.migration.history.get_applied_migrations') as mock_get:
       mock_get.return_value = [
         MigrationHistory(
           version='20260109_120000',
           description='Test',
-          applied_at=pytest.approx,
+          applied_at=datetime.now(UTC),
           checksum='abc',
         )
       ]
@@ -282,7 +294,7 @@ class TestCreateRollbackPlan:
 class TestExecuteRollback:
   """Tests for execute_rollback function."""
 
-  @pytest.mark.asyncio
+  @pytest.mark.anyio
   async def test_execute_safe_rollback(self, safe_migration: Migration) -> None:
     """Test executing a safe rollback."""
     mock_client = AsyncMock()
@@ -303,7 +315,7 @@ class TestExecuteRollback:
       assert result.rolled_back_count == 1
       mock_exec.assert_called_once()
 
-  @pytest.mark.asyncio
+  @pytest.mark.anyio
   async def test_execute_unsafe_rollback_without_force(self, unsafe_migration: Migration) -> None:
     """Test executing unsafe rollback without force flag."""
     mock_client = AsyncMock()
@@ -318,7 +330,7 @@ class TestExecuteRollback:
     with pytest.raises(ValueError, match='unsafe'):
       await execute_rollback(mock_client, plan, force=False)
 
-  @pytest.mark.asyncio
+  @pytest.mark.anyio
   async def test_execute_unsafe_rollback_with_force(self, unsafe_migration: Migration) -> None:
     """Test executing unsafe rollback with force flag."""
     mock_client = AsyncMock()
@@ -337,7 +349,7 @@ class TestExecuteRollback:
 
       assert result.success is True
 
-  @pytest.mark.asyncio
+  @pytest.mark.anyio
   async def test_execute_rollback_with_error(self, safe_migration: Migration) -> None:
     """Test rollback execution with errors."""
     mock_client = AsyncMock()
@@ -362,7 +374,7 @@ class TestExecuteRollback:
 class TestAnalyzeRollbackSafety:
   """Tests for analyze_rollback_safety function."""
 
-  @pytest.mark.asyncio
+  @pytest.mark.anyio
   async def test_analyze_safety(self, data_loss_migration: Migration) -> None:
     """Test analyzing rollback safety."""
     mock_client = AsyncMock()

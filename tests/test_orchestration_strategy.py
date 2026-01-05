@@ -95,7 +95,7 @@ class TestDeploymentResult:
 class TestSequentialStrategy:
   """Tests for SequentialStrategy."""
 
-  @pytest.mark.asyncio
+  @pytest.mark.anyio
   async def test_sequential_dry_run(
     self,
     sample_environments: list[EnvironmentConfig],
@@ -109,7 +109,7 @@ class TestSequentialStrategy:
     assert all(r.status == DeploymentStatus.SUCCESS for r in results)
     assert all(r.migrations_applied == len(sample_migrations) for r in results)
 
-  @pytest.mark.asyncio
+  @pytest.mark.anyio
   async def test_sequential_deployment_order(
     self,
     sample_environments: list[EnvironmentConfig],
@@ -127,7 +127,7 @@ class TestSequentialStrategy:
 class TestParallelStrategy:
   """Tests for ParallelStrategy."""
 
-  @pytest.mark.asyncio
+  @pytest.mark.anyio
   async def test_parallel_dry_run(
     self,
     sample_environments: list[EnvironmentConfig],
@@ -140,7 +140,7 @@ class TestParallelStrategy:
     assert len(results) == len(sample_environments)
     assert all(r.status == DeploymentStatus.SUCCESS for r in results)
 
-  @pytest.mark.asyncio
+  @pytest.mark.anyio
   async def test_parallel_max_concurrent(
     self,
     sample_environments: list[EnvironmentConfig],
@@ -158,7 +158,7 @@ class TestParallelStrategy:
 class TestRollingStrategy:
   """Tests for RollingStrategy."""
 
-  @pytest.mark.asyncio
+  @pytest.mark.anyio
   async def test_rolling_dry_run(
     self,
     sample_environments: list[EnvironmentConfig],
@@ -171,7 +171,7 @@ class TestRollingStrategy:
     assert len(results) == len(sample_environments)
     assert all(r.status == DeploymentStatus.SUCCESS for r in results)
 
-  @pytest.mark.asyncio
+  @pytest.mark.anyio
   async def test_rolling_batch_size(
     self,
     sample_environments: list[EnvironmentConfig],
@@ -197,7 +197,7 @@ class TestRollingStrategy:
 class TestCanaryStrategy:
   """Tests for CanaryStrategy."""
 
-  @pytest.mark.asyncio
+  @pytest.mark.anyio
   async def test_canary_dry_run(
     self,
     sample_environments: list[EnvironmentConfig],
@@ -210,7 +210,7 @@ class TestCanaryStrategy:
     assert len(results) == len(sample_environments)
     assert all(r.status == DeploymentStatus.SUCCESS for r in results)
 
-  @pytest.mark.asyncio
+  @pytest.mark.anyio
   async def test_canary_percentage_calculation(
     self,
     sample_environments: list[EnvironmentConfig],
@@ -237,7 +237,7 @@ class TestCanaryStrategy:
     with pytest.raises(ValueError):
       CanaryStrategy(canary_percentage=51.0)
 
-  @pytest.mark.asyncio
+  @pytest.mark.anyio
   async def test_canary_minimum_count(
     self,
     sample_migrations: list[Migration],
@@ -258,14 +258,14 @@ class TestCanaryStrategy:
 class TestStrategyEdgeCases:
   """Tests for edge cases in deployment strategies."""
 
-  @pytest.mark.asyncio
+  @pytest.mark.anyio
   async def test_empty_environments(self, sample_migrations: list[Migration]) -> None:
     """Test deployment with no environments."""
     strategy = SequentialStrategy(dry_run=True)
     results = await strategy.deploy([], sample_migrations)
     assert len(results) == 0
 
-  @pytest.mark.asyncio
+  @pytest.mark.anyio
   async def test_empty_migrations(self, sample_environments: list[EnvironmentConfig]) -> None:
     """Test deployment with no migrations."""
     strategy = SequentialStrategy(dry_run=True)
@@ -275,7 +275,7 @@ class TestStrategyEdgeCases:
     assert len(results) == len(sample_environments)
     assert all(r.migrations_applied == 0 for r in results)
 
-  @pytest.mark.asyncio
+  @pytest.mark.anyio
   async def test_single_environment(self, sample_migrations: list[Migration]) -> None:
     """Test deployment to single environment."""
     conn = ConnectionConfig(db_url='ws://localhost:8000/rpc', db_ns='test', db='main')

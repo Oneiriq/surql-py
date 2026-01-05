@@ -1,0 +1,40 @@
+/*
+ * Reverie Schema Visualization - GraphViz DOT Format
+ *
+ * This is SOURCE CODE that needs to be RENDERED to see the beautiful diagram.
+ * The styling (colors, gradients) is present in this code but invisible until rendered.
+ *
+ * HOW TO RENDER:
+ *
+ * Command Line:
+ *   dot -Tpng schema_modern_graphviz.dot -o schema.png
+ *   dot -Tsvg schema_modern_graphviz.dot -o schema.svg
+ *
+ * Online (no installation):
+ *   1. Visit: https://dreampuf.github.io/GraphvizOnline/
+ *   2. Copy/paste this entire file
+ *   3. See the rendered diagram instantly!
+ *
+ * VS Code:
+ *   1. Install "Graphviz Preview" extension
+ *   2. Open this file
+ *   3. Press Ctrl+Shift+V (Cmd+Shift+V on Mac)
+ *
+ * For more details: docs/VISUALIZATION_RENDERING_GUIDE.md
+ */
+
+digraph schema {
+    rankdir=LR;
+    fontname="Arial";
+    node [shape=record, style="filled,rounded", fontname="Arial", pad="0.5", margin="0.2"];
+    edge [color="#64748b", style=solid, fontname="Arial"];
+
+    comment [label=<<TABLE BORDER="0" CELLBORDER="1" CELLSPACING="0" CELLPADDING="4"><TR><TD BGCOLOR="#6366f1" COLSPAN="2"><FONT COLOR="#FFFFFF"><B>comment</B></FONT></TD></TR><TR><TD ALIGN="LEFT">id</TD><TD ALIGN="LEFT"><FONT COLOR="#94a3b8">string</FONT> <FONT COLOR="#ef4444">PK</FONT></TD></TR><TR><TD ALIGN="LEFT">text</TD><TD ALIGN="LEFT"><FONT COLOR="#10b981">string</FONT></TD></TR><TR><TD ALIGN="LEFT">author</TD><TD ALIGN="LEFT"><FONT COLOR="#6366f1">record</FONT> <FONT COLOR="#6366f1">FK</FONT></TD></TR><TR><TD ALIGN="LEFT">post</TD><TD ALIGN="LEFT"><FONT COLOR="#6366f1">record</FONT> <FONT COLOR="#6366f1">FK</FONT></TD></TR><TR><TD ALIGN="LEFT">created_at</TD><TD ALIGN="LEFT"><FONT COLOR="#ec4899">datetime</FONT></TD></TR></TABLE>>];
+    post [label=<<TABLE BORDER="0" CELLBORDER="1" CELLSPACING="0" CELLPADDING="4"><TR><TD BGCOLOR="#6366f1" COLSPAN="2"><FONT COLOR="#FFFFFF"><B>post</B></FONT></TD></TR><TR><TD ALIGN="LEFT">id</TD><TD ALIGN="LEFT"><FONT COLOR="#94a3b8">string</FONT> <FONT COLOR="#ef4444">PK</FONT></TD></TR><TR><TD ALIGN="LEFT">title</TD><TD ALIGN="LEFT"><FONT COLOR="#10b981">string</FONT></TD></TR><TR><TD ALIGN="LEFT">content</TD><TD ALIGN="LEFT"><FONT COLOR="#10b981">string</FONT></TD></TR><TR><TD ALIGN="LEFT">author</TD><TD ALIGN="LEFT"><FONT COLOR="#6366f1">record</FONT> <FONT COLOR="#6366f1">FK</FONT></TD></TR><TR><TD ALIGN="LEFT">published_at</TD><TD ALIGN="LEFT"><FONT COLOR="#ec4899">datetime</FONT></TD></TR></TABLE>>];
+    user [label=<<TABLE BORDER="0" CELLBORDER="1" CELLSPACING="0" CELLPADDING="4"><TR><TD BGCOLOR="#6366f1" COLSPAN="2"><FONT COLOR="#FFFFFF"><B>user</B></FONT></TD></TR><TR><TD ALIGN="LEFT">id</TD><TD ALIGN="LEFT"><FONT COLOR="#94a3b8">string</FONT> <FONT COLOR="#ef4444">PK</FONT></TD></TR><TR><TD ALIGN="LEFT">username</TD><TD ALIGN="LEFT"><FONT COLOR="#10b981">string</FONT></TD></TR><TR><TD ALIGN="LEFT">email</TD><TD ALIGN="LEFT"><FONT COLOR="#10b981">string</FONT></TD></TR><TR><TD ALIGN="LEFT">created_at</TD><TD ALIGN="LEFT"><FONT COLOR="#ec4899">datetime</FONT></TD></TR></TABLE>>];
+    wrote [label=<<TABLE BORDER="0" CELLBORDER="1" CELLSPACING="0" CELLPADDING="4"><TR><TD BGCOLOR="#6366f1" COLSPAN="2"><FONT COLOR="#FFFFFF"><B>wrote</B></FONT></TD></TR><TR><TD ALIGN="LEFT">at</TD><TD ALIGN="LEFT"><FONT COLOR="#ec4899">datetime</FONT></TD></TR></TABLE>>];
+
+    user -> comment [label="commented"];
+    post -> comment [label="has_comment"];
+    user -> post [label="wrote"];
+}

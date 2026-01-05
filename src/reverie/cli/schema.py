@@ -1703,28 +1703,61 @@ def visualize_schema_cmd(
     bool,
     typer.Option('--no-edges', help='Exclude edge relationships from diagram'),
   ] = False,
+  theme: Annotated[
+    str,
+    typer.Option('--theme', help='Theme to use for visualization (default: modern)'),
+  ] = 'modern',
+  no_gradients: Annotated[
+    bool,
+    typer.Option('--no-gradients', help='Disable gradient styling in GraphViz output'),
+  ] = False,
+  ascii_style: Annotated[
+    str,
+    typer.Option('--ascii-style', help='ASCII box drawing style: single, double, rounded, heavy'),
+  ] = 'rounded',
+  no_unicode: Annotated[
+    bool,
+    typer.Option('--no-unicode', help='Force basic ASCII characters (no Unicode)'),
+  ] = False,
+  no_colors: Annotated[
+    bool,
+    typer.Option('--no-colors', help='Disable ANSI colors in ASCII output'),
+  ] = False,
+  no_icons: Annotated[
+    bool,
+    typer.Option('--no-icons', help='Disable emoji/Unicode icons in ASCII output'),
+  ] = False,
   verbose: Annotated[bool, verbose_option] = False,
 ) -> None:
-  """Generate visual diagrams of the database schema.
+  """Generate visual diagrams of the database schema with modern theming.
 
   Creates Mermaid ER diagrams, GraphViz DOT files, or ASCII art
-  representations of schema definitions from a Python file.
+  representations of schema definitions from a Python file. Supports
+  multiple preset themes and format-specific customization options.
+
+  Available themes: modern (default), dark, forest, minimal, none
 
   Examples:
-    Generate Mermaid diagram to stdout:
+    Generate Mermaid diagram with default modern theme:
     $ reverie schema visualize --schema schemas/models.py
 
-    Generate GraphViz DOT file:
-    $ reverie schema visualize --schema schemas/models.py --format graphviz --output schema.dot
+    Generate with dark theme:
+    $ reverie schema visualize --schema schemas/models.py --theme dark
 
-    Generate ASCII art (terminal display):
-    $ reverie schema visualize --schema schemas/models.py --format ascii
+    GraphViz with forest theme, no gradients:
+    $ reverie schema visualize --schema schemas/models.py -f graphviz --theme forest --no-gradients
+
+    ASCII with minimal theme, custom box style:
+    $ reverie schema visualize --schema schemas/models.py -f ascii --theme minimal --ascii-style double
+
+    ASCII with modern theme but no icons:
+    $ reverie schema visualize --schema schemas/models.py -f ascii --theme modern --no-icons
+
+    Backward compatible (no theme):
+    $ reverie schema visualize --schema schemas/models.py --theme none
 
     Filter to specific tables:
     $ reverie schema visualize --schema schemas/models.py --tables user,post,comment
-
-    Exclude edges:
-    $ reverie schema visualize --schema schemas/models.py --no-edges
   """
   try:
     _visualize_schema(
@@ -1734,6 +1767,12 @@ def visualize_schema_cmd(
       tables=tables,
       no_fields=no_fields,
       no_edges=no_edges,
+      theme=theme,
+      no_gradients=no_gradients,
+      ascii_style=ascii_style,
+      no_unicode=no_unicode,
+      no_colors=no_colors,
+      no_icons=no_icons,
       verbose=verbose,
     )
   except Exception as e:
@@ -1748,9 +1787,15 @@ def _visualize_schema(
   tables: str | None,
   no_fields: bool,
   no_edges: bool,
+  theme: str,
+  no_gradients: bool,
+  ascii_style: str,
+  no_unicode: bool,
+  no_colors: bool,
+  no_icons: bool,
   verbose: bool,
 ) -> None:
-  """Implementation of schema visualization.
+  """Implementation of schema visualization with theme support.
 
   Args:
     schema_file: Path to Python schema file
@@ -1759,9 +1804,16 @@ def _visualize_schema(
     tables: Comma-separated list of tables to include
     no_fields: Exclude field definitions
     no_edges: Exclude edge relationships
+    theme: Theme name or "none" for backward compatibility
+    no_gradients: Disable gradients in GraphViz
+    ascii_style: ASCII box drawing style
+    no_unicode: Disable Unicode in ASCII
+    no_colors: Disable colors in ASCII
+    no_icons: Disable icons in ASCII
     verbose: Enable verbose output
   """
   from reverie.schema.registry import clear_registry, get_registered_edges
+  from reverie.schema.themes import ASCIITheme, GraphVizTheme, MermaidTheme, Theme, get_theme
   from reverie.schema.visualize import OutputFormat as VisualizeFormat
   from reverie.schema.visualize import visualize_schema as generate_diagram
 
@@ -1828,6 +1880,49 @@ def _visualize_schema(
   }
   output_format = format_map[format_lower]
 
+  # Handle theme selection and customization
+  final_theme: GraphVizTheme | MermaidTheme | ASCIITheme | Theme | None = (
+    None  # None for backward compatibility
+  )
+  if theme.lower() != 'none':
+    try:
+      # Get the base theme
+      base_theme = get_theme(theme.lower())
+
+      # Apply format-specific overrides
+      if output_format == VisualizeFormat.GRAPHVIZ and no_gradients:
+        # Override GraphViz theme to disable gradients
+        final_theme = GraphVizTheme(
+          node_color=base_theme.graphviz.node_color,
+          edge_color=base_theme.graphviz.edge_color,
+          bg_color=base_theme.graphviz.bg_color,
+          font_name=base_theme.graphviz.font_name,
+          node_shape=base_theme.graphviz.node_shape,
+          node_style=base_theme.graphviz.node_style,
+          edge_style=base_theme.graphviz.edge_style,
+          use_gradients=False,  # Override
+          use_clusters=base_theme.graphviz.use_clusters,
+        )
+      elif output_format == VisualizeFormat.ASCII:
+        # Apply ASCII-specific overrides
+        final_theme = ASCIITheme(
+          box_style=ascii_style,  # Use CLI-specified style
+          use_unicode=not no_unicode,  # Invert the flag
+          use_colors=not no_colors,  # Invert the flag
+          use_icons=not no_icons,  # Invert the flag
+          color_scheme=base_theme.ascii.color_scheme,
+        )
+      else:
+        # Use theme as-is for Mermaid or unmodified GraphViz
+        final_theme = base_theme
+
+      if verbose:
+        display_info(f'Using theme: {theme}')
+    except ValueError as e:
+      display_error(str(e))
+      display_info('Available themes: modern, dark, forest, minimal, none')
+      raise typer.Exit(1) from e
+
   # Generate diagram
   if verbose:
     display_info(f'Generating {format_lower} diagram...')
@@ -1838,6 +1933,7 @@ def _visualize_schema(
     output_format=output_format,
     include_fields=not no_fields,
     include_edges=not no_edges,
+    theme=final_theme,
   )
 
   # Output handling

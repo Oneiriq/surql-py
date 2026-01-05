@@ -5,6 +5,7 @@ from pathlib import Path
 from unittest.mock import AsyncMock
 
 import pytest
+from pydantic import ValidationError
 
 from reverie.migration.models import Migration
 from reverie.migration.versioning import (
@@ -58,7 +59,7 @@ class TestSchemaSnapshot:
 
   def test_snapshot_immutable(self, sample_snapshot: SchemaSnapshot) -> None:
     """Test that snapshot is immutable."""
-    with pytest.raises(Exception):
+    with pytest.raises(ValidationError):
       sample_snapshot.version = 'new_version'  # type: ignore
 
 
@@ -189,7 +190,7 @@ class TestVersionGraph:
 class TestCreateSnapshot:
   """Tests for create_snapshot function."""
 
-  @pytest.mark.asyncio
+  @pytest.mark.anyio
   async def test_create_snapshot(self) -> None:
     """Test creating a schema snapshot."""
     mock_client = AsyncMock()
@@ -217,7 +218,7 @@ class TestCreateSnapshot:
 class TestStoreAndLoadSnapshot:
   """Tests for store_snapshot and load_snapshot functions."""
 
-  @pytest.mark.asyncio
+  @pytest.mark.anyio
   async def test_store_snapshot(self, sample_snapshot: SchemaSnapshot) -> None:
     """Test storing a snapshot."""
     mock_client = AsyncMock()
@@ -231,7 +232,7 @@ class TestStoreAndLoadSnapshot:
     assert args[0][0] == '_schema_snapshot'
     assert args[0][1]['version'] == sample_snapshot.version
 
-  @pytest.mark.asyncio
+  @pytest.mark.anyio
   async def test_load_snapshot_found(self, sample_snapshot: SchemaSnapshot) -> None:
     """Test loading a snapshot that exists."""
     mock_client = AsyncMock()
@@ -259,7 +260,7 @@ class TestStoreAndLoadSnapshot:
     assert loaded.version == sample_snapshot.version
     assert loaded.checksum == sample_snapshot.checksum
 
-  @pytest.mark.asyncio
+  @pytest.mark.anyio
   async def test_load_snapshot_not_found(self) -> None:
     """Test loading a snapshot that doesn't exist."""
     mock_client = AsyncMock()
@@ -273,7 +274,7 @@ class TestStoreAndLoadSnapshot:
 class TestListSnapshots:
   """Tests for list_snapshots function."""
 
-  @pytest.mark.asyncio
+  @pytest.mark.anyio
   async def test_list_snapshots_empty(self) -> None:
     """Test listing snapshots when none exist."""
     mock_client = AsyncMock()
@@ -283,7 +284,7 @@ class TestListSnapshots:
 
     assert len(snapshots) == 0
 
-  @pytest.mark.asyncio
+  @pytest.mark.anyio
   async def test_list_snapshots_multiple(self) -> None:
     """Test listing multiple snapshots."""
     mock_client = AsyncMock()

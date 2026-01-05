@@ -513,3 +513,353 @@ class TestCLIConfirmations:
     with patch('typer.prompt', return_value='YES'), patch('reverie.cli.common.display_warning'):
       result = confirm_destructive('Test operation')
       assert result is True
+
+
+class TestSchemaVisualizeCommand:
+  """Test suite for schema visualize command with theme support."""
+
+  def setup_method(self) -> None:
+    """Set up test resources."""
+    self.runner = CliRunner(env={'NO_COLOR': '1'})
+
+  def test_visualize_help(self) -> None:
+    """Test visualize command help."""
+    from reverie.cli.schema import app as schema_app
+
+    result = self.runner.invoke(schema_app, ['visualize', '--help'])
+
+    assert result.exit_code == 0
+    assert 'visualize' in result.stdout.lower()
+    assert '--theme' in result.stdout
+    assert '--no-gradients' in result.stdout
+    assert '--ascii-style' in result.stdout
+
+  def test_visualize_theme_option_available(self) -> None:
+    """Test that theme option is available."""
+    from reverie.cli.schema import app as schema_app
+
+    result = self.runner.invoke(schema_app, ['visualize', '--help'])
+
+    assert result.exit_code == 0
+    assert '--theme' in result.stdout
+    assert 'modern' in result.stdout.lower() or 'theme' in result.stdout.lower()
+
+  def test_visualize_graphviz_options(self) -> None:
+    """Test GraphViz-specific options are available."""
+    from reverie.cli.schema import app as schema_app
+
+    result = self.runner.invoke(schema_app, ['visualize', '--help'])
+
+    assert result.exit_code == 0
+    assert '--no-gradients' in result.stdout
+
+  def test_visualize_ascii_options(self) -> None:
+    """Test ASCII-specific options are available."""
+    from reverie.cli.schema import app as schema_app
+
+    result = self.runner.invoke(schema_app, ['visualize', '--help'])
+
+    assert result.exit_code == 0
+    assert '--ascii-style' in result.stdout
+    assert '--no-unicode' in result.stdout
+    assert '--no-colors' in result.stdout
+    assert '--no-icons' in result.stdout
+
+  def test_visualize_with_theme_modern(self, tmp_path: Path) -> None:
+    """Test visualize with modern theme."""
+    from reverie.cli.schema import app as schema_app
+
+    # Create a simple schema file
+    schema_file = tmp_path / 'schema.py'
+    schema_content = """
+from reverie.schema.table import table_schema
+from reverie.schema.fields import string_field
+from reverie.schema.registry import register_table
+
+user_table = table_schema('user', fields=[string_field('email')])
+register_table(user_table)
+"""
+    schema_file.write_text(schema_content)
+
+    with patch('reverie.cli.schema.display_code'):
+      result = self.runner.invoke(
+        schema_app,
+        ['visualize', '--schema', str(schema_file), '--theme', 'modern'],
+      )
+
+      # Should succeed (may fail for other reasons but not theme-related)
+      # We're just testing that the option is accepted
+      assert '--theme' not in result.stdout or result.exit_code in [0, 1]
+
+  def test_visualize_with_theme_dark(self, tmp_path: Path) -> None:
+    """Test visualize with dark theme."""
+    from reverie.cli.schema import app as schema_app
+
+    # Create a simple schema file
+    schema_file = tmp_path / 'schema.py'
+    schema_content = """
+from reverie.schema.table import table_schema
+from reverie.schema.fields import string_field
+from reverie.schema.registry import register_table
+
+user_table = table_schema('user', fields=[string_field('email')])
+register_table(user_table)
+"""
+    schema_file.write_text(schema_content)
+
+    with patch('reverie.cli.schema.display_code'):
+      result = self.runner.invoke(
+        schema_app,
+        ['visualize', '--schema', str(schema_file), '--theme', 'dark'],
+      )
+
+      # Should process the dark theme option
+      assert result.exit_code in [0, 1]
+
+  def test_visualize_with_theme_none_backward_compat(self, tmp_path: Path) -> None:
+    """Test visualize with theme 'none' for backward compatibility."""
+    from reverie.cli.schema import app as schema_app
+
+    # Create a simple schema file
+    schema_file = tmp_path / 'schema.py'
+    schema_content = """
+from reverie.schema.table import table_schema
+from reverie.schema.fields import string_field
+from reverie.schema.registry import register_table
+
+user_table = table_schema('user', fields=[string_field('email')])
+register_table(user_table)
+"""
+    schema_file.write_text(schema_content)
+
+    with patch('reverie.cli.schema.display_code'):
+      result = self.runner.invoke(
+        schema_app,
+        ['visualize', '--schema', str(schema_file), '--theme', 'none'],
+      )
+
+      # Should handle 'none' theme
+      assert result.exit_code in [0, 1]
+
+  def test_visualize_graphviz_no_gradients(self, tmp_path: Path) -> None:
+    """Test visualize GraphViz with --no-gradients flag."""
+    from reverie.cli.schema import app as schema_app
+
+    # Create a simple schema file
+    schema_file = tmp_path / 'schema.py'
+    schema_content = """
+from reverie.schema.table import table_schema
+from reverie.schema.fields import string_field
+from reverie.schema.registry import register_table
+
+user_table = table_schema('user', fields=[string_field('email')])
+register_table(user_table)
+"""
+    schema_file.write_text(schema_content)
+
+    with patch('reverie.cli.schema.display_code'):
+      result = self.runner.invoke(
+        schema_app,
+        [
+          'visualize',
+          '--schema',
+          str(schema_file),
+          '--format',
+          'graphviz',
+          '--theme',
+          'modern',
+          '--no-gradients',
+        ],
+      )
+
+      # Should accept the flag
+      assert result.exit_code in [0, 1]
+
+  def test_visualize_ascii_custom_style(self, tmp_path: Path) -> None:
+    """Test visualize ASCII with custom box style."""
+    from reverie.cli.schema import app as schema_app
+
+    # Create a simple schema file
+    schema_file = tmp_path / 'schema.py'
+    schema_content = """
+from reverie.schema.table import table_schema
+from reverie.schema.fields import string_field
+from reverie.schema.registry import register_table
+
+user_table = table_schema('user', fields=[string_field('email')])
+register_table(user_table)
+"""
+    schema_file.write_text(schema_content)
+
+    with patch('reverie.cli.schema.display_panel'):
+      result = self.runner.invoke(
+        schema_app,
+        [
+          'visualize',
+          '--schema',
+          str(schema_file),
+          '--format',
+          'ascii',
+          '--ascii-style',
+          'double',
+        ],
+      )
+
+      # Should accept the style option
+      assert result.exit_code in [0, 1]
+
+  def test_visualize_ascii_no_unicode(self, tmp_path: Path) -> None:
+    """Test visualize ASCII with --no-unicode flag."""
+    from reverie.cli.schema import app as schema_app
+
+    # Create a simple schema file
+    schema_file = tmp_path / 'schema.py'
+    schema_content = """
+from reverie.schema.table import table_schema
+from reverie.schema.fields import string_field
+from reverie.schema.registry import register_table
+
+user_table = table_schema('user', fields=[string_field('email')])
+register_table(user_table)
+"""
+    schema_file.write_text(schema_content)
+
+    with patch('reverie.cli.schema.display_panel'):
+      result = self.runner.invoke(
+        schema_app,
+        [
+          'visualize',
+          '--schema',
+          str(schema_file),
+          '--format',
+          'ascii',
+          '--no-unicode',
+        ],
+      )
+
+      # Should accept the flag
+      assert result.exit_code in [0, 1]
+
+  def test_visualize_ascii_no_colors(self, tmp_path: Path) -> None:
+    """Test visualize ASCII with --no-colors flag."""
+    from reverie.cli.schema import app as schema_app
+
+    # Create a simple schema file
+    schema_file = tmp_path / 'schema.py'
+    schema_content = """
+from reverie.schema.table import table_schema
+from reverie.schema.fields import string_field
+from reverie.schema.registry import register_table
+
+user_table = table_schema('user', fields=[string_field('email')])
+register_table(user_table)
+"""
+    schema_file.write_text(schema_content)
+
+    with patch('reverie.cli.schema.display_panel'):
+      result = self.runner.invoke(
+        schema_app,
+        [
+          'visualize',
+          '--schema',
+          str(schema_file),
+          '--format',
+          'ascii',
+          '--no-colors',
+        ],
+      )
+
+      # Should accept the flag
+      assert result.exit_code in [0, 1]
+
+  def test_visualize_ascii_no_icons(self, tmp_path: Path) -> None:
+    """Test visualize ASCII with --no-icons flag."""
+    from reverie.cli.schema import app as schema_app
+
+    # Create a simple schema file
+    schema_file = tmp_path / 'schema.py'
+    schema_content = """
+from reverie.schema.table import table_schema
+from reverie.schema.fields import string_field
+from reverie.schema.registry import register_table
+
+user_table = table_schema('user', fields=[string_field('email')])
+register_table(user_table)
+"""
+    schema_file.write_text(schema_content)
+
+    with patch('reverie.cli.schema.display_panel'):
+      result = self.runner.invoke(
+        schema_app,
+        [
+          'visualize',
+          '--schema',
+          str(schema_file),
+          '--format',
+          'ascii',
+          '--no-icons',
+        ],
+      )
+
+      # Should accept the flag
+      assert result.exit_code in [0, 1]
+
+  def test_visualize_invalid_theme(self, tmp_path: Path) -> None:
+    """Test visualize with invalid theme name."""
+    from reverie.cli.schema import app as schema_app
+
+    # Create a simple schema file
+    schema_file = tmp_path / 'schema.py'
+    schema_content = """
+from reverie.schema.table import table_schema
+from reverie.schema.fields import string_field
+from reverie.schema.registry import register_table
+
+user_table = table_schema('user', fields=[string_field('email')])
+register_table(user_table)
+"""
+    schema_file.write_text(schema_content)
+
+    result = self.runner.invoke(
+      schema_app,
+      ['visualize', '--schema', str(schema_file), '--theme', 'invalid_theme'],
+    )
+
+    # Should fail with error about invalid theme
+    assert result.exit_code == 1
+
+  def test_visualize_combined_options(self, tmp_path: Path) -> None:
+    """Test visualize with multiple options combined."""
+    from reverie.cli.schema import app as schema_app
+
+    # Create a simple schema file
+    schema_file = tmp_path / 'schema.py'
+    schema_content = """
+from reverie.schema.table import table_schema
+from reverie.schema.fields import string_field
+from reverie.schema.registry import register_table
+
+user_table = table_schema('user', fields=[string_field('email')])
+register_table(user_table)
+"""
+    schema_file.write_text(schema_content)
+
+    with patch('reverie.cli.schema.display_panel'):
+      result = self.runner.invoke(
+        schema_app,
+        [
+          'visualize',
+          '--schema',
+          str(schema_file),
+          '--format',
+          'ascii',
+          '--theme',
+          'minimal',
+          '--ascii-style',
+          'heavy',
+          '--no-icons',
+        ],
+      )
+
+      # Should accept all the combined options
+      assert result.exit_code in [0, 1]

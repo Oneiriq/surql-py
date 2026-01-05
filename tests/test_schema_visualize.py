@@ -1080,3 +1080,339 @@ class TestEdgeCases:
     # All three should have UK annotation
     uk_count = result.count(' UK')
     assert uk_count >= 3
+
+
+# Theme Tests
+
+
+class TestGraphVizWithThemes:
+  """Test suite for GraphViz generator with theme support."""
+
+  def test_graphviz_with_modern_theme(self, simple_table: TableDefinition) -> None:
+    """Test GraphViz generation with modern theme and gradients."""
+    from reverie.schema.themes import MODERN_THEME
+
+    generator = GraphVizGenerator(theme=MODERN_THEME.graphviz)
+    result = generator.generate({'user': simple_table}, {})
+
+    # Check for theme-specific HTML labels
+    assert '<TABLE BORDER="0"' in result
+    assert 'BGCOLOR=' in result
+    # Check for semantic coloring
+    assert 'FONT COLOR=' in result
+
+  def test_graphviz_with_theme_string(self, simple_table: TableDefinition) -> None:
+    """Test visualize_schema with theme name string."""
+    result = visualize_schema(
+      {'user': simple_table}, output_format=OutputFormat.GRAPHVIZ, theme='dark'
+    )
+
+    # Should use dark theme with gradients
+    assert '<TABLE BORDER="0"' in result
+    assert 'digraph schema {' in result
+
+  def test_graphviz_with_gradients_disabled(self, simple_table: TableDefinition) -> None:
+    """Test GraphViz with gradients disabled for backward compatibility."""
+    from reverie.schema.themes import GraphVizTheme
+
+    theme = GraphVizTheme(
+      node_color='#6366f1',
+      edge_color='#64748b',
+      bg_color='transparent',
+      font_name='Arial',
+      node_shape='record',
+      node_style='filled,rounded',
+      edge_style='solid',
+      use_gradients=False,
+      use_clusters=False,
+    )
+
+    generator = GraphVizGenerator(theme=theme)
+    result = generator.generate({'user': simple_table}, {})
+
+    # Should use plain record labels not HTML
+    assert '{user|' in result
+    assert '<TABLE' not in result
+
+  def test_semantic_field_coloring(self) -> None:
+    """Test fields are colored by type in themed GraphViz."""
+    from reverie.schema.themes import MODERN_THEME
+
+    table = TableDefinition(
+      name='mixed',
+      mode=TableMode.SCHEMAFULL,
+      fields=[
+        FieldDefinition(name='text', type=FieldType.STRING),
+        FieldDefinition(name='number', type=FieldType.INT),
+        FieldDefinition(name='flag', type=FieldType.BOOL),
+        FieldDefinition(name='ref', type=FieldType.RECORD),
+      ],
+    )
+
+    generator = GraphVizGenerator(theme=MODERN_THEME.graphviz)
+    result = generator.generate({'mixed': table}, {})
+
+    # Check that different colors are used (HTML labels with FONT COLOR)
+    assert 'FONT COLOR=' in result
+    # String fields should use success color (green)
+    assert MODERN_THEME.color_scheme.success in result
+    # Int fields should use warning color (amber)
+    assert MODERN_THEME.color_scheme.warning in result
+
+  def test_constraint_semantic_coloring(self, table_with_indexes: TableDefinition) -> None:
+    """Test constraints get semantic colors."""
+    from reverie.schema.themes import MODERN_THEME
+
+    generator = GraphVizGenerator(theme=MODERN_THEME.graphviz)
+    result = generator.generate({'user': table_with_indexes}, {})
+
+    # Primary key should use error color (red)
+    assert MODERN_THEME.color_scheme.error in result  # PK
+    # Unique key should use accent color (violet)
+    assert MODERN_THEME.color_scheme.accent in result  # UK
+
+  def test_backward_compatibility_no_theme(self, simple_table: TableDefinition) -> None:
+    """Test generators work without theme (backward compatibility)."""
+    # Should use default theme with gradients disabled
+    generator = GraphVizGenerator()
+    result = generator.generate({'user': simple_table}, {})
+
+    # Should produce valid output without HTML
+    assert 'digraph schema {' in result
+    assert 'node [shape=record];' in result
+    # Should NOT have HTML tables (gradients disabled by default)
+    assert '<TABLE' not in result
+
+  def test_self_referential_edge_with_theme(
+    self, simple_table: TableDefinition, edge_definition: EdgeDefinition
+  ) -> None:
+    """Test self-referential edges with theme colors."""
+    from reverie.schema.themes import MODERN_THEME
+
+    generator = GraphVizGenerator(theme=MODERN_THEME.graphviz)
+    result = generator.generate({'user': simple_table}, {'follows': edge_definition})
+
+    # Should have dashed style and theme color
+    assert 'style=dashed' in result
+    assert MODERN_THEME.color_scheme.secondary in result
+
+
+# Mermaid Theme Tests
+
+
+class TestMermaidWithThemes:
+  """Test suite for Mermaid generator with theme support."""
+
+  def test_mermaid_with_modern_theme(self, simple_table: TableDefinition) -> None:
+    """Test Mermaid generation includes theme directive."""
+    from reverie.schema.themes import MODERN_THEME
+
+    generator = MermaidGenerator(theme=MODERN_THEME.mermaid)
+    result = generator.generate({'user': simple_table}, {})
+
+    # Check for theme initialization directive
+    assert "%%{init: {'theme':'default'}}%%" in result
+    assert 'erDiagram' in result
+
+  def test_mermaid_with_forest_theme(self, simple_table: TableDefinition) -> None:
+    """Test Mermaid with forest theme."""
+    from reverie.schema.themes import FOREST_THEME
+
+    generator = MermaidGenerator(theme=FOREST_THEME.mermaid)
+    result = generator.generate({'user': simple_table}, {})
+
+    assert "%%{init: {'theme':'forest'}}%%" in result
+
+  def test_mermaid_with_dark_theme(self, simple_table: TableDefinition) -> None:
+    """Test Mermaid with dark theme."""
+    from reverie.schema.themes import DARK_THEME
+
+    generator = MermaidGenerator(theme=DARK_THEME.mermaid)
+    result = generator.generate({'user': simple_table}, {})
+
+    assert "%%{init: {'theme':'dark'}}%%" in result
+
+  def test_mermaid_with_theme_string(self, simple_table: TableDefinition) -> None:
+    """Test visualize_schema with theme name string for Mermaid."""
+    result = visualize_schema(
+      {'user': simple_table}, output_format=OutputFormat.MERMAID, theme='forest'
+    )
+
+    assert "%%{init: {'theme':'forest'}}%%" in result
+    assert 'erDiagram' in result
+
+  def test_mermaid_backward_compatibility(self, simple_table: TableDefinition) -> None:
+    """Test Mermaid works without theme (backward compatibility)."""
+    generator = MermaidGenerator()
+    result = generator.generate({'user': simple_table}, {})
+
+    # Should NOT have theme directive
+    assert '%%{init:' not in result
+    assert 'erDiagram' in result
+    assert 'user {' in result
+
+
+# ASCII Theme Tests
+
+
+class TestASCIIWithThemes:
+  """Test suite for ASCII generator with theme support."""
+
+  def test_ascii_with_modern_theme_unicode(self, simple_table: TableDefinition) -> None:
+    """Test ASCII generation with unicode box characters."""
+    from reverie.schema.themes import MODERN_THEME
+
+    generator = ASCIIGenerator(theme=MODERN_THEME.ascii)
+    result = generator.generate({'user': simple_table}, {})
+
+    # Check for rounded unicode box characters
+    assert '╭' in result or '╮' in result or '╰' in result or '╯' in result
+    # Should have content
+    assert 'user' in result
+
+  def test_ascii_with_single_box_style(self, simple_table: TableDefinition) -> None:
+    """Test ASCII with single line box style."""
+    from reverie.schema.themes import ASCIITheme
+
+    theme = ASCIITheme(box_style='single', use_unicode=True, use_colors=False, use_icons=False)
+    generator = ASCIIGenerator(theme=theme)
+    result = generator.generate({'user': simple_table}, {})
+
+    # Check for single line unicode characters
+    assert '┌' in result or '└' in result or '─' in result or '│' in result
+
+  def test_ascii_with_double_box_style(self, simple_table: TableDefinition) -> None:
+    """Test ASCII with double line box style."""
+    from reverie.schema.themes import ASCIITheme
+
+    theme = ASCIITheme(box_style='double', use_unicode=True, use_colors=False, use_icons=False)
+    generator = ASCIIGenerator(theme=theme)
+    result = generator.generate({'user': simple_table}, {})
+
+    # Check for double line unicode characters
+    assert '╔' in result or '╚' in result or '═' in result or '║' in result
+
+  def test_ascii_with_heavy_box_style(self, simple_table: TableDefinition) -> None:
+    """Test ASCII with heavy line box style."""
+    from reverie.schema.themes import ASCIITheme
+
+    theme = ASCIITheme(box_style='heavy', use_unicode=True, use_colors=False, use_icons=False)
+    generator = ASCIIGenerator(theme=theme)
+    result = generator.generate({'user': simple_table}, {})
+
+    # Check for heavy line unicode characters
+    assert '┏' in result or '┗' in result or '━' in result or '┃' in result
+
+  def test_ascii_with_ansi_colors(self, table_with_record_field: TableDefinition) -> None:
+    """Test ASCII with ANSI color codes."""
+    from reverie.schema.themes import ASCIITheme
+
+    theme = ASCIITheme(box_style='single', use_unicode=False, use_colors=True, use_icons=False)
+    generator = ASCIIGenerator(theme=theme)
+    result = generator.generate({'post': table_with_record_field}, {})
+
+    # Check for ANSI color codes
+    assert '\033[' in result
+    # Check for color reset codes
+    assert '\033[0m' in result
+
+  def test_ascii_with_icons(self, table_with_indexes: TableDefinition) -> None:
+    """Test ASCII with constraint icons."""
+    from reverie.schema.themes import ASCIITheme
+
+    theme = ASCIITheme(box_style='single', use_unicode=False, use_colors=False, use_icons=True)
+    generator = ASCIIGenerator(theme=theme)
+    result = generator.generate({'user': table_with_indexes}, {})
+
+    # Check for constraint icons
+    assert '🔑' in result  # PK icon
+    assert '⭐' in result  # UK icon
+
+  def test_ascii_with_all_features(self, table_with_record_field: TableDefinition) -> None:
+    """Test ASCII with unicode, colors, and icons all enabled."""
+    from reverie.schema.themes import MODERN_THEME
+
+    generator = ASCIIGenerator(theme=MODERN_THEME.ascii)
+    result = generator.generate({'post': table_with_record_field}, {})
+
+    # Unicode box characters
+    assert '╭' in result or '╮' in result or '╰' in result or '╯' in result
+    # ANSI colors
+    assert '\033[' in result
+    # Icons
+    assert '🔑' in result  # PK
+    assert '🔗' in result  # FK (for record field)
+
+  def test_ascii_backward_compatibility(self, simple_table: TableDefinition) -> None:
+    """Test ASCII works without theme (backward compatibility)."""
+    generator = ASCIIGenerator()
+    result = generator.generate({'user': simple_table}, {})
+
+    # Should use basic ASCII
+    assert '+' in result
+    assert '-' in result
+    assert '|' in result
+    # Should NOT have unicode
+    assert '╭' not in result
+    # Should NOT have ANSI codes
+    assert '\033[' not in result
+    # Should NOT have icons
+    assert '🔑' not in result
+
+  def test_ascii_minimal_theme(self, simple_table: TableDefinition) -> None:
+    """Test ASCII with minimal theme (no colors, no icons)."""
+    from reverie.schema.themes import MINIMAL_THEME
+
+    generator = ASCIIGenerator(theme=MINIMAL_THEME.ascii)
+    result = generator.generate({'user': simple_table}, {})
+
+    # Should have unicode (single style)
+    assert '┌' in result or '└' in result
+    # Should NOT have ANSI codes
+    assert '\033[' not in result
+    # Should NOT have icons
+    assert '🔑' not in result
+
+  def test_ascii_with_theme_string(self, simple_table: TableDefinition) -> None:
+    """Test visualize_schema with theme name string for ASCII."""
+    result = visualize_schema(
+      {'user': simple_table}, output_format=OutputFormat.ASCII, theme='modern'
+    )
+
+    # Modern theme has unicode, colors, and icons
+    assert '╭' in result or '╮' in result or '╰' in result or '╯' in result
+    assert '\033[' in result
+    assert '🔑' in result
+
+  def test_ascii_unicode_disabled_fallback(self, simple_table: TableDefinition) -> None:
+    """Test ASCII falls back to basic characters when unicode disabled."""
+    from reverie.schema.themes import ASCIITheme
+
+    theme = ASCIITheme(box_style='rounded', use_unicode=False, use_colors=False, use_icons=False)
+    generator = ASCIIGenerator(theme=theme)
+    result = generator.generate({'user': simple_table}, {})
+
+    # Should use basic ASCII even though box_style is 'rounded'
+    assert '+' in result
+    assert '-' in result
+    assert '|' in result
+    # Should NOT have unicode
+    assert '╭' not in result
+
+  def test_ascii_complex_table_with_theme(
+    self, table_with_indexes: TableDefinition, table_with_record_field: TableDefinition
+  ) -> None:
+    """Test ASCII with multiple constraint types and theme."""
+    from reverie.schema.themes import MODERN_THEME
+
+    generator = ASCIIGenerator(theme=MODERN_THEME.ascii)
+    result = generator.generate({'user': table_with_indexes, 'post': table_with_record_field}, {})
+
+    # Should have all icons
+    assert '🔑' in result  # PK
+    assert '⭐' in result  # UK
+    assert '🔗' in result  # FK
+    # Should have colors
+    assert '\033[' in result
+    # Should have unicode
+    assert '╭' in result or '╮' in result
