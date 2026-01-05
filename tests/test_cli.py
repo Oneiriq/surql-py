@@ -531,10 +531,11 @@ class TestSchemaVisualizeCommand:
     result = self.runner.invoke(schema_app, ['visualize', '--help'])
 
     assert result.exit_code == 0
-    assert 'visualize' in result.output.lower()
-    assert '--theme' in result.output
-    assert '--no-gradients' in result.output
-    assert '--ascii-style' in result.output
+    output = strip_ansi(result.output)
+    assert 'visualize' in output.lower()
+    assert '--theme' in output
+    assert '--no-gradients' in output
+    assert '--ascii-style' in output
 
   def test_visualize_theme_option_available(self) -> None:
     """Test that theme option is available."""
@@ -543,8 +544,9 @@ class TestSchemaVisualizeCommand:
     result = self.runner.invoke(schema_app, ['visualize', '--help'])
 
     assert result.exit_code == 0
-    assert '--theme' in result.output
-    assert 'modern' in result.output.lower() or 'theme' in result.output.lower()
+    output = strip_ansi(result.output)
+    assert '--theme' in output
+    assert 'modern' in output.lower() or 'theme' in output.lower()
 
   def test_visualize_graphviz_options(self) -> None:
     """Test GraphViz-specific options are available."""
@@ -553,7 +555,8 @@ class TestSchemaVisualizeCommand:
     result = self.runner.invoke(schema_app, ['visualize', '--help'])
 
     assert result.exit_code == 0
-    assert '--no-gradients' in result.output
+    output = strip_ansi(result.output)
+    assert '--no-gradients' in output
 
   def test_visualize_ascii_options(self) -> None:
     """Test ASCII-specific options are available."""
@@ -562,10 +565,11 @@ class TestSchemaVisualizeCommand:
     result = self.runner.invoke(schema_app, ['visualize', '--help'])
 
     assert result.exit_code == 0
-    assert '--ascii-style' in result.output
-    assert '--no-unicode' in result.output
-    assert '--no-colors' in result.output
-    assert '--no-icons' in result.output
+    output = strip_ansi(result.output)
+    assert '--ascii-style' in output
+    assert '--no-unicode' in output
+    assert '--no-colors' in output
+    assert '--no-icons' in output
 
   def test_visualize_with_theme_modern(self, tmp_path: Path) -> None:
     """Test visualize with modern theme."""
