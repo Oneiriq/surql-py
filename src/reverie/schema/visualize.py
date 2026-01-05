@@ -5,6 +5,7 @@ in multiple formats: Mermaid, GraphViz (DOT), and ASCII art.
 """
 
 import re
+import unicodedata
 from enum import Enum
 from typing import Protocol
 
@@ -20,6 +21,38 @@ from reverie.schema.themes import (
   Theme,
   get_theme,
 )
+
+# ANSI escape code pattern for stripping color codes from strings
+_ANSI_ESCAPE_PATTERN = re.compile(r'\x1b\[[0-9;]*m')
+
+
+def _get_display_width(text: str) -> int:
+  """Calculate terminal display width, stripping ANSI and counting wide chars.
+
+  Python's len() counts emoji as 1 character, but terminals display them as
+  2 columns wide. This function calculates the actual terminal display width
+  by checking the Unicode East Asian Width property of each character.
+
+  Args:
+    text: Text possibly containing ANSI escape codes and/or emoji characters
+
+  Returns:
+    Actual display width in terminal columns
+  """
+  # Strip ANSI escape codes first
+  stripped = _ANSI_ESCAPE_PATTERN.sub('', text)
+
+  width = 0
+  for char in stripped:
+    # Check East Asian Width property
+    ea_width = unicodedata.east_asian_width(char)
+    if ea_width in ('W', 'F'):  # Wide or Fullwidth
+      width += 2
+    elif ea_width == 'A':  # Ambiguous - treat as narrow
+      width += 1
+    else:
+      width += 1
+  return width
 
 
 class OutputFormat(Enum):
@@ -694,11 +727,10 @@ class ASCIIGenerator:
         type_str = _get_field_type_str(field.type)
         field_lines.append(f'{field.name} : {type_str}{constraint_str}')
 
-    # Calculate box width (strip ANSI codes for width calculation)
-    ansi_escape = re.compile(r'\x1b\[[0-9;]*m')
+    # Calculate box width using display width to handle emoji properly
     min_width = max(len(table_name) + 4, 20)
     content_width = (
-      max((len(ansi_escape.sub('', line)) for line in field_lines), default=0) if field_lines else 0
+      max((_get_display_width(line) for line in field_lines), default=0) if field_lines else 0
     )
     width = max(min_width, content_width + 2)
 
@@ -711,8 +743,8 @@ class ASCIIGenerator:
     # Table name (centered, with header styling)
     name_padded = table_name.center(width)
     styled_name = self._colorize(name_padded, 'header')
-    # Need to account for color codes in padding
-    visible_len = len(ansi_escape.sub('', styled_name))
+    # Need to account for color codes and wide chars in padding
+    visible_len = _get_display_width(styled_name)
     padding_needed = width - visible_len
     left_pad = padding_needed // 2
     right_pad = padding_needed - left_pad
@@ -725,7 +757,7 @@ class ASCIIGenerator:
 
       # Fields
       for line in field_lines:
-        visible_len = len(ansi_escape.sub('', line))
+        visible_len = _get_display_width(line)
         padding = width - visible_len - 1  # -1 for the leading space
         padded = f' {line}{" " * padding}'
         box_lines.append(f'{chars["v"]}{padded}{chars["v"]}')

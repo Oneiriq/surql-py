@@ -1,28 +1,3 @@
-/*
- * Reverie Schema Visualization - GraphViz DOT Format (Dark Theme)
- *
- * This is SOURCE CODE that needs to be RENDERED to see the beautiful diagram.
- * The dark theme styling with purple accents is present but invisible until rendered.
- *
- * HOW TO RENDER:
- *
- * Command Line:
- *   dot -Tpng schema_dark_graphviz.dot -o schema_dark.png
- *   dot -Tsvg schema_dark_graphviz.dot -o schema_dark.svg
- *
- * Online (no installation):
- *   1. Visit: https://dreampuf.github.io/GraphvizOnline/
- *   2. Copy/paste this entire file
- *   3. See the rendered diagram instantly!
- *
- * VS Code:
- *   1. Install "Graphviz Preview" extension
- *   2. Open this file
- *   3. Press Ctrl+Shift+V (Cmd+Shift+V on Mac)
- *
- * For more details: docs/VISUALIZATION_RENDERING_GUIDE.md
- */
-
 digraph schema {
     rankdir=LR;
     bgcolor="#1e1b4b";

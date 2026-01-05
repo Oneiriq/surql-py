@@ -25,6 +25,7 @@ from reverie.schema.visualize import (
   GraphVizGenerator,
   MermaidGenerator,
   OutputFormat,
+  _get_display_width,
   visualize_from_registry,
   visualize_schema,
 )
@@ -1416,3 +1417,87 @@ class TestASCIIWithThemes:
     assert '\033[' in result
     # Should have unicode
     assert '╭' in result or '╮' in result
+
+  def test_ascii_box_alignment_with_emoji_icons(
+    self, table_with_indexes: TableDefinition, table_with_record_field: TableDefinition
+  ) -> None:
+    """Test that ASCII box lines align correctly when emoji icons are present.
+
+    Emoji characters have East Asian Wide width (display as 2 columns) while
+    Python's len() counts them as 1. The _get_display_width function should
+    account for this to keep box borders vertically aligned.
+    """
+    from reverie.schema.themes import FOREST_THEME, MODERN_THEME
+
+    # Test with multiple themes that have icons enabled
+    for theme_name, theme in [('modern', MODERN_THEME), ('forest', FOREST_THEME)]:
+      generator = ASCIIGenerator(theme=theme.ascii)
+      result = generator.generate({'user': table_with_indexes, 'post': table_with_record_field}, {})
+
+      # Parse the output into individual table boxes
+      lines = result.split('\n')
+
+      # Find boxes by identifying top corners (╭ or ┌ or +)
+      box_start_chars = {'╭', '┌', '+', '╔', '┏'}
+      box_end_chars = {'╰', '└', '+', '╚', '┗'}
+      vertical_chars = {'│', '|', '║', '┃'}
+
+      current_box_lines: list[str] = []
+      in_box = False
+
+      for line in lines:
+        if not line.strip():
+          # Empty line - end of current box if we're in one
+          if in_box and current_box_lines:
+            self._verify_box_alignment(current_box_lines, theme_name)
+            current_box_lines = []
+            in_box = False
+          continue
+
+        first_char = line[0] if line else ''
+
+        if first_char in box_start_chars:
+          # Start of a new box
+          if in_box and current_box_lines:
+            # Verify previous box before starting new one
+            self._verify_box_alignment(current_box_lines, theme_name)
+          current_box_lines = [line]
+          in_box = True
+        elif first_char in box_end_chars:
+          # End of a box
+          if in_box:
+            current_box_lines.append(line)
+            self._verify_box_alignment(current_box_lines, theme_name)
+            current_box_lines = []
+            in_box = False
+        elif first_char in vertical_chars or (in_box and (first_char == '├' or first_char == '╠')):
+          # Middle of a box
+          if in_box:
+            current_box_lines.append(line)
+
+      # Verify any remaining box
+      if in_box and current_box_lines:
+        self._verify_box_alignment(current_box_lines, theme_name)
+
+  def _verify_box_alignment(self, box_lines: list[str], theme_name: str) -> None:
+    """Verify all lines in a box have consistent display width.
+
+    Args:
+      box_lines: List of lines forming a single ASCII box
+      theme_name: Name of the theme for error messages
+    """
+    if not box_lines:
+      return
+
+    # Calculate display width for each line
+    widths = [_get_display_width(line) for line in box_lines]
+
+    # All lines in a box should have the same display width
+    expected_width = widths[0]
+    for i, (line, width) in enumerate(zip(box_lines, widths, strict=True)):
+      assert width == expected_width, (
+        f'Box line alignment mismatch in {theme_name} theme:\n'
+        f'  Line {i}: display_width={width}, expected={expected_width}\n'
+        f'  Content: {repr(line)}\n'
+        f'  All widths: {widths}'
+      )
