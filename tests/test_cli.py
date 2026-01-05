@@ -37,7 +37,7 @@ class TestOutputFormat:
 class TestGetMigrationsDirectory:
   """Test suite for get_migrations_directory function."""
 
-  def test_get_migrations_directory_default(self, tmp_path: Path, monkeypatch) -> None:
+  def test_get_migrations_directory_default(self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
     """Test getting default migrations directory."""
     monkeypatch.chdir(tmp_path)
 
@@ -529,10 +529,10 @@ class TestSchemaVisualizeCommand:
     result = self.runner.invoke(schema_app, ['visualize', '--help'])
 
     assert result.exit_code == 0
-    assert 'visualize' in result.stdout.lower()
-    assert '--theme' in result.stdout
-    assert '--no-gradients' in result.stdout
-    assert '--ascii-style' in result.stdout
+    assert 'visualize' in result.output.lower()
+    assert '--theme' in result.output
+    assert '--no-gradients' in result.output
+    assert '--ascii-style' in result.output
 
   def test_visualize_theme_option_available(self) -> None:
     """Test that theme option is available."""
@@ -541,8 +541,8 @@ class TestSchemaVisualizeCommand:
     result = self.runner.invoke(schema_app, ['visualize', '--help'])
 
     assert result.exit_code == 0
-    assert '--theme' in result.stdout
-    assert 'modern' in result.stdout.lower() or 'theme' in result.stdout.lower()
+    assert '--theme' in result.output
+    assert 'modern' in result.output.lower() or 'theme' in result.output.lower()
 
   def test_visualize_graphviz_options(self) -> None:
     """Test GraphViz-specific options are available."""
@@ -551,7 +551,7 @@ class TestSchemaVisualizeCommand:
     result = self.runner.invoke(schema_app, ['visualize', '--help'])
 
     assert result.exit_code == 0
-    assert '--no-gradients' in result.stdout
+    assert '--no-gradients' in result.output
 
   def test_visualize_ascii_options(self) -> None:
     """Test ASCII-specific options are available."""
@@ -560,10 +560,10 @@ class TestSchemaVisualizeCommand:
     result = self.runner.invoke(schema_app, ['visualize', '--help'])
 
     assert result.exit_code == 0
-    assert '--ascii-style' in result.stdout
-    assert '--no-unicode' in result.stdout
-    assert '--no-colors' in result.stdout
-    assert '--no-icons' in result.stdout
+    assert '--ascii-style' in result.output
+    assert '--no-unicode' in result.output
+    assert '--no-colors' in result.output
+    assert '--no-icons' in result.output
 
   def test_visualize_with_theme_modern(self, tmp_path: Path) -> None:
     """Test visualize with modern theme."""

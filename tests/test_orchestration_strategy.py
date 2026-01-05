@@ -89,7 +89,7 @@ class TestDeploymentResult:
     )
 
     with pytest.raises(ValidationError):
-      result.status = DeploymentStatus.FAILED  # type: ignore
+      result.status = DeploymentStatus.FAILED
 
 
 class TestSequentialStrategy:

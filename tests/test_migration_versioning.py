@@ -60,7 +60,7 @@ class TestSchemaSnapshot:
   def test_snapshot_immutable(self, sample_snapshot: SchemaSnapshot) -> None:
     """Test that snapshot is immutable."""
     with pytest.raises(ValidationError):
-      sample_snapshot.version = 'new_version'  # type: ignore
+      sample_snapshot.version = 'new_version'
 
 
 class TestVersionNode:
