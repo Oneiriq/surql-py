@@ -37,7 +37,9 @@ class TestOutputFormat:
 class TestGetMigrationsDirectory:
   """Test suite for get_migrations_directory function."""
 
-  def test_get_migrations_directory_default(self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+  def test_get_migrations_directory_default(
+    self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+  ) -> None:
     """Test getting default migrations directory."""
     monkeypatch.chdir(tmp_path)
 
