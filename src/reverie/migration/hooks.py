@@ -272,11 +272,35 @@ def generate_precommit_config(
 
 
 def _find_migrations_dir() -> Path | None:
-  """Find migrations directory in common locations.
+  """Find migrations directory using settings or common locations.
+
+  Resolution order:
+  1. REVERIE_MIGRATION_PATH environment variable
+  2. .env file (REVERIE_MIGRATION_PATH)
+  3. pyproject.toml [tool.reverie] migration_path
+  4. Common locations (migrations/, db/migrations/, etc.)
 
   Returns:
     Path to migrations directory or None if not found
   """
+  # First, check configured path from settings
+  try:
+    from reverie.settings import get_migration_path
+
+    configured_path = get_migration_path()
+    # If relative path, resolve relative to current directory
+    if not configured_path.is_absolute():
+      resolved_path = Path.cwd() / configured_path
+    else:
+      resolved_path = configured_path
+
+    if resolved_path.exists() and resolved_path.is_dir():
+      return resolved_path
+  except Exception:
+    # Fall back to common locations if settings fail
+    pass
+
+  # Fallback: check common locations
   common_locations = [
     Path('migrations'),
     Path('db/migrations'),

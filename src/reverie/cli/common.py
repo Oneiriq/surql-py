@@ -180,14 +180,28 @@ def confirm_destructive(message: str) -> bool:
 def get_migrations_directory(directory: Path | None = None) -> Path:
   """Get migrations directory path, ensuring it exists.
 
+  Resolution order (first wins):
+  1. Explicit directory parameter (CLI --directory flag)
+  2. REVERIE_MIGRATION_PATH environment variable
+  3. .env file (REVERIE_MIGRATION_PATH)
+  4. pyproject.toml [tool.reverie] migration_path
+  5. Default: ./migrations
+
   Args:
-    directory: Optional custom directory path
+    directory: Optional custom directory path (from CLI flag)
 
   Returns:
     Path to migrations directory
   """
   if directory is None:
-    directory = Path.cwd() / 'migrations'
+    from reverie.settings import get_migration_path
+
+    configured_path = get_migration_path()
+    # If relative path, resolve relative to current directory
+    if not configured_path.is_absolute():
+      directory = Path.cwd() / configured_path
+    else:
+      directory = configured_path
 
   if not directory.exists():
     display_info(f'Creating migrations directory: {directory}')
