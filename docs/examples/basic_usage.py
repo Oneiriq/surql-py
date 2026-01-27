@@ -45,7 +45,7 @@ config = ConnectionConfig(
 )
 
 
-async def main():
+async def main() -> None:
   """Main example function."""
 
   async with get_client(config) as client:

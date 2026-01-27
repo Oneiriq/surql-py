@@ -18,6 +18,23 @@ from rich.progress import Progress, SpinnerColumn, TextColumn
 from rich.syntax import Syntax
 from rich.table import Table
 
+
+def _supports_unicode() -> bool:
+  """Check if the console supports Unicode output."""
+  try:
+    '✓'.encode(sys.stdout.encoding or 'utf-8')
+    return True
+  except (UnicodeEncodeError, LookupError):
+    return False
+
+
+# Unicode symbols with ASCII fallbacks
+_UNICODE_SUPPORTED = _supports_unicode()
+SYMBOL_SUCCESS = '✓' if _UNICODE_SUPPORTED else '+'
+SYMBOL_ERROR = '✗' if _UNICODE_SUPPORTED else 'x'
+SYMBOL_INFO = 'ℹ' if _UNICODE_SUPPORTED else '*'
+SYMBOL_WARNING = '⚠' if _UNICODE_SUPPORTED else '!'
+
 logger = structlog.get_logger(__name__)
 console = Console()
 err_console = Console(stderr=True, style='bold red')
@@ -83,7 +100,7 @@ def display_success(message: str) -> None:
   Args:
     message: Success message to display
   """
-  console.print(f'[green]✓[/green] {message}')
+  console.print(f'[green]{SYMBOL_SUCCESS}[/green] {message}')
 
 
 def display_info(message: str) -> None:
@@ -92,7 +109,7 @@ def display_info(message: str) -> None:
   Args:
     message: Info message to display
   """
-  console.print(f'[blue]ℹ[/blue] {message}')
+  console.print(f'[blue]{SYMBOL_INFO}[/blue] {message}')
 
 
 def display_warning(message: str) -> None:
@@ -101,7 +118,7 @@ def display_warning(message: str) -> None:
   Args:
     message: Warning message to display
   """
-  console.print(f'[yellow]⚠[/yellow] {message}')
+  console.print(f'[yellow]{SYMBOL_WARNING}[/yellow] {message}')
 
 
 def display_error(message: str, exit_code: int | None = None) -> None:
@@ -111,7 +128,7 @@ def display_error(message: str, exit_code: int | None = None) -> None:
     message: Error message to display
     exit_code: If provided, exit with this code
   """
-  err_console.print(f'[bold red]✗[/bold red] {message}')
+  err_console.print(f'[bold red]{SYMBOL_ERROR}[/bold red] {message}')
   if exit_code is not None:
     sys.exit(exit_code)
 

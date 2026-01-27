@@ -44,7 +44,7 @@ reverie version
 Output:
 
 ```shell
-reverie version 0.1.0
+reverie version 0.6.0
 Environment: development
 ```
 

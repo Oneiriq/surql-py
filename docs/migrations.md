@@ -5,6 +5,7 @@ This guide covers creating, managing, and executing database migrations with rev
 ## Table of Contents
 
 - [Overview](#overview)
+- [Configuration](#configuration)
 - [Migration Structure](#migration-structure)
 - [Creating Migrations](#creating-migrations)
 - [Migration Naming](#migration-naming)
@@ -30,6 +31,86 @@ reverie's migration system provides:
 1. Create migration file → 2. Write SQL statements → 3. Validate migration
                           ↓
 4. Apply to database ← 5. Track in history ← 6. Execute statements
+```
+
+## Configuration
+
+### Migration Path Configuration
+
+The migration path can be configured through multiple sources (in priority order):
+
+1. **CLI flag** (`--directory` / `-d`) - highest priority
+2. **Environment variable** (`REVERIE_MIGRATION_PATH`)
+3. **`.env` file** (`REVERIE_MIGRATION_PATH=...`)
+4. **`pyproject.toml`** (`[tool.reverie]` section)
+5. **Default value** (`./migrations`) - lowest priority
+
+### pyproject.toml Configuration
+
+Add a `[tool.reverie]` section to your `pyproject.toml`:
+
+```toml
+[tool.reverie]
+migration_path = "db/migrations"
+```
+
+### Environment Variable
+
+Set the `REVERIE_MIGRATION_PATH` environment variable:
+
+```shell
+# Unix/macOS
+export REVERIE_MIGRATION_PATH=db/migrations
+
+# Windows (PowerShell)
+$env:REVERIE_MIGRATION_PATH = "db/migrations"
+
+# Windows (CMD)
+set REVERIE_MIGRATION_PATH=db/migrations
+```
+
+### .env File
+
+Create a `.env` file in your project root:
+
+```shell
+REVERIE_MIGRATION_PATH=db/migrations
+```
+
+### CLI Override
+
+Override the configured path for a single command:
+
+```shell
+reverie migrate up --directory custom/migrations
+reverie migrate status -d ./other/migrations
+```
+
+### Configuration Priority Example
+
+If you have:
+- `pyproject.toml`: `migration_path = "toml/migrations"`
+- `.env`: `REVERIE_MIGRATION_PATH=env/migrations`
+- Environment: `REVERIE_MIGRATION_PATH=shell/migrations`
+- CLI: `--directory cli/migrations`
+
+The resolved path would be `cli/migrations` (CLI has highest priority).
+
+Without the CLI flag, it would use `shell/migrations` (environment variable).
+
+### Accessing Configuration Programmatically
+
+```python
+from reverie.settings import get_migration_path, get_settings
+
+# Get just the migration path
+migration_dir = get_migration_path()
+print(f"Migrations directory: {migration_dir}")
+
+# Get all settings
+settings = get_settings()
+print(f"Migration path: {settings.migration_path}")
+print(f"Environment: {settings.environment}")
 ```
 
 ## Migration Structure
