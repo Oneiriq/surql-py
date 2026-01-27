@@ -432,7 +432,10 @@ def _generate_modify_permissions_diff(
       )
 
   forward_sql = ' '.join(forward_sql_parts) if forward_sql_parts else ''
-  backward_sql = ''  # Permissions rollback is complex, left as TODO
+  # Note: Permission rollback is intentionally left empty. SurrealDB doesn't provide
+  # a way to query existing permissions, so we can't generate proper rollback SQL.
+  # Users should manually specify rollback SQL if needed for permission changes.
+  backward_sql = ''
 
   return SchemaDiff(
     operation=DiffOperation.MODIFY_PERMISSIONS,

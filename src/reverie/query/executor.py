@@ -186,8 +186,9 @@ async def fetch_many(
     >>> async for user in fetch_many(query, User):
     ...     print(user.name)
   """
-  # For now, fetch all and yield (SurrealDB client doesn't support streaming)
-  # TODO: Implement true streaming when SurrealDB client supports it
+  # Note: SurrealDB Python client (surrealdb>=1.0.8) does not yet support cursor-based
+  # streaming. This implementation fetches all results and yields them sequentially.
+  # For true streaming support, monitor: https://github.com/surrealdb/surrealdb.py
   results = await fetch_all(query, model, client)
 
   for item in results:

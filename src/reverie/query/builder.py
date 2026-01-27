@@ -12,7 +12,7 @@ from typing import TYPE_CHECKING, Any, Literal, TypeVar
 import structlog
 from pydantic import BaseModel, ConfigDict, Field
 
-from reverie.types.operators import Operator, _quote_value
+from reverie.types.operators import Operator, _quote_value, _validate_identifier
 from reverie.types.record_id import RecordID
 
 if TYPE_CHECKING:
@@ -134,10 +134,16 @@ class Query[T: BaseModel](BaseModel):
     Returns:
       New Query instance with table set
 
+    Raises:
+      ValueError: If table name contains invalid characters
+
     Examples:
       >>> Query().select().from_table('user')
       >>> Query().select().from_table('user:alice')
     """
+    # Validate table name (extract table part from record ID if present)
+    table_part = table.split(':')[0] if ':' in table else table
+    _validate_identifier(table_part, 'table name')
     return self.model_copy(update={'table_name': table})
 
   def where(self, condition: str | Operator) -> Query[T]:
@@ -236,9 +242,17 @@ class Query[T: BaseModel](BaseModel):
     Returns:
       New Query instance with INSERT operation
 
+    Raises:
+      ValueError: If table name or field names contain invalid characters
+
     Examples:
       >>> Query().insert('user', {'name': 'Alice', 'email': 'alice@example.com'})
     """
+    # Validate table name and field names to prevent SQL injection
+    _validate_identifier(table, 'table name')
+    for field_name in data:
+      _validate_identifier(field_name, 'field name')
+
     return self.model_copy(
       update={
         'operation': 'INSERT',
@@ -257,10 +271,19 @@ class Query[T: BaseModel](BaseModel):
     Returns:
       New Query instance with UPDATE operation
 
+    Raises:
+      ValueError: If table name or field names contain invalid characters
+
     Examples:
       >>> Query().update('user:alice', {'status': 'active'})
       >>> Query().update('user', {'status': 'inactive'}).where('last_login < "2024-01-01"')
     """
+    # Validate table name (extract from record ID if present) and field names
+    table_part = target.split(':')[0] if ':' in target else target
+    _validate_identifier(table_part, 'table name')
+    for field_name in data:
+      _validate_identifier(field_name, 'field name')
+
     return self.model_copy(
       update={
         'operation': 'UPDATE',
@@ -278,10 +301,17 @@ class Query[T: BaseModel](BaseModel):
     Returns:
       New Query instance with DELETE operation
 
+    Raises:
+      ValueError: If table name contains invalid characters
+
     Examples:
       >>> Query().delete('user:alice')
       >>> Query().delete('user').where('deleted_at IS NOT NULL')
     """
+    # Validate table name (extract from record ID if present)
+    table_part = target.split(':')[0] if ':' in target else target
+    _validate_identifier(table_part, 'table name')
+
     return self.model_copy(
       update={
         'operation': 'DELETE',
@@ -307,12 +337,30 @@ class Query[T: BaseModel](BaseModel):
     Returns:
       New Query instance with RELATE operation
 
+    Raises:
+      ValueError: If table names or field names contain invalid characters
+
     Examples:
       >>> Query().relate('likes', 'user:alice', 'post:123')
       >>> Query().relate('follows', 'user:alice', 'user:bob', {'since': '2024-01-01'})
     """
+    # Validate edge table name
+    _validate_identifier(edge_table, 'edge table name')
+
+    # Validate from/to record IDs
     from_str = str(from_record) if isinstance(from_record, RecordID) else from_record
     to_str = str(to_record) if isinstance(to_record, RecordID) else to_record
+
+    # Validate table parts of record IDs
+    from_table = from_str.split(':')[0] if ':' in from_str else from_str
+    to_table = to_str.split(':')[0] if ':' in to_str else to_str
+    _validate_identifier(from_table, 'from table name')
+    _validate_identifier(to_table, 'to table name')
+
+    # Validate edge data field names if provided
+    if data:
+      for field_name in data:
+        _validate_identifier(field_name, 'field name')
 
     return self.model_copy(
       update={

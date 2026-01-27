@@ -13,7 +13,7 @@ import structlog
 from pydantic import BaseModel
 
 from reverie.connection.context import get_db
-from reverie.types.operators import _quote_value
+from reverie.types.operators import _quote_value, _validate_identifier
 
 if TYPE_CHECKING:
   from reverie.connection.client import DatabaseClient
@@ -29,9 +29,14 @@ def _format_item_for_surql(item: dict[str, Any]) -> str:
 
   Returns:
     SurrealQL object string representation
+
+  Raises:
+    ValueError: If any field name contains invalid characters
   """
   parts = []
   for key, value in item.items():
+    # Validate field name to prevent SQL injection
+    _validate_identifier(key, 'field name')
     # Handle nested dicts/lists with JSON, others with quote_value
     if isinstance(value, (dict, list)):
       parts.append(f'{key}: {json.dumps(value)}')
@@ -98,6 +103,14 @@ async def upsert_many(
 
   if not table:
     raise ValueError('Table name is required')
+
+  # Validate table name to prevent SQL injection
+  _validate_identifier(table, 'table name')
+
+  # Validate conflict fields if provided
+  if conflict_fields:
+    for field in conflict_fields:
+      _validate_identifier(field, 'conflict field name')
 
   logger.info('upsert_many_start', table=table, count=len(items))
 
@@ -182,6 +195,11 @@ async def relate_many(
   if not edge:
     raise ValueError('Edge table name is required')
 
+  # Validate table names to prevent SQL injection
+  _validate_identifier(from_table, 'from table name')
+  _validate_identifier(edge, 'edge table name')
+  _validate_identifier(to_table, 'to table name')
+
   logger.info(
     'relate_many_start',
     from_table=from_table,
@@ -193,6 +211,12 @@ async def relate_many(
   # Build individual RELATE statements and execute them together
   statements: list[str] = []
   for from_id, to_id, data in relations:
+    # Validate record ID table parts
+    from_id_table = from_id.split(':')[0] if ':' in from_id else from_id
+    to_id_table = to_id.split(':')[0] if ':' in to_id else to_id
+    _validate_identifier(from_id_table, 'from record table')
+    _validate_identifier(to_id_table, 'to record table')
+
     # Build the RELATE statement
     relate_stmt = f'RELATE {from_id}->{edge}->{to_id}'
 
@@ -200,6 +224,8 @@ async def relate_many(
     if data:
       set_parts = []
       for key, value in data.items():
+        # Validate field name
+        _validate_identifier(key, 'field name')
         if isinstance(value, (dict, list)):
           set_parts.append(f'{key} = {json.dumps(value)}')
         else:
@@ -267,6 +293,9 @@ async def insert_many(
   if not table:
     raise ValueError('Table name is required')
 
+  # Validate table name to prevent SQL injection
+  _validate_identifier(table, 'table name')
+
   logger.info('insert_many_start', table=table, count=len(items))
 
   # Convert Pydantic models to dicts
@@ -277,7 +306,7 @@ async def insert_many(
     else:
       item_dicts.append(item)
 
-  # Build INSERT statement
+  # Build INSERT statement (field names validated in _format_items_array)
   items_array = _format_items_array(item_dicts)
   query = f'INSERT INTO {table} {items_array};'
 
@@ -340,6 +369,9 @@ async def delete_many(
   if not table:
     raise ValueError('Table name is required')
 
+  # Validate table name to prevent SQL injection
+  _validate_identifier(table, 'table name')
+
   logger.info('delete_many_start', table=table, count=len(ids))
 
   # Build DELETE statements for each ID
@@ -347,6 +379,11 @@ async def delete_many(
   records: list[dict[str, Any]] = []
 
   for record_id in ids:
+    # Validate record ID table part if it includes a table prefix
+    if ':' in record_id:
+      id_table = record_id.split(':')[0]
+      _validate_identifier(id_table, 'record ID table')
+
     # Check if ID already has table prefix
     target = record_id if ':' in record_id else f'{table}:{record_id}'
 
@@ -402,6 +439,13 @@ def build_upsert_query(
   if not items:
     return ''
 
+  # Validate table name and conflict fields to prevent SQL injection
+  _validate_identifier(table, 'table name')
+  if conflict_fields:
+    for field in conflict_fields:
+      _validate_identifier(field, 'conflict field name')
+
+  # Field names in items are validated by _format_items_array
   items_array = _format_items_array(items)
 
   if conflict_fields:
@@ -439,11 +483,22 @@ def build_relate_query(
     >>> print(query)
     RELATE person:alice->knows->person:bob SET since = '2024-01-01';
   """
+  # Validate edge table name to prevent SQL injection
+  _validate_identifier(edge, 'edge table name')
+
+  # Validate record ID table parts
+  from_table = from_id.split(':')[0] if ':' in from_id else from_id
+  to_table = to_id.split(':')[0] if ':' in to_id else to_id
+  _validate_identifier(from_table, 'from record table')
+  _validate_identifier(to_table, 'to record table')
+
   relate_stmt = f'RELATE {from_id}->{edge}->{to_id}'
 
   if data:
     set_parts = []
     for key, value in data.items():
+      # Validate field name
+      _validate_identifier(key, 'field name')
       if isinstance(value, (dict, list)):
         set_parts.append(f'{key} = {json.dumps(value)}')
       else:

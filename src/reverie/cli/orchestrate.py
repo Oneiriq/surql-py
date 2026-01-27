@@ -294,8 +294,14 @@ async def _validate_async(config_path: Path) -> None:
 
       status = await health_check.check_environment(env_config)
 
-      conn_status = f'[green]{SYMBOL_SUCCESS}[/green]' if status.can_connect else f'[red]{SYMBOL_ERROR}[/red]'
-      table_status = f'[green]{SYMBOL_SUCCESS}[/green]' if status.migration_table_exists else f'[yellow]{SYMBOL_WARNING}[/yellow]'
+      conn_status = (
+        f'[green]{SYMBOL_SUCCESS}[/green]' if status.can_connect else f'[red]{SYMBOL_ERROR}[/red]'
+      )
+      table_status = (
+        f'[green]{SYMBOL_SUCCESS}[/green]'
+        if status.migration_table_exists
+        else f'[yellow]{SYMBOL_WARNING}[/yellow]'
+      )
       overall = '[green]Healthy[/green]' if status.is_healthy else '[red]Unhealthy[/red]'
 
       if not status.is_healthy:

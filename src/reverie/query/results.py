@@ -5,6 +5,7 @@ with support for pagination and metadata, plus utilities for extracting
 data from raw SurrealDB responses.
 """
 
+from collections.abc import Iterator
 from typing import Any, TypeVar
 
 from pydantic import BaseModel, ConfigDict, Field
@@ -92,7 +93,7 @@ class ListResult[T: BaseModel](BaseModel):
     """
     return len(self.records)
 
-  def __iter__(self):  # type: ignore[no-untyped-def]
+  def __iter__(self) -> Iterator[T]:  # type: ignore[override]
     """Iterate over records.
 
     Yields:
@@ -210,7 +211,7 @@ class PaginatedResult[T: BaseModel](BaseModel):
     """
     return len(self.items)
 
-  def __iter__(self):  # type: ignore[no-untyped-def]
+  def __iter__(self) -> Iterator[T]:  # type: ignore[override]
     """Iterate over items.
 
     Yields:

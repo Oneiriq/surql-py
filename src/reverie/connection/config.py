@@ -43,6 +43,7 @@ class ConnectionConfig(BaseSettings):
     default=None,
     description='Authentication password',
     alias='password',
+    repr=False,
   )
 
   # Connection pool settings

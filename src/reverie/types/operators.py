@@ -3,6 +3,7 @@
 This module provides immutable dataclasses for comparison, logical, and array operators.
 """
 
+import re
 from dataclasses import dataclass
 from typing import Any
 
@@ -543,6 +544,38 @@ def not_(operand: Operator) -> Not:
 # Private helper functions
 
 
+# Pattern for valid SurrealDB identifiers: alphanumeric and underscore, not starting with digit
+_IDENTIFIER_PATTERN = re.compile(r'^[a-zA-Z_][a-zA-Z0-9_]*$')
+
+
+def _validate_identifier(name: str, context: str = 'identifier') -> str:
+  """Validate that a name is a safe SurrealDB identifier.
+
+  Validates table names, field names, and other identifiers to prevent
+  SQL injection through malicious identifier names.
+
+  Args:
+    name: The identifier name to validate
+    context: Context for error messages (e.g., 'table name', 'field name')
+
+  Returns:
+    The validated identifier
+
+  Raises:
+    ValueError: If the identifier contains invalid characters
+  """
+  if not name:
+    raise ValueError(f'{context.capitalize()} cannot be empty')
+
+  if not _IDENTIFIER_PATTERN.match(name):
+    raise ValueError(
+      f'Invalid {context}: {name!r}. Must contain only alphanumeric '
+      'characters and underscores, and cannot start with a digit'
+    )
+
+  return name
+
+
 def _quote_value(value: Any) -> str:
   """Quote value for SurrealQL.
 
@@ -559,8 +592,9 @@ def _quote_value(value: Any) -> str:
   elif isinstance(value, (int, float)):
     return str(value)
   elif isinstance(value, str):
-    # Escape single quotes in string
-    escaped = value.replace("'", "\\'")
+    # Escape backslashes first, then single quotes to prevent SQL injection
+    # The order matters: \ must be escaped before ' to prevent \' escaping out
+    escaped = value.replace('\\', '\\\\').replace("'", "\\'")
     return f"'{escaped}'"
   else:
     # For other types, convert to string and quote

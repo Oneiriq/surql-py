@@ -22,7 +22,7 @@ class RootCredentials(BaseModel):
   """Root-level authentication credentials."""
 
   username: str = Field(description='Root username')
-  password: str = Field(description='Root password')
+  password: str = Field(description='Root password', repr=False)
 
   def to_dict(self) -> dict[str, str]:
     """Convert to dictionary for SDK."""
@@ -37,7 +37,7 @@ class NamespaceCredentials(BaseModel):
 
   namespace: str = Field(description='Namespace name')
   username: str = Field(description='Namespace username')
-  password: str = Field(description='Namespace password')
+  password: str = Field(description='Namespace password', repr=False)
 
   def to_dict(self) -> dict[str, str]:
     """Convert to dictionary for SDK."""
@@ -54,7 +54,7 @@ class DatabaseCredentials(BaseModel):
   namespace: str = Field(description='Namespace name')
   database: str = Field(description='Database name')
   username: str = Field(description='Database username')
-  password: str = Field(description='Database password')
+  password: str = Field(description='Database password', repr=False)
 
   def to_dict(self) -> dict[str, str]:
     """Convert to dictionary for SDK."""
@@ -90,7 +90,7 @@ class ScopeCredentials(BaseModel):
 class TokenAuth(BaseModel):
   """JWT token authentication."""
 
-  token: str = Field(description='JWT authentication token')
+  token: str = Field(description='JWT authentication token', repr=False)
 
 
 class AuthManager:
