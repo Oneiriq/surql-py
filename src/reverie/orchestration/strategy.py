@@ -4,11 +4,11 @@ This module implements various deployment strategies for rolling out
 migrations across multiple database instances.
 """
 
-import asyncio
 from abc import ABC, abstractmethod
 from datetime import UTC, datetime
 from enum import Enum
 
+import anyio
 import structlog
 from pydantic import BaseModel, ConfigDict, Field
 
@@ -106,7 +106,7 @@ class DeploymentStrategy(ABC):
 
     if self.dry_run:
       # Simulate deployment
-      await asyncio.sleep(0.1)
+      await anyio.sleep(0.1)
       return DeploymentResult(
         environment=env.name,
         status=DeploymentStatus.SUCCESS,
@@ -243,18 +243,18 @@ class ParallelStrategy(DeploymentStrategy):
       max_concurrent=self.max_concurrent,
     )
 
-    # Create semaphore for concurrency control
-    semaphore = asyncio.Semaphore(self.max_concurrent)
+    limiter = anyio.CapacityLimiter(self.max_concurrent)
+    results: list[DeploymentResult] = [None] * len(environments)  # type: ignore[list-item]
 
-    async def deploy_with_semaphore(env: EnvironmentConfig) -> DeploymentResult:
-      async with semaphore:
-        return await self._deploy_to_environment(env, migrations)
+    async def deploy_with_limiter(idx: int, env: EnvironmentConfig) -> None:
+      async with limiter:
+        results[idx] = await self._deploy_to_environment(env, migrations)
 
-    # Execute all deployments in parallel
-    tasks = [deploy_with_semaphore(env) for env in environments]
-    results = await asyncio.gather(*tasks)
+    async with anyio.create_task_group() as tg:
+      for i, env in enumerate(environments):
+        tg.start_soon(deploy_with_limiter, i, env)
 
-    return list(results)
+    return results
 
 
 class RollingStrategy(DeploymentStrategy):
@@ -308,8 +308,19 @@ class RollingStrategy(DeploymentStrategy):
       )
 
       # Deploy batch in parallel
-      tasks = [self._deploy_to_environment(env, migrations) for env in batch]
-      batch_results = await asyncio.gather(*tasks)
+      batch_results: list[DeploymentResult] = [None] * len(batch)  # type: ignore[list-item]
+
+      async def deploy_batch_env(
+        idx: int,
+        env: EnvironmentConfig,
+        dest: list[DeploymentResult],
+      ) -> None:
+        dest[idx] = await self._deploy_to_environment(env, migrations)
+
+      async with anyio.create_task_group() as tg:
+        for j, env in enumerate(batch):
+          tg.start_soon(deploy_batch_env, j, env, batch_results)
+
       results.extend(batch_results)
 
       # Check for failures in batch
@@ -320,7 +331,7 @@ class RollingStrategy(DeploymentStrategy):
 
       # Add delay between batches for stability
       if i + self.batch_size < len(environments):
-        await asyncio.sleep(1.0)
+        await anyio.sleep(1.0)
 
     return results
 
@@ -373,8 +384,14 @@ class CanaryStrategy(DeploymentStrategy):
     logger.info('deploying_to_canary', canary_count=canary_count)
 
     # Deploy to canary environments
-    canary_tasks = [self._deploy_to_environment(env, migrations) for env in canary_envs]
-    canary_results = await asyncio.gather(*canary_tasks)
+    canary_results: list[DeploymentResult] = [None] * len(canary_envs)  # type: ignore[list-item]
+
+    async def deploy_canary(idx: int, env: EnvironmentConfig) -> None:
+      canary_results[idx] = await self._deploy_to_environment(env, migrations)
+
+    async with anyio.create_task_group() as tg:
+      for i, env in enumerate(canary_envs):
+        tg.start_soon(deploy_canary, i, env)
 
     # Check canary success
     canary_failed = any(r.status == DeploymentStatus.FAILED for r in canary_results)
@@ -386,7 +403,13 @@ class CanaryStrategy(DeploymentStrategy):
     logger.info('canary_successful_proceeding', remaining=len(remaining_envs))
 
     # Deploy to remaining environments
-    remaining_tasks = [self._deploy_to_environment(env, migrations) for env in remaining_envs]
-    remaining_results = await asyncio.gather(*remaining_tasks)
+    remaining_results: list[DeploymentResult] = [None] * len(remaining_envs)  # type: ignore[list-item]
+
+    async def deploy_remaining(idx: int, env: EnvironmentConfig) -> None:
+      remaining_results[idx] = await self._deploy_to_environment(env, migrations)
+
+    async with anyio.create_task_group() as tg:
+      for i, env in enumerate(remaining_envs):
+        tg.start_soon(deploy_remaining, i, env)
 
     return canary_results + remaining_results

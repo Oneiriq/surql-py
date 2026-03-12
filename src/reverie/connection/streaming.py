@@ -1,11 +1,11 @@
 """Live query and real-time streaming support."""
 
-import asyncio
-import contextlib
+import inspect
 from collections.abc import AsyncIterator, Callable
 from typing import Any
 from uuid import UUID
 
+import anyio
 import structlog
 
 logger = structlog.get_logger(__name__)
@@ -70,7 +70,7 @@ class LiveQuery:
     """
     for callback in self._callbacks:
       try:
-        if asyncio.iscoroutinefunction(callback):
+        if inspect.iscoroutinefunction(callback):
           await callback(notification)
         else:
           callback(notification)
@@ -103,7 +103,7 @@ class StreamingManager:
     """
     self._client = client
     self._queries: dict[UUID, LiveQuery] = {}
-    self._subscription_tasks: dict[UUID, asyncio.Task[None]] = {}
+    self._subscription_scopes: dict[UUID, anyio.CancelScope] = {}
     logger.info('streaming_manager_initialized')
 
   async def live(
@@ -202,6 +202,10 @@ class StreamingManager:
   ) -> None:
     """Subscribe to live query with callback function.
 
+    Consumes all notifications from the live query, invoking the callback
+    for each one. Returns when the subscription closes (CLOSE action
+    received or stream ends).
+
     Args:
       query: Live query to subscribe to
       callback: Function to call on each notification
@@ -216,13 +220,8 @@ class StreamingManager:
       ```
     """
     query.add_callback(callback)
-
-    async def subscription_loop() -> None:
-      async for _notification in self.subscribe(query):
-        pass  # Callbacks are handled in subscribe()
-
-    task = asyncio.create_task(subscription_loop())
-    self._subscription_tasks[query.query_uuid] = task
+    async for _notification in self.subscribe(query):
+      pass  # Callbacks are handled in subscribe()
 
   async def kill(self, query: LiveQuery) -> None:
     """Kill a live query.
@@ -239,13 +238,10 @@ class StreamingManager:
       await self._client.kill(query.query_uuid)
       query.deactivate()
 
-      # Cancel subscription task if exists
-      if query.query_uuid in self._subscription_tasks:
-        task = self._subscription_tasks[query.query_uuid]
-        task.cancel()
-        with contextlib.suppress(asyncio.CancelledError):
-          await task
-        del self._subscription_tasks[query.query_uuid]
+      # Cancel subscription scope if exists
+      if query.query_uuid in self._subscription_scopes:
+        self._subscription_scopes[query.query_uuid].cancel()
+        del self._subscription_scopes[query.query_uuid]
 
       if query.query_uuid in self._queries:
         del self._queries[query.query_uuid]

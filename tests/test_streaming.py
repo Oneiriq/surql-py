@@ -1,6 +1,5 @@
 """Tests for streaming module."""
 
-import asyncio
 from unittest.mock import AsyncMock, MagicMock
 from uuid import uuid4
 
@@ -285,11 +284,8 @@ class TestStreamingManager:
     def callback(notification):
       callback_received.append(notification)
 
-    # Start subscription with callback (it runs in background task)
+    # Subscribe with callback (consumes all notifications inline)
     await streaming_manager.subscribe_with_callback(query, callback)
-
-    # Give it time to process
-    await asyncio.sleep(0.1)
 
     # Callback should have been called for CREATE (not CLOSE)
     assert len(callback_received) == 1
@@ -308,31 +304,17 @@ class TestStreamingManager:
     mock_client.kill.assert_called_once_with(query_uuid)
 
   @pytest.mark.anyio
-  async def test_kill_query_with_subscription_task(self, streaming_manager, mock_client):
-    """Test killing a query cancels its subscription task."""
+  async def test_kill_query_cleans_up_state(self, streaming_manager, mock_client):
+    """Test killing a query cleans up internal state."""
     query_uuid = uuid4()
     mock_client.live.return_value = query_uuid
 
-    async def mock_subscribe(_uuid):
-      while True:
-        await asyncio.sleep(0.1)
-        yield {'action': 'CREATE', 'result': {'id': 'person:1'}}
-
-    mock_client.subscribe_live = mock_subscribe
-
     query = await streaming_manager.live('person')
+    assert query.query_uuid in streaming_manager._queries
 
-    # Start subscription task
-    def callback(notification):
-      pass
-
-    await streaming_manager.subscribe_with_callback(query, callback)
-    await asyncio.sleep(0.05)  # Let task start
-
-    # Kill should cancel the task
     await streaming_manager.kill(query)
 
-    assert query.query_uuid not in streaming_manager._subscription_tasks
+    assert query.is_active is False
     assert query.query_uuid not in streaming_manager._queries
 
   @pytest.mark.anyio

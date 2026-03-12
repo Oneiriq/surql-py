@@ -149,6 +149,11 @@ class RecordID[T](BaseModel):
 
     table, id_str = parts
 
+    if not table or not table.strip():
+      raise ValueError(f'Invalid record ID: table name cannot be empty in {record_id!r}')
+    if not id_str or not id_str.strip():
+      raise ValueError(f'Invalid record ID: id cannot be empty in {record_id!r}')
+
     # Strip angle brackets if present
     if id_str.startswith('<') and id_str.endswith('>'):
       id_str = id_str[1:-1]

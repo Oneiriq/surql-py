@@ -1,7 +1,7 @@
 [project]
 name = "reverie"
 
-version = "0.6.0"
+version = "0.7.0"
 description = "Code-first schema, validation, generation, and serialization for Python and SurrealDB."
 authors = [
   { name = "Shon Thomas", email = "shon@oneiriq.com" }
@@ -67,6 +67,7 @@ select = [
 ]
 ignore = [
   "E501",   # line too long
+  "UP017",  # datetime.UTC alias - mypy strict rejects it
   "UP047",  # PEP 695 type params - ParamSpec/TypeVar still valid
 ]
 
@@ -91,7 +92,7 @@ addopts = [
   "--showlocals",
 ]
 markers = [
-  "asyncio: mark test as async",
+  "anyio: mark test as async",
 ]
 filterwarnings = [
   "ignore:Remove `format_exc_info` from your processor chain:UserWarning:structlog",
@@ -159,6 +160,7 @@ good-names = ['i', 'j', 'k', 'ex', 'id', 'db', '_']
 
 [dependency-groups]
 dev = [
+  "anyio[trio]>=4.0.0",
   "mypy>=1.19.1",
   "pytest>=9.0.2",
   "pytest-cov>=7.0.0",

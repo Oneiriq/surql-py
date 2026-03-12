@@ -4,9 +4,12 @@ This module provides field type definitions and builder functions for creating
 type-safe field definitions in table schemas.
 """
 
+import re
 from enum import Enum
 
 from pydantic import BaseModel, ConfigDict
+
+_FIELD_NAME_PART_PATTERN = re.compile(r'^[a-zA-Z_][a-zA-Z0-9_]*$')
 
 
 class FieldType(Enum):
@@ -105,6 +108,8 @@ def field(
     >>> field('age', FieldType.INT, assertion='$value >= 0 AND $value <= 150')
     FieldDefinition(name='age', type=FieldType.INT, assertion='$value >= 0 AND $value <= 150', ...)
   """
+  _validate_field_name(name)
+
   return FieldDefinition(
     name=name,
     type=field_type,
@@ -115,6 +120,32 @@ def field(
     readonly=readonly,
     flexible=flexible,
   )
+
+
+def _validate_field_name(name: str) -> None:
+  """Validate a field name against SurrealDB identifier rules.
+
+  Supports dot-notation for nested fields (e.g., 'address.city').
+  Each part must be alphanumeric/underscore and not start with a digit.
+
+  Args:
+    name: Field name to validate
+
+  Raises:
+    ValueError: If the field name is invalid
+  """
+  if not name:
+    raise ValueError('Field name cannot be empty')
+
+  parts = name.split('.')
+  for part in parts:
+    if not part:
+      raise ValueError(f'Invalid field name {name!r}: empty segment')
+    if not _FIELD_NAME_PART_PATTERN.match(part):
+      raise ValueError(
+        f'Invalid field name {name!r}: segment {part!r} must contain only '
+        'alphanumeric characters and underscores, and cannot start with a digit'
+      )
 
 
 def string_field(

@@ -31,6 +31,7 @@ from reverie.query.builder import (  # Query builder
   relate,
   select,
   update,
+  upsert,
   vector_search_query,
   where,
 )
@@ -48,6 +49,7 @@ from reverie.query.crud import (  # CRUD operations
   query_records,
   query_records_wrapped,
   update_record,
+  upsert_record,
 )
 from reverie.query.executor import (  # Query executor
   execute_query,
@@ -147,6 +149,7 @@ __all__ = [
   'insert',
   'update',
   'delete',
+  'upsert',
   'relate',
   'vector_search_query',
   'VectorDistanceType',
@@ -208,6 +211,7 @@ __all__ = [
   'delete_records',
   'query_records',
   'query_records_wrapped',
+  'upsert_record',
   'count_records',
   'exists',
   'first',

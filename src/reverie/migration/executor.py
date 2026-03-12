@@ -68,21 +68,30 @@ async def execute_migration(
     # Record start time
     start_time = time.time()
 
-    # Execute each statement
-    for i, statement in enumerate(statements):
+    # Execute statements within a transaction for atomicity
+    await client.execute('BEGIN TRANSACTION;')
+    try:
+      for i, statement in enumerate(statements):
+        try:
+          log.debug('executing_statement', statement_index=i, statement=statement)
+          await client.execute(statement)
+        except QueryError as e:
+          log.error(
+            'statement_execution_failed',
+            statement_index=i,
+            statement=statement,
+            error=str(e),
+          )
+          raise MigrationExecutionError(
+            f'Failed to execute statement {i} in migration {migration.version}: {e}'
+          ) from e
+      await client.execute('COMMIT TRANSACTION;')
+    except Exception:
       try:
-        log.debug('executing_statement', statement_index=i, statement=statement)
-        await client.execute(statement)
-      except QueryError as e:
-        log.error(
-          'statement_execution_failed',
-          statement_index=i,
-          statement=statement,
-          error=str(e),
-        )
-        raise MigrationExecutionError(
-          f'Failed to execute statement {i} in migration {migration.version}: {e}'
-        ) from e
+        await client.execute('CANCEL TRANSACTION;')
+      except Exception as cancel_err:
+        log.error('transaction_cancel_failed', error=str(cancel_err))
+      raise
 
     # Calculate execution time
     execution_time_ms = int((time.time() - start_time) * 1000)

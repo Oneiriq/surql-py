@@ -4,6 +4,8 @@ This module provides functions for comparing schema definitions and generating
 SQL statements for schema changes.
 """
 
+import re
+
 import structlog
 
 from reverie.migration.models import DiffOperation, SchemaDiff
@@ -16,6 +18,40 @@ from reverie.schema.table import (
 )
 
 logger = structlog.get_logger(__name__)
+
+
+# Pattern matching safe SurrealDB default values:
+# - Function calls: time::now(), rand::uuid(), math::floor(1.5)
+# - Numeric literals: 42, 3.14, -1
+# - Boolean literals: true, false
+# - String literals in single quotes: 'hello'
+# - NONE/NULL
+_SAFE_DEFAULT_PATTERN = re.compile(
+  r'^('
+  r'[a-zA-Z_][a-zA-Z0-9_]*(?:::[a-zA-Z_][a-zA-Z0-9_]*)*\([^;]*\)'  # function calls
+  r'|-?\d+(?:\.\d+)?'  # numeric literals
+  r'|true|false'  # boolean literals
+  r'|NONE|NULL'  # null values
+  r"|'(?:[^'\\]|\\.)*'"  # single-quoted strings
+  r'|\$[a-zA-Z_][a-zA-Z0-9_]*'  # parameter references
+  r')$'
+)
+
+
+def _validate_default_value(default: str) -> None:
+  """Validate that a field default is a safe SurrealDB expression.
+
+  Args:
+    default: The default value expression to validate
+
+  Raises:
+    ValueError: If the default contains potentially unsafe SQL
+  """
+  if not _SAFE_DEFAULT_PATTERN.match(default.strip()):
+    raise ValueError(
+      f'Unsafe default value expression: {default!r}. '
+      'Defaults must be function calls, literals, or parameter references.'
+    )
 
 
 def diff_tables(
@@ -284,6 +320,7 @@ def _generate_add_field_diff(table_name: str, field: FieldDefinition) -> SchemaD
 
   # Add backfill SQL for fields with defaults to update existing records
   if field.default:
+    _validate_default_value(field.default)
     backfill_sql = (
       f'UPDATE {table_name} SET {field.name} = {field.default} WHERE {field.name} IS NONE;'
     )
@@ -526,9 +563,11 @@ def _field_to_sql(table_name: str, field: FieldDefinition) -> str:
     sql += f' ASSERT {field.assertion}'
 
   if field.default:
+    _validate_default_value(field.default)
     sql += f' DEFAULT {field.default}'
 
   if field.value:
+    _validate_default_value(field.value)
     sql += f' VALUE {field.value}'
 
   if field.readonly:

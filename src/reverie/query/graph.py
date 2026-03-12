@@ -346,15 +346,8 @@ class GraphQuery[T: BaseModel]:
     Examples:
       >>> has_followers = await GraphQuery("user:alice").in_("follows").exists()
     """
-    # Use count with limit 1 for efficiency
-    original_limit = self._limit
-    self._limit = 1
-
-    try:
-      count = await self.count(client)
-      return count > 0
-    finally:
-      self._limit = original_limit
+    count = await self.count(client)
+    return count > 0
 
 
 def _extract_graph_result(result: Any) -> list[dict[str, Any]]:

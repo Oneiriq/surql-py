@@ -76,8 +76,8 @@ class DatabaseClient:
       ConnectionError: If connection fails after all retries
     """
     if self._connected:
-      self._log.warning('client_already_connected')
-      return
+      self._log.info('reconnecting_client')
+      await self.disconnect()
 
     try:
       async for attempt in AsyncRetrying(

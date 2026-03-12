@@ -236,11 +236,22 @@ class TestDatabaseClient:
 
   @pytest.mark.anyio
   async def test_connect_already_connected(self, mock_db_client: DatabaseClient) -> None:
-    """Test connecting when already connected."""
-    # Client is already connected from fixture
-    await mock_db_client.connect()
+    """Test reconnecting when already connected disconnects first."""
+    # Save reference to the original mock client
+    original_client = mock_db_client._client
 
-    # Should still be connected (warning logged but no error)
+    # Mock AsyncSurreal so reconnect doesn't hit a real server
+    new_mock = Mock()
+    new_mock.connect = AsyncMock()
+    new_mock.signin = AsyncMock()
+    new_mock.use = AsyncMock()
+
+    with patch('reverie.connection.client.AsyncSurreal', return_value=new_mock):
+      await mock_db_client.connect()
+
+    # Original client should have been closed
+    original_client.close.assert_called_once()
+    # Should still be connected after reconnect
     assert mock_db_client.is_connected is True
 
   @pytest.mark.anyio

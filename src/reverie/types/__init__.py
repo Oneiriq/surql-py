@@ -3,6 +3,7 @@
 This package provides type-safe wrappers and operators for building SurrealDB queries.
 """
 
+from reverie.types.coerce import coerce_datetime, coerce_record_datetimes
 from reverie.types.operators import (
   # Logical operators
   And,
@@ -87,4 +88,7 @@ __all__ = [
   'and_',
   'or_',
   'not_',
+  # Coercion utilities
+  'coerce_datetime',
+  'coerce_record_datetimes',
 ]

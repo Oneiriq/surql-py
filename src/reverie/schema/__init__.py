@@ -45,6 +45,11 @@ from reverie.schema.registry import (
   register_edge,
   register_table,
 )
+from reverie.schema.sql import (
+  generate_edge_sql,
+  generate_schema_sql,
+  generate_table_sql,
+)
 from reverie.schema.table import (
   EventDefinition,
   IndexDefinition,
@@ -148,4 +153,8 @@ __all__ = [
   'MINIMAL_THEME',
   'get_theme',
   'list_themes',
+  # SQL generation
+  'generate_table_sql',
+  'generate_edge_sql',
+  'generate_schema_sql',
 ]

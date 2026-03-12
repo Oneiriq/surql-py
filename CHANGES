@@ -5,6 +5,59 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.7.0] - 2026-03-11
+
+### Added
+
+- **Upsert support**: `upsert()` query builder method and `upsert_record()` CRUD function
+  for insert-or-update operations
+- **Datetime coercion utilities**: `coerce_datetime()` and `coerce_record_datetimes()` for
+  converting SurrealDB ISO datetime strings to Python datetime objects, including nanosecond
+  truncation and timezone handling
+- **SQL generation from schema definitions**: `generate_table_sql()`, `generate_edge_sql()`,
+  and `generate_schema_sql()` for generating SurrealQL DEFINE statements directly from
+  TableDefinition/EdgeDefinition objects
+- **Additional exports**: `extract_result`, `extract_one`, `extract_scalar`, `has_results`,
+  and `delete_records` added to package-level `__all__`
+- **Field name validation**: Schema field builder functions now validate field names against
+  SurrealDB identifier rules (alphanumeric + underscore, dot notation for nested fields)
+
+### Fixed
+
+- **CI format check was a no-op**: `ruff format src tests` (formats in-place, always passes)
+  changed to `ruff format --check src tests`
+- **GraphQuery.exists() mutated state**: `exists()` modified `self._limit` directly, violating
+  immutability. Rewritten to use `count()` without mutation
+- **SQL injection in migration diff defaults**: Field default values interpolated into SQL
+  without sanitization. Added `_validate_default_value()` with safe literal pattern matching
+- **Pytest marker mismatch**: Declared `asyncio` marker but tests use `anyio`. Fixed marker
+  declaration to `anyio`
+- **Migration executor lacked transactional wrapping**: Statements now execute within
+  BEGIN/COMMIT/CANCEL TRANSACTION blocks for atomicity
+- **Connection client reconnection**: Calling `connect()` when already connected now properly
+  disconnects first before reconnecting
+- **Cache TTL logic**: Fixed unreachable code path for custom TTL tracking
+- **RecordID empty parts**: `parse()` now validates that table and id parts are non-empty
+- **Nested transaction prevention**: Transaction manager checks for active transactions via
+  `ContextVar` and raises `TransactionError` if nested
+- **asyncio/trio incompatibility**: Replaced `asyncio.sleep`, `asyncio.gather`,
+  `asyncio.Semaphore`, and `asyncio.create_task` with anyio equivalents in orchestration
+  strategies and streaming module
+
+### Changed
+
+- **Edge schema RELATION mode validation**: Moved from construction-time to SQL generation
+  time, allowing incremental composition via `with_from_table()`/`with_to_table()`
+- **CHANGES file**: Updated to reflect versions 0.1.0 through 0.7.0
+
+### Testing
+
+- **Test coverage**: 2089 tests passing (up from ~1018)
+- New test suites: `test_coerce.py`, `test_schema_sql.py`, `test_upsert.py`
+- Field name validation tests added to `test_schema.py`
+
+---
+
 ## [0.1.0] - 2026-01-02
 
 ### Added

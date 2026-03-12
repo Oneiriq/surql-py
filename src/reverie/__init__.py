@@ -30,14 +30,19 @@ from reverie.query import (
   create_relation,
   delete,
   delete_record,
+  delete_records,
   execute_query,
   exists,
+  extract_one,
+  extract_result,
+  extract_scalar,
   fetch_all,
   fetch_many,
   fetch_one,
   first,
   get_record,
   get_related_records,
+  has_results,
   insert,
   last,
   merge_record,
@@ -48,6 +53,8 @@ from reverie.query import (
   traverse,
   update,
   update_record,
+  upsert,
+  upsert_record,
 )
 from reverie.types import (
   Operator,
@@ -64,7 +71,7 @@ from reverie.types import (
   or_,
 )
 
-__version__ = '0.6.0'
+__version__ = '0.7.0'
 
 __all__ = [
   # Configuration
@@ -95,6 +102,7 @@ __all__ = [
   'insert',
   'update',
   'delete',
+  'upsert',
   'relate',
   # Query execution
   'execute_query',
@@ -107,7 +115,9 @@ __all__ = [
   'get_record',
   'update_record',
   'merge_record',
+  'upsert_record',
   'delete_record',
+  'delete_records',
   'query_records',
   'count_records',
   'exists',
@@ -122,6 +132,11 @@ __all__ = [
   'RecordResult',
   'ListResult',
   'CountResult',
+  # Result extraction utilities
+  'extract_result',
+  'extract_one',
+  'extract_scalar',
+  'has_results',
   # Types
   'RecordID',
   'Operator',

@@ -138,8 +138,6 @@ class MemoryCache(CacheBackend):
         ttl: Time-to-live in seconds. Uses default_ttl if None.
     """
     async with self._lock:
-      effective_ttl = ttl if ttl is not None else self._default_ttl
-
       # Store with custom TTL tracking if different from default
       if ttl is not None and ttl != self._default_ttl:
         self._custom_ttls[key] = (time.monotonic(), ttl)
@@ -148,10 +146,6 @@ class MemoryCache(CacheBackend):
 
       # Store in cache (TTLCache handles its own expiration for default TTL)
       self._cache[key] = value
-
-      # If we have a smaller TTL than default, schedule cleanup
-      if effective_ttl < self._default_ttl:
-        self._custom_ttls[key] = (time.monotonic(), effective_ttl)
 
   async def delete(self, key: str) -> None:
     """Delete key from cache.

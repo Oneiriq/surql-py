@@ -2,6 +2,7 @@
 
 from collections.abc import AsyncIterator
 from contextlib import asynccontextmanager
+from contextvars import ContextVar
 from enum import Enum
 from typing import Any
 
@@ -10,6 +11,8 @@ import structlog
 from reverie.connection.client import DatabaseClient
 
 logger = structlog.get_logger(__name__)
+
+_active_transaction: ContextVar[bool] = ContextVar('_active_transaction', default=False)
 
 
 class TransactionState(Enum):
@@ -57,15 +60,19 @@ class Transaction:
     """Begin the transaction.
 
     Raises:
-      TransactionError: If transaction is already active or cannot be started
+      TransactionError: If transaction is already active, nested, or cannot be started
     """
     if self._state != TransactionState.PENDING:
       raise TransactionError(f'Cannot begin transaction in {self._state.value} state')
+
+    if _active_transaction.get():
+      raise TransactionError('Nested transactions are not supported by SurrealDB')
 
     try:
       self._log.info('beginning_transaction')
       await self._client.execute('BEGIN TRANSACTION;')
       self._state = TransactionState.ACTIVE
+      _active_transaction.set(True)
       self._log.info('transaction_started')
     except Exception as e:
       self._log.error('transaction_begin_failed', error=str(e))
@@ -84,10 +91,12 @@ class Transaction:
       self._log.info('committing_transaction')
       await self._client.execute('COMMIT TRANSACTION;')
       self._state = TransactionState.COMMITTED
+      _active_transaction.set(False)
       self._log.info('transaction_committed')
     except Exception as e:
       self._log.error('transaction_commit_failed', error=str(e))
       self._state = TransactionState.CANCELLED
+      _active_transaction.set(False)
       raise TransactionError(f'Failed to commit transaction: {e}') from e
 
   async def cancel(self) -> None:
@@ -108,10 +117,12 @@ class Transaction:
       if self._state == TransactionState.ACTIVE:
         await self._client.execute('CANCEL TRANSACTION;')
       self._state = TransactionState.CANCELLED
+      _active_transaction.set(False)
       self._log.info('transaction_cancelled')
     except Exception as e:
       self._log.error('transaction_cancel_failed', error=str(e))
       self._state = TransactionState.CANCELLED
+      _active_transaction.set(False)
       raise TransactionError(f'Failed to cancel transaction: {e}') from e
 
   async def execute(self, query: str, params: dict[str, Any] | None = None) -> Any:

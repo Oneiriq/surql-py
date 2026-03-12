@@ -18,6 +18,7 @@ from reverie.schema.edge import (
 from reverie.schema.fields import (
   FieldDefinition,
   FieldType,
+  _validate_field_name,
   array_field,
   bool_field,
   computed_field,
@@ -29,6 +30,7 @@ from reverie.schema.fields import (
   record_field,
   string_field,
 )
+from reverie.schema.sql import generate_edge_sql
 from reverie.schema.table import (
   EventDefinition,
   IndexDefinition,
@@ -540,12 +542,18 @@ class TestEdgeBuilders:
   """Test suite for edge builder functions."""
 
   def test_edge_schema_builder(self) -> None:
-    """Test edge_schema builder."""
-    edge = edge_schema('likes')
+    """Test edge_schema builder with RELATION mode requires from/to tables."""
+    edge = edge_schema('likes', from_table='user', to_table='post')
 
     assert edge.name == 'likes'
-    assert edge.from_table is None
-    assert edge.to_table is None
+    assert edge.from_table == 'user'
+    assert edge.to_table == 'post'
+
+  def test_edge_schema_relation_missing_tables(self) -> None:
+    """Test generate_edge_sql RELATION mode raises without from_table/to_table."""
+    edge = edge_schema('likes')
+    with pytest.raises(ValueError, match='requires both from_table and to_table'):
+      generate_edge_sql(edge)
 
   def test_edge_schema_with_constraints(self) -> None:
     """Test edge_schema with table constraints."""
@@ -562,6 +570,8 @@ class TestEdgeBuilders:
     """Test edge_schema with fields."""
     edge = edge_schema(
       'likes',
+      from_table='user',
+      to_table='post',
       fields=[datetime_field('created_at', default='time::now()')],
     )
 
@@ -695,4 +705,77 @@ class TestSchemaIntegration:
     assert likes_edge.name == 'likes'
     assert likes_edge.from_table == 'user'
     assert likes_edge.to_table == 'post'
-    assert len(likes_edge.fields) == 2
+
+
+class TestValidateFieldName:
+  """Tests for _validate_field_name function."""
+
+  def test_simple_name_valid(self) -> None:
+    """Accepts a simple alphanumeric field name."""
+    _validate_field_name('name')  # should not raise
+
+  def test_underscore_prefix_valid(self) -> None:
+    """Accepts field names starting with an underscore."""
+    _validate_field_name('_internal')  # should not raise
+
+  def test_mixed_alphanumeric_valid(self) -> None:
+    """Accepts field names with letters, digits, and underscores."""
+    _validate_field_name('field_name_1')  # should not raise
+
+  def test_dot_notation_valid(self) -> None:
+    """Accepts nested field names using dot notation."""
+    _validate_field_name('address.city')  # should not raise
+
+  def test_deep_dot_notation_valid(self) -> None:
+    """Accepts multiple levels of dot notation."""
+    _validate_field_name('a.b.c')  # should not raise
+
+  def test_empty_name_raises(self) -> None:
+    """Raises ValueError for empty string."""
+    with pytest.raises(ValueError, match='cannot be empty'):
+      _validate_field_name('')
+
+  def test_starts_with_digit_raises(self) -> None:
+    """Raises ValueError when field name starts with a digit."""
+    with pytest.raises(ValueError):
+      _validate_field_name('1name')
+
+  def test_special_chars_raises(self) -> None:
+    """Raises ValueError for names containing special characters."""
+    with pytest.raises(ValueError):
+      _validate_field_name('na me!')
+
+  def test_hyphen_raises(self) -> None:
+    """Raises ValueError for names with hyphens."""
+    with pytest.raises(ValueError):
+      _validate_field_name('field-name')
+
+  def test_empty_dot_segment_raises(self) -> None:
+    """Raises ValueError for dot notation with empty segment (e.g., 'a..b')."""
+    with pytest.raises(ValueError, match='empty segment'):
+      _validate_field_name('a..b')
+
+  def test_trailing_dot_raises(self) -> None:
+    """Raises ValueError for trailing dot (empty segment at end)."""
+    with pytest.raises(ValueError, match='empty segment'):
+      _validate_field_name('address.')
+
+  def test_leading_dot_raises(self) -> None:
+    """Raises ValueError for leading dot (empty segment at start)."""
+    with pytest.raises(ValueError, match='empty segment'):
+      _validate_field_name('.address')
+
+  def test_dot_segment_starts_with_digit_raises(self) -> None:
+    """Raises ValueError when a nested segment starts with a digit."""
+    with pytest.raises(ValueError):
+      _validate_field_name('address.1city')
+
+  def test_field_builder_validates_name(self) -> None:
+    """The field() builder function validates the name via _validate_field_name."""
+    with pytest.raises(ValueError):
+      field('1bad', FieldType.STRING)
+
+  def test_string_field_builder_validates_name(self) -> None:
+    """string_field() builder validates the name."""
+    with pytest.raises(ValueError):
+      string_field('bad name!')

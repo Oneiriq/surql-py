@@ -439,6 +439,52 @@ async def count_records(
   return 0
 
 
+async def upsert_record(
+  table: str,
+  record_id: str | RecordID[Any],
+  data: dict[str, Any] | BaseModel,
+  client: DatabaseClient | None = None,
+) -> dict[str, Any]:
+  """Insert or update a record.
+
+  Creates the record if it does not exist, or updates it if it does.
+
+  Args:
+    table: Table name
+    record_id: Record ID
+    data: Record data (Pydantic model or dict)
+    client: Database client. If None, uses context client.
+
+  Returns:
+    Upserted record
+
+  Raises:
+    QueryError: If upsert fails
+
+  Examples:
+    >>> result = await upsert_record('user', 'alice', {'name': 'Alice', 'status': 'active'})
+  """
+  db = client or get_db()
+
+  target = str(record_id) if isinstance(record_id, RecordID) else f'{table}:{record_id}'
+  record_data = data.model_dump() if isinstance(data, BaseModel) else data
+
+  logger.info('upserting_record', target=target)
+
+  query: Query[Any] = Query().upsert(target, record_data)
+  result = await db.execute(query.to_surql())
+
+  if isinstance(result, list) and len(result) > 0:
+    if isinstance(result[0], dict) and 'result' in result[0]:
+      data_list = result[0]['result']
+      if isinstance(data_list, list) and len(data_list) > 0:
+        return data_list[0]  # type: ignore[no-any-return]
+    elif isinstance(result[0], dict):
+      return result[0]
+
+  return result  # type: ignore[no-any-return]
+
+
 async def exists(
   table: str,
   record_id: str | RecordID[Any],

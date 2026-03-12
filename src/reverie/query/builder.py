@@ -319,6 +319,38 @@ class Query[T: BaseModel](BaseModel):
       }
     )
 
+  def upsert(self, target: str, data: dict[str, Any]) -> Query[T]:
+    """Create an UPSERT query.
+
+    Inserts a record if it does not exist, or updates it if it does.
+
+    Args:
+      target: Table name or record ID to upsert
+      data: Data to upsert
+
+    Returns:
+      New Query instance with UPSERT operation
+
+    Raises:
+      ValueError: If table name or field names contain invalid characters
+
+    Examples:
+      >>> Query().upsert('user:alice', {'name': 'Alice', 'status': 'active'})
+      >>> Query().upsert('user', {'name': 'Bob'}).where('email = "bob@example.com"')
+    """
+    table_part = target.split(':')[0] if ':' in target else target
+    _validate_identifier(table_part, 'table name')
+    for field_name in data:
+      _validate_identifier(field_name, 'field name')
+
+    return self.model_copy(
+      update={
+        'operation': 'UPSERT',
+        'table_name': target,
+        'update_data': data,
+      }
+    )
+
   def relate(
     self,
     edge_table: str,
@@ -712,6 +744,8 @@ class Query[T: BaseModel](BaseModel):
       base_sql = self._build_update()
     elif self.operation == 'DELETE':
       base_sql = self._build_delete()
+    elif self.operation == 'UPSERT':
+      base_sql = self._build_upsert()
     elif self.operation == 'RELATE':
       base_sql = self._build_relate()
     else:
@@ -843,6 +877,35 @@ class Query[T: BaseModel](BaseModel):
       raise ValueError('Table name required for DELETE query')
 
     parts = [f'DELETE {self.table_name}']
+
+    # Add WHERE conditions
+    if self.conditions:
+      conditions_str = ' AND '.join(f'({c})' for c in self.conditions)
+      parts.append(f'WHERE {conditions_str}')
+
+    # Add RETURN clause if specified
+    if self.return_format:
+      parts.append(f'RETURN {self.return_format.value}')
+
+    return ' '.join(parts)
+
+  def _build_upsert(self) -> str:
+    """Build UPSERT query string."""
+    if not self.table_name:
+      raise ValueError('Table name required for UPSERT query')
+
+    if not self.update_data:
+      raise ValueError('Data required for UPSERT query')
+
+    # Build CONTENT object
+    data_parts = []
+    for key, value in self.update_data.items():
+      quoted_value = _quote_value(value)
+      data_parts.append(f'{key}: {quoted_value}')
+
+    data_str = '{' + ', '.join(data_parts) + '}'
+
+    parts = [f'UPSERT {self.table_name} CONTENT {data_str}']
 
     # Add WHERE conditions
     if self.conditions:
@@ -1003,6 +1066,19 @@ def delete(target: str) -> Query[Any]:
     Query instance with DELETE operation
   """
   return Query().delete(target)
+
+
+def upsert(target: str, data: dict[str, Any]) -> Query[Any]:
+  """Create an UPSERT query.
+
+  Args:
+    target: Table name or record ID
+    data: Data to upsert
+
+  Returns:
+    Query instance with UPSERT operation
+  """
+  return Query().upsert(target, data)
 
 
 def relate(

@@ -43,8 +43,8 @@ class TestExecuteMigration:
       assert isinstance(result, int)
       assert result >= 0
 
-      # Verify SQL statements were executed
-      assert mock_db_client._client.query.call_count == 2
+      # Verify SQL statements were executed (BEGIN + 2 statements + COMMIT = 4)
+      assert mock_db_client._client.query.call_count == 4
 
       # Verify migration was recorded
       mock_record.assert_called_once()
@@ -88,8 +88,17 @@ class TestExecuteMigration:
       down=lambda: ['DROP TABLE test;'],
     )
 
-    # Mock query to fail on second statement
-    mock_db_client._client.query = AsyncMock(side_effect=QueryError('Syntax error'))
+    # Mock query to succeed for BEGIN TRANSACTION then fail on statements
+    call_count = 0
+
+    async def side_effect(query: str, _params: dict | None = None) -> list:
+      nonlocal call_count
+      call_count += 1
+      if 'BEGIN' in query or 'CANCEL' in query:
+        return [{'result': [], 'time': '0ns'}]
+      raise QueryError('Syntax error')
+
+    mock_db_client._client.query = AsyncMock(side_effect=side_effect)
 
     with pytest.raises(MigrationExecutionError) as exc_info:
       await execute_migration(mock_db_client, migration, MigrationDirection.UP)
@@ -576,7 +585,8 @@ class TestExecuteMigrationPlan:
       await execute_migration_plan(mock_db_client, plan)
 
       # Verify both migrations were executed
-      assert mock_db_client._client.query.call_count == 2
+      # 2 migrations x 3 calls each (BEGIN + statement + COMMIT)
+      assert mock_db_client._client.query.call_count == 6
 
   @pytest.mark.anyio
   async def test_execute_migration_plan_down(self, mock_db_client, tmp_path: Path):
@@ -603,8 +613,8 @@ class TestExecuteMigrationPlan:
     with patch('reverie.migration.executor.remove_migration_record', new=AsyncMock()):
       await execute_migration_plan(mock_db_client, plan)
 
-      # Verify migrations were executed in reverse order
-      assert mock_db_client._client.query.call_count == 2
+      # 2 migrations x 3 calls each (BEGIN + statement + COMMIT)
+      assert mock_db_client._client.query.call_count == 6
 
   @pytest.mark.anyio
   async def test_execute_migration_plan_empty(self, mock_db_client):
