@@ -280,13 +280,17 @@ class TestGenerateSchemaSql:
     assert 'DEFINE TABLE user' in sql
     assert 'DEFINE TABLE post' in sql
 
-  def test_result_is_string(self) -> None:
-    """Returns a string result."""
-    user_table = table_schema('user')
+  def test_tables_separated_by_blank_lines(self) -> None:
+    """Multiple tables are separated by blank lines for readability."""
+    sql = generate_schema_sql(
+      tables={
+        'user': table_schema('user'),
+        'post': table_schema('post'),
+      }
+    )
 
-    result = generate_schema_sql(tables={'user': user_table})
-
-    assert isinstance(result, str)
+    lines = sql.split('\n')
+    assert any(line == '' for line in lines)
 
 
 class TestIfNotExists:

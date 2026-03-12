@@ -56,20 +56,23 @@ class TestFieldType:
   """Test suite for FieldType enum."""
 
   def test_field_type_values(self) -> None:
-    """Test FieldType enum values."""
-    assert FieldType.STRING.value == 'string'
-    assert FieldType.INT.value == 'int'
-    assert FieldType.FLOAT.value == 'float'
-    assert FieldType.BOOL.value == 'bool'
-    assert FieldType.DATETIME.value == 'datetime'
-    assert FieldType.DURATION.value == 'duration'
-    assert FieldType.DECIMAL.value == 'decimal'
-    assert FieldType.NUMBER.value == 'number'
-    assert FieldType.OBJECT.value == 'object'
-    assert FieldType.ARRAY.value == 'array'
-    assert FieldType.RECORD.value == 'record'
-    assert FieldType.GEOMETRY.value == 'geometry'
-    assert FieldType.ANY.value == 'any'
+    """FieldType values produce correct type strings in SQL generation."""
+    from reverie.schema.sql import generate_table_sql
+
+    # Verify a representative sample of field types generate correct SQL
+    table = table_schema(
+      'test',
+      fields=[
+        field('s', FieldType.STRING),
+        field('i', FieldType.INT),
+        field('d', FieldType.DATETIME),
+      ],
+    )
+    stmts = generate_table_sql(table)
+    sql = '\n'.join(stmts)
+    assert 'TYPE string' in sql
+    assert 'TYPE int' in sql
+    assert 'TYPE datetime' in sql
 
 
 class TestFieldDefinition:
@@ -234,28 +237,41 @@ class TestTableMode:
   """Test suite for TableMode enum."""
 
   def test_table_mode_values(self) -> None:
-    """Test TableMode enum values."""
-    assert TableMode.SCHEMAFULL.value == 'SCHEMAFULL'
-    assert TableMode.SCHEMALESS.value == 'SCHEMALESS'
-    assert TableMode.DROP.value == 'DROP'
+    """TableMode values produce correct mode strings in SQL."""
+    from reverie.schema.sql import generate_table_sql
+
+    for mode_val in [TableMode.SCHEMAFULL, TableMode.SCHEMALESS]:
+      table = table_schema('test', mode=mode_val)
+      stmts = generate_table_sql(table)
+      assert mode_val.value in stmts[0]
 
 
 class TestIndexType:
   """Test suite for IndexType enum."""
 
   def test_index_type_values(self) -> None:
-    """Test IndexType enum values."""
-    assert IndexType.UNIQUE.value == 'UNIQUE'
-    assert IndexType.SEARCH.value == 'SEARCH'
-    assert IndexType.STANDARD.value == 'INDEX'
-    assert IndexType.MTREE.value == 'MTREE'
+    """IndexType values produce correct index types in SQL."""
+    from reverie.schema.sql import generate_table_sql
+
+    table = table_schema(
+      'test',
+      indexes=[
+        unique_index('u_idx', ['email']),
+        index('s_idx', ['title'], IndexType.STANDARD),
+      ],
+    )
+    stmts = generate_table_sql(table)
+    sql = '\n'.join(stmts)
+    assert 'UNIQUE' in sql
+    # STANDARD indexes don't append keyword
+    assert 'DEFINE INDEX s_idx ON TABLE test COLUMNS title;' in sql
 
 
 class TestMTreeDistanceType:
   """Test suite for MTreeDistanceType enum."""
 
   def test_mtree_distance_type_values(self) -> None:
-    """Test MTreeDistanceType enum values."""
+    """Verify enum values match SurrealDB expected distance metric strings."""
     assert MTreeDistanceType.COSINE.value == 'COSINE'
     assert MTreeDistanceType.EUCLIDEAN.value == 'EUCLIDEAN'
     assert MTreeDistanceType.MANHATTAN.value == 'MANHATTAN'
@@ -266,7 +282,7 @@ class TestMTreeVectorType:
   """Test suite for MTreeVectorType enum."""
 
   def test_mtree_vector_type_values(self) -> None:
-    """Test MTreeVectorType enum values."""
+    """Verify enum values match SurrealDB expected vector type strings."""
     assert MTreeVectorType.F64.value == 'F64'
     assert MTreeVectorType.F32.value == 'F32'
     assert MTreeVectorType.I64.value == 'I64'
@@ -555,17 +571,6 @@ class TestEdgeBuilders:
     with pytest.raises(ValueError, match='requires both from_table and to_table'):
       generate_edge_sql(edge)
 
-  def test_edge_schema_with_constraints(self) -> None:
-    """Test edge_schema with table constraints."""
-    edge = edge_schema(
-      'likes',
-      from_table='user',
-      to_table='post',
-    )
-
-    assert edge.from_table == 'user'
-    assert edge.to_table == 'post'
-
   def test_edge_schema_with_fields(self) -> None:
     """Test edge_schema with fields."""
     edge = edge_schema(
@@ -665,7 +670,9 @@ class TestSchemaIntegration:
   """Integration tests for schema components."""
 
   def test_build_complete_table_schema(self) -> None:
-    """Test building a complete table schema with composition."""
+    """Composed table schema generates valid SQL with all components."""
+    from reverie.schema.sql import generate_table_sql
+
     user_table = table_schema('user')
     user_table = with_fields(
       user_table,
@@ -686,13 +693,22 @@ class TestSchemaIntegration:
       },
     )
 
-    assert user_table.name == 'user'
-    assert len(user_table.fields) == 4
-    assert len(user_table.indexes) == 1
-    assert user_table.permissions is not None
+    stmts = generate_table_sql(user_table)
+    sql = '\n'.join(stmts)
+
+    assert 'DEFINE TABLE user SCHEMAFULL' in sql
+    assert 'DEFINE FIELD email ON TABLE user TYPE string' in sql
+    assert 'ASSERT string::is::email($value)' in sql
+    assert 'DEFINE FIELD created_at ON TABLE user TYPE datetime' in sql
+    assert 'DEFAULT time::now()' in sql
+    assert 'READONLY' in sql
+    assert 'DEFINE INDEX email_idx ON TABLE user COLUMNS email UNIQUE' in sql
+    assert 'FOR SELECT' in sql
 
   def test_build_complete_edge_schema(self) -> None:
-    """Test building a complete edge schema with composition."""
+    """Composed edge schema generates valid SQL with all components."""
+    from reverie.schema.sql import generate_edge_sql
+
     likes_edge = edge_schema('likes')
     likes_edge = with_from_table(likes_edge, 'user')
     likes_edge = with_to_table(likes_edge, 'post')
@@ -702,9 +718,12 @@ class TestSchemaIntegration:
       int_field('weight', default='1'),
     )
 
-    assert likes_edge.name == 'likes'
-    assert likes_edge.from_table == 'user'
-    assert likes_edge.to_table == 'post'
+    stmts = generate_edge_sql(likes_edge)
+    sql = '\n'.join(stmts)
+
+    assert 'DEFINE TABLE likes TYPE RELATION FROM user TO post' in sql
+    assert 'DEFINE FIELD created_at ON TABLE likes TYPE datetime' in sql
+    assert 'DEFINE FIELD weight ON TABLE likes TYPE int' in sql
 
 
 class TestValidateFieldName:

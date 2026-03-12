@@ -85,6 +85,13 @@ class TestCreateRecord:
     assert result['email'] == 'alice@example.com'
     assert result['age'] == 30
     mock_db_client.create.assert_called_once()
+    # Verify Pydantic model was serialized to dict for the create call
+    call_args = mock_db_client.create.call_args[0]
+    assert call_args[0] == 'user'
+    assert isinstance(call_args[1], dict)
+    assert call_args[1]['name'] == 'Alice'
+    assert call_args[1]['email'] == 'alice@example.com'
+    assert call_args[1]['age'] == 30
 
   @pytest.mark.anyio
   async def test_create_record_with_context(self, mock_db_client: DatabaseClient) -> None:
@@ -422,15 +429,18 @@ class TestMergeRecord:
 
   @pytest.mark.anyio
   async def test_merge_record_preserves_other_fields(self, mock_db_client: DatabaseClient) -> None:
-    """Test that merge preserves fields not in update data."""
+    """Test that merge sends only partial data while response contains all fields."""
     mock_db_client.merge = AsyncMock(
       return_value={'id': 'user:alice', 'name': 'Alice', 'email': 'alice@example.com', 'age': 31}
     )
 
     result = await merge_record('user', 'alice', {'age': 31}, client=mock_db_client)
 
-    assert result['name'] == 'Alice'
-    assert result['email'] == 'alice@example.com'
+    # Verify only partial data was sent in the merge call
+    mock_db_client.merge.assert_called_once_with('user:alice', {'age': 31})
+    # Response contains all fields including non-merged ones
+    assert 'name' in result
+    assert 'email' in result
     assert result['age'] == 31
 
 
@@ -482,6 +492,11 @@ class TestDeleteRecords:
     await delete_records('user', 'status = "inactive"', client=mock_db_client)
 
     mock_db_client.execute.assert_called_once()
+    query = mock_db_client.execute.call_args[0][0]
+    assert 'DELETE' in query
+    assert 'user' in query
+    assert 'WHERE' in query
+    assert 'status = "inactive"' in query
 
   @pytest.mark.anyio
   async def test_delete_records_with_operator(self, mock_db_client: DatabaseClient) -> None:
@@ -491,6 +506,10 @@ class TestDeleteRecords:
     await delete_records('user', eq('status', 'inactive'), client=mock_db_client)
 
     mock_db_client.execute.assert_called_once()
+    query = mock_db_client.execute.call_args[0][0]
+    assert 'DELETE' in query
+    assert 'user' in query
+    assert "status = 'inactive'" in query
 
   @pytest.mark.anyio
   async def test_delete_records_no_condition(self, mock_db_client: DatabaseClient) -> None:
@@ -500,15 +519,10 @@ class TestDeleteRecords:
     await delete_records('user', client=mock_db_client)
 
     mock_db_client.execute.assert_called_once()
-
-  @pytest.mark.anyio
-  async def test_delete_records_returns_none(self, mock_db_client: DatabaseClient) -> None:
-    """Test that delete_records returns None."""
-    mock_db_client.execute = AsyncMock(return_value=[{'result': []}])
-
-    result = await delete_records('user', 'age > 100', client=mock_db_client)
-
-    assert result is None
+    query = mock_db_client.execute.call_args[0][0]
+    assert 'DELETE' in query
+    assert 'user' in query
+    assert 'WHERE' not in query
 
 
 # ============================================================================
@@ -536,6 +550,11 @@ class TestCountRecords:
     count = await count_records('user', 'age > 18', client=mock_db_client)
 
     assert count == 15
+    mock_db_client.execute.assert_called_once()
+    query = mock_db_client.execute.call_args[0][0]
+    assert 'SELECT count() FROM user' in query
+    assert 'WHERE' in query
+    assert 'age > 18' in query
 
   @pytest.mark.anyio
   async def test_count_records_with_operator(self, mock_db_client: DatabaseClient) -> None:
@@ -545,6 +564,10 @@ class TestCountRecords:
     count = await count_records('user', eq('status', 'active'), client=mock_db_client)
 
     assert count == 10
+    mock_db_client.execute.assert_called_once()
+    query = mock_db_client.execute.call_args[0][0]
+    assert 'SELECT count() FROM user' in query
+    assert "status = 'active'" in query
 
   @pytest.mark.anyio
   async def test_count_records_empty_result(self, mock_db_client: DatabaseClient) -> None:
@@ -589,15 +612,19 @@ class TestExists:
 
   @pytest.mark.anyio
   async def test_exists_with_record_id(self, mock_db_client: DatabaseClient) -> None:
-    """Test exists with RecordID."""
+    """Test exists with RecordID passes RecordID through correctly."""
     record_id = RecordID(table='user', id='alice')
     with patch(
       'reverie.query.crud.get_record',
       AsyncMock(return_value=User(name='Alice', email='alice@example.com')),
-    ):
+    ) as mock_get:
       result = await exists('user', record_id, client=mock_db_client)
 
     assert result is True
+    # Verify RecordID was passed through correctly
+    mock_get.assert_called_once()
+    call_args = mock_get.call_args
+    assert call_args[0][1] == record_id
 
 
 # ============================================================================
@@ -701,14 +728,17 @@ class TestLast:
 
   @pytest.mark.anyio
   async def test_last_with_condition(self, mock_db_client: DatabaseClient) -> None:
-    """Test last with WHERE condition."""
+    """Test last with WHERE condition is passed through to query_records."""
     with patch(
       'reverie.query.crud.query_records',
       AsyncMock(return_value=[User(name='Bob', email='bob@example.com')]),
-    ):
+    ) as mock_query:
       result = await last('user', User, condition='status = "active"', client=mock_db_client)
 
     assert result is not None
+    # Verify condition was passed to query_records
+    call_args = mock_query.call_args
+    assert call_args.kwargs.get('conditions') is not None or 'status' in str(call_args)
 
   @pytest.mark.anyio
   async def test_last_no_results(self, mock_db_client: DatabaseClient) -> None:

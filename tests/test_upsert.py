@@ -21,31 +21,18 @@ class User(BaseModel):
 class TestQueryUpsertMethod:
   """Tests for Query.upsert() method."""
 
-  def test_upsert_sets_operation(self) -> None:
-    """Sets operation to UPSERT."""
-    query = Query().upsert('user:alice', {'name': 'Alice'})
+  def test_upsert_generates_valid_sql_with_record_id(self) -> None:
+    """Generates UPSERT SQL with record ID target."""
+    sql = Query().upsert('user:alice', {'name': 'Alice'}).to_surql()
 
-    assert query.operation == 'UPSERT'
+    assert sql.startswith('UPSERT user:alice CONTENT')
+    assert '"name"' in sql or "'name'" in sql or 'name' in sql
 
-  def test_upsert_sets_table_name(self) -> None:
-    """Sets table_name to the given target."""
-    query = Query().upsert('user:alice', {'name': 'Alice'})
+  def test_upsert_generates_valid_sql_without_record_id(self) -> None:
+    """Generates UPSERT SQL with table-only target."""
+    sql = Query().upsert('user', {'name': 'Bob'}).to_surql()
 
-    assert query.table_name == 'user:alice'
-
-  def test_upsert_stores_data(self) -> None:
-    """Stores the provided data in update_data."""
-    data = {'name': 'Alice', 'status': 'active'}
-    query = Query().upsert('user:alice', data)
-
-    assert query.update_data == data
-
-  def test_upsert_table_without_record_id(self) -> None:
-    """Accepts a plain table name without record ID."""
-    query = Query().upsert('user', {'name': 'Bob'})
-
-    assert query.table_name == 'user'
-    assert query.operation == 'UPSERT'
+    assert sql.startswith('UPSERT user CONTENT')
 
   def test_upsert_generates_content_sql(self) -> None:
     """to_surql produces UPSERT ... CONTENT ... statement."""
@@ -108,24 +95,13 @@ class TestQueryUpsertMethod:
 class TestUpsertFreeFunction:
   """Tests for the upsert() free function in builder module."""
 
-  def test_upsert_free_function_returns_query(self) -> None:
-    """Returns a Query instance."""
-    result = upsert('user:alice', {'name': 'Alice'})
-
-    assert isinstance(result, Query)
-
-  def test_upsert_free_function_operation(self) -> None:
-    """Sets UPSERT operation."""
-    result = upsert('user:alice', {'name': 'Alice'})
-
-    assert result.operation == 'UPSERT'
-
-  def test_upsert_free_function_sql(self) -> None:
-    """Generates valid UPSERT SQL."""
-    result = upsert('user:bob', {'name': 'Bob', 'status': 'pending'})
-    sql = result.to_surql()
+  def test_upsert_free_function_generates_valid_sql(self) -> None:
+    """Generates valid UPSERT SQL with all provided fields."""
+    sql = upsert('user:bob', {'name': 'Bob', 'status': 'pending'}).to_surql()
 
     assert 'UPSERT user:bob CONTENT' in sql
+    assert 'name' in sql
+    assert 'status' in sql
 
   def test_upsert_free_function_invalid_table_raises(self) -> None:
     """Raises ValueError for invalid table name."""

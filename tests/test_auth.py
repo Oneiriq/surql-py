@@ -88,6 +88,7 @@ class TestCredentialModels:
     """Test token auth model."""
     token_auth = TokenAuth(token='eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9')
     assert token_auth.token == 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9'
+    assert str(token_auth.token).startswith('eyJ')
 
 
 class TestAuthManager:
@@ -125,6 +126,9 @@ class TestAuthManager:
     assert auth_manager.auth_type == AuthType.SCOPE
     assert auth_manager.is_authenticated is True
     mock_client.signup.assert_called_once()
+    call_args = mock_client.signup.call_args[0][0]
+    assert call_args['namespace'] == 'test'
+    assert call_args['email'] == 'user@example.com'
 
   @pytest.mark.anyio
   async def test_signin_root(self, auth_manager, mock_client):
@@ -149,6 +153,9 @@ class TestAuthManager:
     assert token == 'signin_token'
     assert auth_manager.auth_type == AuthType.NAMESPACE
     assert auth_manager.is_authenticated is True
+    mock_client.signin.assert_called_once_with(
+      {'namespace': 'test', 'username': 'ns_user', 'password': 'ns_pass'}
+    )
 
   @pytest.mark.anyio
   async def test_signin_database(self, auth_manager, mock_client):
@@ -165,6 +172,9 @@ class TestAuthManager:
     assert token == 'signin_token'
     assert auth_manager.auth_type == AuthType.DATABASE
     assert auth_manager.is_authenticated is True
+    mock_client.signin.assert_called_once_with(
+      {'namespace': 'test', 'database': 'main', 'username': 'db_user', 'password': 'db_pass'}
+    )
 
   @pytest.mark.anyio
   async def test_signin_scope(self, auth_manager, mock_client):
@@ -181,6 +191,15 @@ class TestAuthManager:
     assert token == 'signin_token'
     assert auth_manager.auth_type == AuthType.SCOPE
     assert auth_manager.is_authenticated is True
+    mock_client.signin.assert_called_once_with(
+      {
+        'namespace': 'test',
+        'database': 'main',
+        'access': 'user',
+        'email': 'user@example.com',
+        'password': 'pass123',
+      }
+    )
 
   @pytest.mark.anyio
   async def test_authenticate(self, auth_manager, mock_client):
@@ -214,8 +233,8 @@ class TestAuthManager:
     assert auth_manager.is_authenticated is False
 
   def test_auth_type_enum(self):
-    """Test AuthType enum values."""
+    """Test AuthType enum values are usable as strings in comparisons."""
     assert AuthType.ROOT == 'root'
-    assert AuthType.NAMESPACE == 'namespace'
-    assert AuthType.DATABASE == 'database'
-    assert AuthType.SCOPE == 'scope'
+    # Verify enum members can be iterated for auth type matching
+    all_types = {t.value for t in AuthType}
+    assert all_types == {'root', 'namespace', 'database', 'scope'}

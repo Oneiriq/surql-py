@@ -17,22 +17,19 @@ from reverie.schema.sql import generate_access_sql
 class TestAccessSchema:
   """Tests for access_schema builder function."""
 
-  def test_creates_jwt_access_definition(self) -> None:
-    """Creates a valid JWT access definition."""
+  def test_jwt_access_generates_correct_sql(self) -> None:
+    """JWT access definition produces correct DEFINE ACCESS SQL."""
     result = access_schema(
       'api',
       type=AccessType.JWT,
       jwt=JwtConfig(algorithm='HS256', key='secret'),
     )
+    stmts = generate_access_sql(result)
 
-    assert result.name == 'api'
-    assert result.type == AccessType.JWT
-    assert result.jwt is not None
-    assert result.jwt.algorithm == 'HS256'
-    assert result.jwt.key == 'secret'
+    assert stmts[0] == "DEFINE ACCESS api ON DATABASE TYPE JWT ALGORITHM HS256 KEY 'secret';"
 
-  def test_creates_record_access_definition(self) -> None:
-    """Creates a valid RECORD access definition."""
+  def test_record_access_generates_correct_sql(self) -> None:
+    """RECORD access definition produces correct DEFINE ACCESS SQL."""
     result = access_schema(
       'user_auth',
       type=AccessType.RECORD,
@@ -40,15 +37,14 @@ class TestAccessSchema:
         signup='CREATE user SET ...', signin='SELECT * FROM user WHERE ...'
       ),
     )
+    stmts = generate_access_sql(result)
 
-    assert result.name == 'user_auth'
-    assert result.type == AccessType.RECORD
-    assert result.record is not None
-    assert result.record.signup == 'CREATE user SET ...'
-    assert result.record.signin == 'SELECT * FROM user WHERE ...'
+    assert 'TYPE RECORD' in stmts[0]
+    assert 'SIGNUP (CREATE user SET ...)' in stmts[0]
+    assert 'SIGNIN (SELECT * FROM user WHERE ...)' in stmts[0]
 
-  def test_includes_duration_fields(self) -> None:
-    """Includes session and token durations when provided."""
+  def test_duration_fields_appear_in_sql(self) -> None:
+    """Session and token durations appear in generated SQL."""
     result = access_schema(
       'api',
       type=AccessType.JWT,
@@ -56,9 +52,9 @@ class TestAccessSchema:
       duration_session='24h',
       duration_token='15m',
     )
+    stmts = generate_access_sql(result)
 
-    assert result.duration_session == '24h'
-    assert result.duration_token == '15m'
+    assert 'DURATION FOR SESSION 24h, FOR TOKEN 15m' in stmts[0]
 
   def test_definition_is_immutable(self) -> None:
     """AccessDefinition is frozen and cannot be mutated."""

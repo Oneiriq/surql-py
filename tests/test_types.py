@@ -297,6 +297,7 @@ class TestComparisonOperators:
     """Test ne helper function."""
     op = ne('status', 'deleted')
     assert isinstance(op, Ne)
+    assert op.to_surql() == "status != 'deleted'"
 
   def test_gt_operator(self) -> None:
     """Test Gt operator."""
@@ -307,6 +308,7 @@ class TestComparisonOperators:
     """Test gt helper function."""
     op = gt('age', 18)
     assert isinstance(op, Gt)
+    assert op.to_surql() == 'age > 18'
 
   def test_gte_operator(self) -> None:
     """Test Gte operator."""
@@ -317,6 +319,7 @@ class TestComparisonOperators:
     """Test gte helper function."""
     op = gte('score', 100)
     assert isinstance(op, Gte)
+    assert op.to_surql() == 'score >= 100'
 
   def test_lt_operator(self) -> None:
     """Test Lt operator."""
@@ -327,6 +330,7 @@ class TestComparisonOperators:
     """Test lt helper function."""
     op = lt('price', 50.0)
     assert isinstance(op, Lt)
+    assert op.to_surql() == 'price < 50.0'
 
   def test_lte_operator(self) -> None:
     """Test Lte operator."""
@@ -337,6 +341,7 @@ class TestComparisonOperators:
     """Test lte helper function."""
     op = lte('quantity', 10)
     assert isinstance(op, Lte)
+    assert op.to_surql() == 'quantity <= 10'
 
 
 class TestStringArrayOperators:
@@ -351,6 +356,7 @@ class TestStringArrayOperators:
     """Test contains helper function."""
     op = contains('email', '@example.com')
     assert isinstance(op, Contains)
+    assert op.to_surql() == "email CONTAINS '@example.com'"
 
   def test_contains_not_operator(self) -> None:
     """Test ContainsNot operator."""
@@ -361,6 +367,7 @@ class TestStringArrayOperators:
     """Test contains_not helper function."""
     op = contains_not('tags', 'spam')
     assert isinstance(op, ContainsNot)
+    assert op.to_surql() == "tags CONTAINSNOT 'spam'"
 
   def test_contains_all_operator(self) -> None:
     """Test ContainsAll operator."""
@@ -371,6 +378,7 @@ class TestStringArrayOperators:
     """Test contains_all helper function."""
     op = contains_all('tags', ['python', 'database'])
     assert isinstance(op, ContainsAll)
+    assert op.to_surql() == "tags CONTAINSALL ['python', 'database']"
 
   def test_contains_any_operator(self) -> None:
     """Test ContainsAny operator."""
@@ -381,6 +389,7 @@ class TestStringArrayOperators:
     """Test contains_any helper function."""
     op = contains_any('tags', ['python', 'javascript'])
     assert isinstance(op, ContainsAny)
+    assert op.to_surql() == "tags CONTAINSANY ['python', 'javascript']"
 
   def test_inside_operator(self) -> None:
     """Test Inside operator."""
@@ -391,6 +400,7 @@ class TestStringArrayOperators:
     """Test inside helper function."""
     op = inside('status', ['active', 'pending'])
     assert isinstance(op, Inside)
+    assert op.to_surql() == "status INSIDE ['active', 'pending']"
 
   def test_not_inside_operator(self) -> None:
     """Test NotInside operator."""
@@ -401,6 +411,7 @@ class TestStringArrayOperators:
     """Test not_inside helper function."""
     op = not_inside('status', ['deleted', 'archived'])
     assert isinstance(op, NotInside)
+    assert op.to_surql() == "status NOTINSIDE ['deleted', 'archived']"
 
 
 class TestNullOperators:
@@ -415,6 +426,7 @@ class TestNullOperators:
     """Test is_null helper function."""
     op = is_null('deleted_at')
     assert isinstance(op, IsNull)
+    assert op.to_surql() == 'deleted_at IS NULL'
 
   def test_is_not_null_operator(self) -> None:
     """Test IsNotNull operator."""
@@ -425,6 +437,7 @@ class TestNullOperators:
     """Test is_not_null helper function."""
     op = is_not_null('created_at')
     assert isinstance(op, IsNotNull)
+    assert op.to_surql() == 'created_at IS NOT NULL'
 
 
 class TestLogicalOperators:
@@ -439,6 +452,7 @@ class TestLogicalOperators:
     """Test and_ helper function."""
     op = and_(gt('age', 18), eq('status', 'active'))
     assert isinstance(op, And)
+    assert op.to_surql() == "(age > 18) AND (status = 'active')"
 
   def test_or_operator(self) -> None:
     """Test Or operator."""
@@ -449,6 +463,7 @@ class TestLogicalOperators:
     """Test or_ helper function."""
     op = or_(eq('type', 'admin'), eq('type', 'moderator'))
     assert isinstance(op, Or)
+    assert op.to_surql() == "(type = 'admin') OR (type = 'moderator')"
 
   def test_not_operator(self) -> None:
     """Test Not operator."""
@@ -459,6 +474,7 @@ class TestLogicalOperators:
     """Test not_ helper function."""
     op = not_(eq('status', 'deleted'))
     assert isinstance(op, Not)
+    assert op.to_surql() == "NOT (status = 'deleted')"
 
   def test_complex_nested_operators(self) -> None:
     """Test complex nested logical operators."""

@@ -54,11 +54,11 @@ class TestCoerceDatetime:
 
     assert result is dt
 
-  def test_already_datetime_returns_same_instance(self) -> None:
-    """Does not copy when input is already a timezone-aware datetime."""
-    dt = datetime(2024, 6, 1, 0, 0, 0, tzinfo=timezone.utc)
+  def test_three_digit_fractional_seconds(self) -> None:
+    """Handles milliseconds (3 digits) correctly."""
+    result = coerce_datetime('2024-01-15T10:30:00.123Z')
 
-    assert coerce_datetime(dt) is dt
+    assert result.microsecond == 123000
 
   def test_naive_datetime_gets_utc(self) -> None:
     """Naive datetime (no tzinfo) is assigned UTC timezone."""

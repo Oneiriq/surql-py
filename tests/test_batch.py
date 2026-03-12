@@ -93,6 +93,12 @@ class TestUpsertMany:
     assert len(results) == 2
     mock_db_client.execute.assert_called_once()
 
+    # Verify Pydantic models were serialized in the query
+    query = mock_db_client.execute.call_args[0][0]
+    assert 'Alice' in query
+    assert 'alice@example.com' in query
+    assert 'Bob' in query
+
   @pytest.mark.anyio
   async def test_upsert_many_empty_list(self, mock_db_client: DatabaseClient) -> None:
     """Test upserting empty list returns empty list."""
@@ -156,6 +162,12 @@ class TestUpsertMany:
 
     assert len(results) == 1
 
+    # Verify nested data structures are in the query
+    query = mock_db_client.execute.call_args[0][0]
+    assert 'metadata' in query
+    assert 'admin' in query
+    assert 'tags' in query
+
   @pytest.mark.anyio
   async def test_upsert_many_handles_empty_result(self, mock_db_client: DatabaseClient) -> None:
     """Test upsert handles database returning empty result."""
@@ -193,6 +205,12 @@ class TestRelateMany:
     assert len(results) == 2
     mock_db_client.execute.assert_called_once()
 
+    # Verify RELATE statements in query
+    query = mock_db_client.execute.call_args[0][0]
+    assert 'RELATE' in query
+    assert 'person:alice->knows->person:bob' in query
+    assert 'person:alice->knows->person:charlie' in query
+
   @pytest.mark.anyio
   async def test_relate_many_with_edge_data(self, mock_db_client: DatabaseClient) -> None:
     """Test creating relationships with edge data."""
@@ -224,6 +242,10 @@ class TestRelateMany:
     assert 'SET' in query
     assert 'since' in query
     assert 'strength' in query
+
+    # Verify SET clauses with correct value formatting
+    assert "since = '2024-01-01'" in query or 'since = "2024-01-01"' in query
+    assert 'strength = 0.8' in query
 
   @pytest.mark.anyio
   async def test_relate_many_empty_list(self, mock_db_client: DatabaseClient) -> None:
@@ -274,6 +296,10 @@ class TestRelateMany:
     results = await relate_many(mock_db_client, 'person', 'knows', 'person', relations)
 
     assert len(results) == 3
+
+    query = mock_db_client.execute.call_args[0][0]
+    # Verify query contains all three RELATE statements
+    assert query.count('RELATE') == 3
 
   @pytest.mark.anyio
   async def test_relate_many_with_nested_edge_data(self, mock_db_client: DatabaseClient) -> None:
@@ -337,6 +363,12 @@ class TestInsertMany:
 
     assert len(results) == 1
 
+    # Verify model data appears in the INSERT query
+    query = mock_db_client.execute.call_args[0][0]
+    assert 'INSERT INTO users' in query
+    assert 'Alice' in query
+    assert 'alice@example.com' in query
+
   @pytest.mark.anyio
   async def test_insert_many_empty_list(self, mock_db_client: DatabaseClient) -> None:
     """Test inserting empty list returns empty list."""
@@ -399,6 +431,13 @@ class TestDeleteMany:
 
     assert len(results) == 2
     assert mock_db_client.execute.call_count == 2
+
+    # Verify DELETE queries were built with correct record IDs
+    calls = mock_db_client.execute.call_args_list
+    all_queries = ' '.join(c[0][0] for c in calls)
+    assert 'DELETE' in all_queries
+    assert 'user:1' in all_queries
+    assert 'user:2' in all_queries
 
   @pytest.mark.anyio
   async def test_delete_many_with_full_record_ids(self, mock_db_client: DatabaseClient) -> None:
@@ -520,6 +559,7 @@ class TestBuildUpsertQuery:
 
     assert 'metadata' in query
     assert 'admin' in query
+    assert '"role"' in query or "'role'" in query
 
   def test_build_upsert_query_with_null_values(self) -> None:
     """Test building upsert query with null values."""
@@ -557,8 +597,7 @@ class TestBuildRelateQuery:
 
     assert 'RELATE person:alice->knows->person:bob' in query
     assert 'SET' in query
-    assert 'since' in query
-    assert '2024-01-01' in query
+    assert "since = '2024-01-01'" in query or 'since = "2024-01-01"' in query
 
   def test_build_relate_query_with_numeric_data(self) -> None:
     """Test building relate query with numeric edge data."""
@@ -578,8 +617,12 @@ class TestBuildRelateQuery:
       'person:alice', 'knows', 'person:bob', {'metadata': {'context': 'work'}}
     )
 
+    assert 'SET' in query
     assert 'metadata' in query
+    # Verify nested object is JSON-formatted
+    assert '{' in query
     assert 'context' in query
+    assert 'work' in query
 
   def test_build_relate_query_with_multiple_fields(self) -> None:
     """Test building relate query with multiple edge data fields."""
@@ -713,6 +756,7 @@ class TestEdgeCases:
     query = build_upsert_query('users', items)
 
     assert 'tags' in query
+    assert '[' in query  # Array bracket notation
     assert 'admin' in query
     assert 'active' in query
 
@@ -722,6 +766,8 @@ class TestEdgeCases:
       'person:alice', 'knows', 'person:bob', {'contexts': ['work', 'social']}
     )
 
+    assert 'SET' in query
     assert 'contexts' in query
+    assert '[' in query  # Array bracket notation
     assert 'work' in query
     assert 'social' in query
