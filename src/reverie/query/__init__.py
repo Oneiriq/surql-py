@@ -18,23 +18,7 @@ from reverie.query.batch import (  # Batch operations
   relate_many,
   upsert_many,
 )
-from reverie.query.builder import (  # Query builder
-  Query,
-  ReturnFormat,
-  VectorDistanceType,
-  delete,
-  from_table,
-  insert,
-  limit,
-  offset,
-  order_by,
-  relate,
-  select,
-  update,
-  upsert,
-  vector_search_query,
-  where,
-)
+from reverie.query.builder import Query  # Query builder
 from reverie.query.crud import (  # CRUD operations
   count_records,
   create_record,
@@ -104,6 +88,22 @@ from reverie.query.graph import (
 )
 from reverie.query.graph import (
   unrelate as remove_relation,
+)
+from reverie.query.helpers import (  # Query builder helpers and shared types
+  ReturnFormat,
+  VectorDistanceType,
+  delete,
+  from_table,
+  insert,
+  limit,
+  offset,
+  order_by,
+  relate,
+  select,
+  update,
+  upsert,
+  vector_search_query,
+  where,
 )
 from reverie.query.hints import (  # Query optimization hints
   ExplainHint,
