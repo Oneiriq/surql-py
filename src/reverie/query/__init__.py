@@ -136,6 +136,13 @@ from reverie.query.results import (  # Result wrappers and utilities
   records,
   success,
 )
+from reverie.query.typed import (  # Typed CRUD operations
+  create_typed,
+  get_typed,
+  query_typed,
+  update_typed,
+  upsert_typed,
+)
 
 __all__ = [
   # Query builder
@@ -252,6 +259,12 @@ __all__ = [
   'extract_one',
   'extract_scalar',
   'has_results',
+  # Typed CRUD operations
+  'create_typed',
+  'get_typed',
+  'query_typed',
+  'update_typed',
+  'upsert_typed',
   # Return format
   'ReturnFormat',
 ]
