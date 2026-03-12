@@ -287,3 +287,144 @@ class TestGenerateSchemaSql:
     result = generate_schema_sql(tables={'user': user_table})
 
     assert isinstance(result, str)
+
+
+class TestIfNotExists:
+  """Tests for IF NOT EXISTS support in SQL generation."""
+
+  def test_table_definition_includes_if_not_exists(self) -> None:
+    """Table DEFINE statement includes IF NOT EXISTS when enabled."""
+    table = table_schema('user', mode=TableMode.SCHEMAFULL)
+
+    stmts = generate_table_sql(table, if_not_exists=True)
+
+    assert stmts[0] == 'DEFINE TABLE IF NOT EXISTS user SCHEMAFULL;'
+
+  def test_field_definition_includes_if_not_exists(self) -> None:
+    """Field DEFINE statement includes IF NOT EXISTS when enabled."""
+    table = table_schema(
+      'user',
+      mode=TableMode.SCHEMAFULL,
+      fields=[string_field('name')],
+    )
+
+    stmts = generate_table_sql(table, if_not_exists=True)
+
+    assert any(s == 'DEFINE FIELD IF NOT EXISTS name ON TABLE user TYPE string;' for s in stmts)
+
+  def test_index_definition_includes_if_not_exists(self) -> None:
+    """Index DEFINE statement includes IF NOT EXISTS when enabled."""
+    table = table_schema(
+      'user',
+      indexes=[unique_index('email_idx', ['email'])],
+    )
+
+    stmts = generate_table_sql(table, if_not_exists=True)
+
+    assert any(
+      s == 'DEFINE INDEX IF NOT EXISTS email_idx ON TABLE user COLUMNS email UNIQUE;' for s in stmts
+    )
+
+  def test_event_definition_includes_if_not_exists(self) -> None:
+    """Event DEFINE statement includes IF NOT EXISTS when enabled."""
+    table = table_schema(
+      'user',
+      events=[
+        event(
+          'email_changed',
+          '$before.email != $after.email',
+          'CREATE audit_log SET user = $value.id',
+        )
+      ],
+    )
+
+    stmts = generate_table_sql(table, if_not_exists=True)
+
+    assert any(
+      s.startswith('DEFINE EVENT IF NOT EXISTS email_changed ON TABLE user') for s in stmts
+    )
+
+  def test_edge_relation_includes_if_not_exists(self) -> None:
+    """Edge DEFINE TABLE statement includes IF NOT EXISTS when enabled."""
+    edge = edge_schema('likes', from_table='user', to_table='post')
+
+    stmts = generate_edge_sql(edge, if_not_exists=True)
+
+    assert stmts[0] == 'DEFINE TABLE IF NOT EXISTS likes TYPE RELATION FROM user TO post;'
+
+  def test_edge_schemafull_includes_if_not_exists(self) -> None:
+    """SCHEMAFULL edge includes IF NOT EXISTS when enabled."""
+    edge = edge_schema('entity_relation', mode=EdgeMode.SCHEMAFULL)
+
+    stmts = generate_edge_sql(edge, if_not_exists=True)
+
+    assert stmts[0] == 'DEFINE TABLE IF NOT EXISTS entity_relation SCHEMAFULL;'
+
+  def test_edge_schemaless_includes_if_not_exists(self) -> None:
+    """SCHEMALESS edge includes IF NOT EXISTS when enabled."""
+    edge = edge_schema('loose_rel', mode=EdgeMode.SCHEMALESS)
+
+    stmts = generate_edge_sql(edge, if_not_exists=True)
+
+    assert stmts[0] == 'DEFINE TABLE IF NOT EXISTS loose_rel SCHEMALESS;'
+
+  def test_edge_fields_include_if_not_exists(self) -> None:
+    """Edge field DEFINE statements include IF NOT EXISTS when enabled."""
+    edge = edge_schema(
+      'likes',
+      from_table='user',
+      to_table='post',
+      fields=[datetime_field('created_at', default='time::now()')],
+    )
+
+    stmts = generate_edge_sql(edge, if_not_exists=True)
+
+    assert any('DEFINE FIELD IF NOT EXISTS created_at ON TABLE likes' in s for s in stmts)
+
+  def test_generate_schema_sql_passes_if_not_exists(self) -> None:
+    """generate_schema_sql forwards if_not_exists to table and edge generation."""
+    user_table = table_schema('user', mode=TableMode.SCHEMAFULL)
+    likes_edge = edge_schema('likes', from_table='user', to_table='post')
+
+    sql = generate_schema_sql(
+      tables={'user': user_table},
+      edges={'likes': likes_edge},
+      if_not_exists=True,
+    )
+
+    assert 'DEFINE TABLE IF NOT EXISTS user SCHEMAFULL' in sql
+    assert 'DEFINE TABLE IF NOT EXISTS likes TYPE RELATION FROM user TO post' in sql
+
+  def test_default_false_omits_if_not_exists(self) -> None:
+    """Default if_not_exists=False produces statements without IF NOT EXISTS."""
+    table = table_schema(
+      'user',
+      mode=TableMode.SCHEMAFULL,
+      fields=[string_field('name')],
+      indexes=[unique_index('email_idx', ['email'])],
+      events=[
+        event(
+          'email_changed',
+          '$before.email != $after.email',
+          'CREATE audit_log SET user = $value.id',
+        )
+      ],
+    )
+
+    stmts = generate_table_sql(table)
+
+    assert stmts[0] == 'DEFINE TABLE user SCHEMAFULL;'
+    assert not any('IF NOT EXISTS' in s for s in stmts)
+
+  def test_standard_index_includes_if_not_exists(self) -> None:
+    """Standard index DEFINE statement includes IF NOT EXISTS when enabled."""
+    table = table_schema(
+      'post',
+      indexes=[index('title_idx', ['title'], IndexType.STANDARD)],
+    )
+
+    stmts = generate_table_sql(table, if_not_exists=True)
+
+    assert any(
+      s == 'DEFINE INDEX IF NOT EXISTS title_idx ON TABLE post COLUMNS title;' for s in stmts
+    )
