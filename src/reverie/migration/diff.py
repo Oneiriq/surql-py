@@ -38,6 +38,27 @@ _SAFE_DEFAULT_PATTERN = re.compile(
 )
 
 
+def _validate_event_expression(expr: str, label: str) -> None:
+  """Validate that an event expression does not contain SQL injection patterns.
+
+  Args:
+    expr: The event condition or action expression to validate
+    label: Label for error messages (e.g. 'condition', 'action')
+
+  Raises:
+    ValueError: If the expression contains dangerous SQL patterns
+  """
+  stripped = expr.strip()
+  if '; ' in stripped or ';--' in stripped or stripped.endswith(';'):
+    raise ValueError(
+      f'Unsafe event {label}: {expr!r}. Event {label}s must not contain statement separators.'
+    )
+  if '--' in stripped:
+    raise ValueError(
+      f'Unsafe event {label}: {expr!r}. Event {label}s must not contain SQL comments.'
+    )
+
+
 def _validate_default_value(default: str) -> None:
   """Validate that a field default is a safe SurrealDB expression.
 
@@ -221,7 +242,11 @@ def diff_permissions(
   diffs: list[SchemaDiff] = []
 
   if old_table.permissions != new_table.permissions:
-    diffs.append(_generate_modify_permissions_diff(old_table.name, new_table.permissions))
+    diffs.append(
+      _generate_modify_permissions_diff(
+        old_table.name, new_table.permissions, old_table.permissions
+      )
+    )
 
   return diffs
 
@@ -251,13 +276,34 @@ def diff_edges(
     diffs.extend(_generate_drop_edge_diffs(old_edge))
     return diffs
 
-  # Both exist - edges are treated similarly to tables
-  # We can leverage the same field/index/event diffing logic
+  # Both exist - compare fields, indexes, events, and permissions
+  if old_edge is not None and new_edge is not None:
+    old_proxy = _edge_to_table_proxy(old_edge)
+    new_proxy = _edge_to_table_proxy(new_edge)
+    diffs.extend(diff_fields(old_proxy, new_proxy))
+    diffs.extend(diff_indexes(old_proxy, new_proxy))
+    diffs.extend(diff_events(old_proxy, new_proxy))
+    diffs.extend(diff_permissions(old_proxy, new_proxy))
 
   return diffs
 
 
 # Helper functions to generate specific diff types
+
+
+def _edge_to_table_proxy(edge: EdgeDefinition) -> TableDefinition:
+  """Wrap an EdgeDefinition as a TableDefinition for diff comparison.
+
+  Both models share name, fields, indexes, events, and permissions attributes.
+  This allows reusing diff_fields/diff_indexes/diff_events/diff_permissions.
+  """
+  return TableDefinition(
+    name=edge.name,
+    fields=list(edge.fields),
+    indexes=list(edge.indexes),
+    events=list(edge.events),
+    permissions=edge.permissions,
+  )
 
 
 def _generate_add_table_diffs(table: TableDefinition) -> list[SchemaDiff]:
@@ -427,6 +473,8 @@ def _generate_drop_index_diff(table_name: str, index: IndexDefinition) -> Schema
 
 def _generate_add_event_diff(table_name: str, event: EventDefinition) -> SchemaDiff:
   """Generate diff for adding an event."""
+  _validate_event_expression(event.condition, 'condition')
+  _validate_event_expression(event.action, 'action')
   forward_sql = f'DEFINE EVENT {event.name} ON TABLE {table_name} WHEN {event.condition} THEN {{ {event.action} }};'
   backward_sql = f'REMOVE EVENT {event.name} ON TABLE {table_name};'
 
@@ -442,6 +490,8 @@ def _generate_add_event_diff(table_name: str, event: EventDefinition) -> SchemaD
 
 def _generate_drop_event_diff(table_name: str, event: EventDefinition) -> SchemaDiff:
   """Generate diff for dropping an event."""
+  _validate_event_expression(event.condition, 'condition')
+  _validate_event_expression(event.action, 'action')
   forward_sql = f'REMOVE EVENT {event.name} ON TABLE {table_name};'
   backward_sql = f'DEFINE EVENT {event.name} ON TABLE {table_name} WHEN {event.condition} THEN {{ {event.action} }};'
 
@@ -458,6 +508,7 @@ def _generate_drop_event_diff(table_name: str, event: EventDefinition) -> Schema
 def _generate_modify_permissions_diff(
   table_name: str,
   permissions: dict[str, str] | None,
+  old_permissions: dict[str, str] | None = None,
 ) -> SchemaDiff:
   """Generate diff for modifying permissions."""
   forward_sql_parts = []
@@ -469,10 +520,15 @@ def _generate_modify_permissions_diff(
       )
 
   forward_sql = ' '.join(forward_sql_parts) if forward_sql_parts else ''
-  # Note: Permission rollback is intentionally left empty. SurrealDB doesn't provide
-  # a way to query existing permissions, so we can't generate proper rollback SQL.
-  # Users should manually specify rollback SQL if needed for permission changes.
-  backward_sql = ''
+
+  # Generate rollback SQL from old permissions
+  backward_sql_parts = []
+  if old_permissions:
+    for operation, condition in old_permissions.items():
+      backward_sql_parts.append(
+        f'DEFINE FIELD PERMISSIONS FOR {operation.upper()} ON TABLE {table_name} WHERE {condition};'
+      )
+  backward_sql = ' '.join(backward_sql_parts) if backward_sql_parts else ''
 
   return SchemaDiff(
     operation=DiffOperation.MODIFY_PERMISSIONS,

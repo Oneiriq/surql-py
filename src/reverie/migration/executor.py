@@ -86,7 +86,7 @@ async def execute_migration(
             f'Failed to execute statement {i} in migration {migration.version}: {e}'
           ) from e
       await client.execute('COMMIT TRANSACTION;')
-    except Exception:
+    except BaseException:
       try:
         await client.execute('CANCEL TRANSACTION;')
       except Exception as cancel_err:

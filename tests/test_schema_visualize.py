@@ -758,7 +758,7 @@ user_table = with_fields(user_table, string_field('name'))
 register_table(user_table)
 """)
 
-    with patch('reverie.cli.schema._load_schemas_from_file') as mock_load:
+    with patch('reverie.cli.schema_visualize._load_schemas_from_file') as mock_load:
       mock_load.return_value = {
         'user': TableDefinition(
           name='user',
@@ -777,7 +777,7 @@ register_table(user_table)
     schema_file.write_text('# schema')
 
     with (
-      patch('reverie.cli.schema._load_schemas_from_file') as mock_load,
+      patch('reverie.cli.schema_visualize._load_schemas_from_file') as mock_load,
       patch('reverie.schema.registry.get_registered_edges', return_value={}),
     ):
       mock_load.return_value = {'user': TableDefinition(name='user', mode=TableMode.SCHEMAFULL)}
@@ -795,7 +795,7 @@ register_table(user_table)
     schema_file.write_text('# schema')
 
     with (
-      patch('reverie.cli.schema._load_schemas_from_file') as mock_load,
+      patch('reverie.cli.schema_visualize._load_schemas_from_file') as mock_load,
       patch('reverie.schema.registry.get_registered_edges', return_value={}),
     ):
       mock_load.return_value = {'user': TableDefinition(name='user', mode=TableMode.SCHEMAFULL)}
@@ -813,7 +813,7 @@ register_table(user_table)
     schema_file.write_text('# schema')
 
     with (
-      patch('reverie.cli.schema._load_schemas_from_file') as mock_load,
+      patch('reverie.cli.schema_visualize._load_schemas_from_file') as mock_load,
       patch('reverie.schema.registry.get_registered_edges', return_value={}),
     ):
       mock_load.return_value = {'user': TableDefinition(name='user', mode=TableMode.SCHEMAFULL)}
@@ -833,7 +833,7 @@ register_table(user_table)
     output_file = tmp_path / 'diagram.md'
 
     with (
-      patch('reverie.cli.schema._load_schemas_from_file') as mock_load,
+      patch('reverie.cli.schema_visualize._load_schemas_from_file') as mock_load,
       patch('reverie.schema.registry.get_registered_edges', return_value={}),
     ):
       mock_load.return_value = {'user': TableDefinition(name='user', mode=TableMode.SCHEMAFULL)}
@@ -854,7 +854,7 @@ register_table(user_table)
     schema_file.write_text('# schema')
 
     with (
-      patch('reverie.cli.schema._load_schemas_from_file') as mock_load,
+      patch('reverie.cli.schema_visualize._load_schemas_from_file') as mock_load,
       patch('reverie.schema.registry.get_registered_edges', return_value={}),
     ):
       mock_load.return_value = {
@@ -879,7 +879,7 @@ register_table(user_table)
     schema_file.write_text('# schema')
 
     with (
-      patch('reverie.cli.schema._load_schemas_from_file') as mock_load,
+      patch('reverie.cli.schema_visualize._load_schemas_from_file') as mock_load,
       patch('reverie.schema.registry.get_registered_edges', return_value={}),
     ):
       mock_load.return_value = {
@@ -907,7 +907,7 @@ register_table(user_table)
     schema_file.write_text('# schema')
 
     with (
-      patch('reverie.cli.schema._load_schemas_from_file') as mock_load,
+      patch('reverie.cli.schema_visualize._load_schemas_from_file') as mock_load,
       patch('reverie.schema.registry.get_registered_edges') as mock_edges,
     ):
       mock_load.return_value = {
@@ -939,7 +939,7 @@ register_table(user_table)
     schema_file = tmp_path / 'schema.py'
     schema_file.write_text('# schema')
 
-    with patch('reverie.cli.schema._load_schemas_from_file') as mock_load:
+    with patch('reverie.cli.schema_visualize._load_schemas_from_file') as mock_load:
       mock_load.return_value = {'user': TableDefinition(name='user', mode=TableMode.SCHEMAFULL)}
 
       result = self.runner.invoke(
@@ -956,7 +956,7 @@ register_table(user_table)
     schema_file = tmp_path / 'empty_schema.py'
     schema_file.write_text('# empty schema file')
 
-    with patch('reverie.cli.schema._load_schemas_from_file') as mock_load:
+    with patch('reverie.cli.schema_visualize._load_schemas_from_file') as mock_load:
       mock_load.return_value = {}
 
       result = self.runner.invoke(schema_app, ['visualize', '--schema', str(schema_file)])

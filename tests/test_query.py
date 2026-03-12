@@ -14,6 +14,7 @@ from reverie.query.builder import (
   vector_search_query,
 )
 from reverie.query.executor import _extract_result_data
+from reverie.query.helpers import similarity_search_query
 from reverie.query.results import (
   ListResult,
   PageInfo,
@@ -1194,3 +1195,215 @@ class TestVectorSearchQueryHelper:
     assert '(published = true)' in sql
     assert 'ORDER BY score DESC' in sql
     assert 'LIMIT 5' in sql
+
+
+class TestVectorSearchThreshold:
+  """Test suite for vector search threshold parameter."""
+
+  def test_vector_search_with_threshold(self) -> None:
+    """Test vector_search stores threshold on the model."""
+    query = (
+      Query[User]()
+      .select()
+      .from_table('documents')
+      .vector_search(field='embedding', vector=[0.1, 0.2, 0.3], threshold=0.7)
+    )
+
+    assert query.vector_threshold == 0.7
+    assert query.vector_field == 'embedding'
+    assert query.vector_k == 10
+
+  def test_vector_search_threshold_none_by_default(self) -> None:
+    """Test threshold is None by default for backward compatibility."""
+    query = (
+      Query[User]()
+      .select()
+      .from_table('documents')
+      .vector_search(field='embedding', vector=[0.1, 0.2])
+    )
+
+    assert query.vector_threshold is None
+
+  def test_to_surql_vector_with_threshold(self) -> None:
+    """Test SurrealQL generation includes threshold in MTREE operator."""
+    query = (
+      Query[User]()
+      .select()
+      .from_table('documents')
+      .vector_search(
+        field='embedding', vector=[0.1, 0.2, 0.3], k=10, distance='COSINE', threshold=0.7
+      )
+    )
+
+    sql = query.to_surql()
+    assert 'embedding <|10,COSINE,0.7|> [0.1, 0.2, 0.3]' in sql
+
+  def test_to_surql_vector_without_threshold(self) -> None:
+    """Test SurrealQL generation without threshold is unchanged."""
+    query = (
+      Query[User]()
+      .select()
+      .from_table('documents')
+      .vector_search(field='embedding', vector=[0.1, 0.2, 0.3], k=10, distance='COSINE')
+    )
+
+    sql = query.to_surql()
+    assert 'embedding <|10,COSINE|> [0.1, 0.2, 0.3]' in sql
+
+  def test_vector_search_query_helper_with_threshold(self) -> None:
+    """Test vector_search_query() convenience function accepts threshold."""
+    query = vector_search_query(
+      table='documents',
+      field='embedding',
+      vector=[0.1, 0.2, 0.3],
+      k=10,
+      distance='COSINE',
+      threshold=0.8,
+    )
+
+    sql = query.to_surql()
+    assert 'embedding <|10,COSINE,0.8|> [0.1, 0.2, 0.3]' in sql
+
+
+class TestSimilarityScore:
+  """Test suite for similarity_score() method."""
+
+  def test_similarity_score_cosine(self) -> None:
+    """Test similarity_score adds cosine scoring to SELECT fields."""
+    query = (
+      Query[User]().select().from_table('documents').similarity_score('embedding', [0.1, 0.2, 0.3])
+    )
+
+    assert any('vector::similarity::cosine' in f for f in query.fields)
+    assert any('AS similarity' in f for f in query.fields)
+
+  def test_similarity_score_euclidean(self) -> None:
+    """Test similarity_score with EUCLIDEAN metric."""
+    query = (
+      Query[User]()
+      .select()
+      .from_table('documents')
+      .similarity_score('embedding', [0.1, 0.2], 'EUCLIDEAN')
+    )
+
+    assert any('vector::similarity::euclidean' in f for f in query.fields)
+
+  def test_similarity_score_custom_alias(self) -> None:
+    """Test similarity_score with a custom alias."""
+    query = (
+      Query[User]()
+      .select()
+      .from_table('documents')
+      .similarity_score('embedding', [0.1, 0.2], alias='score')
+    )
+
+    assert any('AS score' in f for f in query.fields)
+
+  def test_similarity_score_in_surql(self) -> None:
+    """Test similarity_score appears in generated SurrealQL SELECT."""
+    query = (
+      Query[User]()
+      .select(['id', 'text'])
+      .from_table('chunk')
+      .similarity_score('embedding', [0.1, 0.2, 0.3], 'COSINE', 'similarity')
+      .vector_search('embedding', [0.1, 0.2, 0.3], k=10, distance='COSINE', threshold=0.7)
+    )
+
+    sql = query.to_surql()
+    assert 'vector::similarity::cosine(embedding, [0.1, 0.2, 0.3]) AS similarity' in sql
+    assert 'embedding <|10,COSINE,0.7|> [0.1, 0.2, 0.3]' in sql
+
+  def test_similarity_score_chaining(self) -> None:
+    """Test similarity_score combined with vector_search, where, order_by, limit."""
+    query = (
+      Query[User]()
+      .select(['id', 'text'])
+      .from_table('chunk')
+      .similarity_score('embedding', [0.1, 0.2], 'COSINE', 'similarity')
+      .vector_search('embedding', [0.1, 0.2], k=20, distance='COSINE', threshold=0.5)
+      .order_by('similarity', 'DESC')
+      .limit(10)
+    )
+
+    sql = query.to_surql()
+    assert 'vector::similarity::cosine' in sql
+    assert 'embedding <|20,COSINE,0.5|>' in sql
+    assert 'ORDER BY similarity DESC' in sql
+    assert 'LIMIT 10' in sql
+
+
+class TestSimilaritySearchQuery:
+  """Test suite for similarity_search_query() convenience function."""
+
+  def test_similarity_search_query_basic(self) -> None:
+    """Test similarity_search_query creates proper query."""
+    query = similarity_search_query(
+      table='chunk',
+      field='embedding',
+      vector=[0.1, 0.2, 0.3],
+      k=10,
+      distance='COSINE',
+    )
+
+    sql = query.to_surql()
+    assert 'vector::similarity::cosine' in sql
+    assert 'AS similarity' in sql
+    assert 'embedding <|10,COSINE|>' in sql
+
+  def test_similarity_search_query_with_threshold(self) -> None:
+    """Test similarity_search_query with threshold parameter."""
+    query = similarity_search_query(
+      table='chunk',
+      field='embedding',
+      vector=[0.1, 0.2, 0.3],
+      k=10,
+      distance='COSINE',
+      threshold=0.7,
+    )
+
+    sql = query.to_surql()
+    assert 'embedding <|10,COSINE,0.7|>' in sql
+
+  def test_similarity_search_query_custom_fields_and_alias(self) -> None:
+    """Test similarity_search_query with custom fields and alias."""
+    query = similarity_search_query(
+      table='chunk',
+      field='embedding',
+      vector=[0.1, 0.2],
+      fields=['id', 'text'],
+      alias='score',
+    )
+
+    sql = query.to_surql()
+    assert 'id' in sql
+    assert 'text' in sql
+    assert 'AS score' in sql
+
+  def test_similarity_search_driftnet_pattern(self) -> None:
+    """Test the exact pattern driftnet uses for vector search.
+
+    Validates that reverie can now produce the equivalent of driftnet's
+    manually constructed SurrealQL:
+      SELECT id, text, vector::similarity::cosine(embedding, $embedding) AS similarity
+      FROM chunk
+      WHERE embedding <|1024,COSINE,{threshold}|> $embedding
+    """
+    vector = [0.1] * 10  # simplified embedding
+    query = (
+      Query()
+      .select(['id', 'text'])
+      .from_table('chunk')
+      .similarity_score('embedding', vector, 'COSINE', 'similarity')
+      .vector_search('embedding', vector, k=1024, distance='COSINE', threshold=0.7)
+      .order_by('similarity', 'DESC')
+      .limit(20)
+    )
+
+    sql = query.to_surql()
+    assert 'id' in sql
+    assert 'text' in sql
+    assert 'vector::similarity::cosine(embedding,' in sql
+    assert 'AS similarity' in sql
+    assert 'embedding <|1024,COSINE,0.7|>' in sql
+    assert 'ORDER BY similarity DESC' in sql
+    assert 'LIMIT 20' in sql

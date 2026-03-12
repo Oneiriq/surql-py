@@ -391,7 +391,7 @@ def _parse_datetime(value: Any) -> datetime:
     # Try ISO format
     try:
       return datetime.fromisoformat(value.replace('Z', '+00:00'))
-    except Exception:
+    except (ValueError, TypeError):
       # Fallback to current time if parsing fails
       return datetime.now(UTC)
   else:

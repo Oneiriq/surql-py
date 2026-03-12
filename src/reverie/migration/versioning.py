@@ -516,7 +516,7 @@ async def _ensure_snapshot_table(client: DatabaseClient) -> None:
   try:
     # Try to query the table
     await client.execute('SELECT * FROM _schema_snapshot LIMIT 1')
-  except Exception:
+  except (RuntimeError, ConnectionError):
     # Create table
     statements = [
       'DEFINE TABLE _schema_snapshot SCHEMAFULL;',
@@ -659,7 +659,7 @@ def _parse_datetime(value: Any) -> datetime:
   elif isinstance(value, str):
     try:
       return datetime.fromisoformat(value.replace('Z', '+00:00'))
-    except Exception:
+    except (ValueError, TypeError):
       return datetime.now(UTC)
   else:
     return datetime.now(UTC)

@@ -1084,9 +1084,9 @@ user_table = with_fields(user_table, string_field('name'))
 """)
 
     with (
-      patch('reverie.cli.schema.get_db_config'),
-      patch('reverie.cli.schema.get_client') as mock_get_client,
-      patch('reverie.cli.schema._load_schemas_from_file') as mock_load,
+      patch('reverie.cli.schema_validate.get_db_config'),
+      patch('reverie.cli.schema_validate.get_client') as mock_get_client,
+      patch('reverie.cli.schema_validate._load_schemas_from_file') as mock_load,
       patch('reverie.schema.validator.validate_schema') as mock_validate,
     ):
       mock_load.return_value = {'user': TableDefinition(name='user', mode=TableMode.SCHEMAFULL)}
@@ -1114,9 +1114,9 @@ user_table = with_fields(user_table, string_field('name'))
     schema_file.write_text('# empty schema')
 
     with (
-      patch('reverie.cli.schema.get_db_config'),
-      patch('reverie.cli.schema.get_client') as mock_get_client,
-      patch('reverie.cli.schema._load_schemas_from_file') as mock_load,
+      patch('reverie.cli.schema_validate.get_db_config'),
+      patch('reverie.cli.schema_validate.get_client') as mock_get_client,
+      patch('reverie.cli.schema_validate._load_schemas_from_file') as mock_load,
       patch('reverie.schema.validator.validate_schema') as mock_validate,
     ):
       mock_load.return_value = {'user': TableDefinition(name='user', mode=TableMode.SCHEMAFULL)}
@@ -1144,9 +1144,9 @@ user_table = with_fields(user_table, string_field('name'))
     schema_file.write_text('# empty schema')
 
     with (
-      patch('reverie.cli.schema.get_db_config'),
-      patch('reverie.cli.schema.get_client') as mock_get_client,
-      patch('reverie.cli.schema._load_schemas_from_file') as mock_load,
+      patch('reverie.cli.schema_validate.get_db_config'),
+      patch('reverie.cli.schema_validate.get_client') as mock_get_client,
+      patch('reverie.cli.schema_validate._load_schemas_from_file') as mock_load,
       patch('reverie.schema.validator.validate_schema') as mock_validate,
     ):
       mock_load.return_value = {'user': TableDefinition(name='user', mode=TableMode.SCHEMAFULL)}
@@ -1173,9 +1173,9 @@ user_table = with_fields(user_table, string_field('name'))
     schema_file.write_text('# empty schema')
 
     with (
-      patch('reverie.cli.schema.get_db_config'),
-      patch('reverie.cli.schema.get_client') as mock_get_client,
-      patch('reverie.cli.schema._load_schemas_from_file') as mock_load,
+      patch('reverie.cli.schema_validate.get_db_config'),
+      patch('reverie.cli.schema_validate.get_client') as mock_get_client,
+      patch('reverie.cli.schema_validate._load_schemas_from_file') as mock_load,
       patch('reverie.schema.validator.validate_schema') as mock_validate,
     ):
       mock_load.return_value = {'user': TableDefinition(name='user', mode=TableMode.SCHEMAFULL)}
@@ -1204,9 +1204,9 @@ user_table = with_fields(user_table, string_field('name'))
     schema_file.write_text('# empty schema')
 
     with (
-      patch('reverie.cli.schema.get_db_config'),
-      patch('reverie.cli.schema.get_client') as mock_get_client,
-      patch('reverie.cli.schema._load_schemas_from_file') as mock_load,
+      patch('reverie.cli.schema_validate.get_db_config'),
+      patch('reverie.cli.schema_validate.get_client') as mock_get_client,
+      patch('reverie.cli.schema_validate._load_schemas_from_file') as mock_load,
       patch('reverie.schema.validator.validate_schema') as mock_validate,
     ):
       mock_load.return_value = {'user': TableDefinition(name='user', mode=TableMode.SCHEMAFULL)}
@@ -1232,9 +1232,9 @@ user_table = with_fields(user_table, string_field('name'))
     output_file = tmp_path / 'report.txt'
 
     with (
-      patch('reverie.cli.schema.get_db_config'),
-      patch('reverie.cli.schema.get_client') as mock_get_client,
-      patch('reverie.cli.schema._load_schemas_from_file') as mock_load,
+      patch('reverie.cli.schema_validate.get_db_config'),
+      patch('reverie.cli.schema_validate.get_client') as mock_get_client,
+      patch('reverie.cli.schema_validate._load_schemas_from_file') as mock_load,
       patch('reverie.schema.validator.validate_schema') as mock_validate,
     ):
       mock_load.return_value = {'user': TableDefinition(name='user', mode=TableMode.SCHEMAFULL)}
@@ -1263,9 +1263,9 @@ user_table = with_fields(user_table, string_field('name'))
     output_file = tmp_path / 'report.json'
 
     with (
-      patch('reverie.cli.schema.get_db_config'),
-      patch('reverie.cli.schema.get_client') as mock_get_client,
-      patch('reverie.cli.schema._load_schemas_from_file') as mock_load,
+      patch('reverie.cli.schema_validate.get_db_config'),
+      patch('reverie.cli.schema_validate.get_client') as mock_get_client,
+      patch('reverie.cli.schema_validate._load_schemas_from_file') as mock_load,
       patch('reverie.schema.validator.validate_schema') as mock_validate,
     ):
       mock_load.return_value = {'user': TableDefinition(name='user', mode=TableMode.SCHEMAFULL)}
@@ -1299,9 +1299,9 @@ user_table = with_fields(user_table, string_field('name'))
     schema_file.write_text('# empty schema')
 
     with (
-      patch('reverie.cli.schema.get_db_config'),
-      patch('reverie.cli.schema.get_client') as mock_get_client,
-      patch('reverie.cli.schema._load_schemas_from_file') as mock_load,
+      patch('reverie.cli.schema_validate.get_db_config'),
+      patch('reverie.cli.schema_validate.get_client') as mock_get_client,
+      patch('reverie.cli.schema_validate._load_schemas_from_file') as mock_load,
     ):
       mock_load.return_value = {'user': TableDefinition(name='user', mode=TableMode.SCHEMAFULL)}
 
@@ -1318,9 +1318,9 @@ user_table = with_fields(user_table, string_field('name'))
     schema_file.write_text('# empty schema')
 
     with (
-      patch('reverie.cli.schema.get_db_config'),
-      patch('reverie.cli.schema.get_client') as mock_get_client,
-      patch('reverie.cli.schema._load_schemas_from_file') as mock_load,
+      patch('reverie.cli.schema_validate.get_db_config'),
+      patch('reverie.cli.schema_validate.get_client') as mock_get_client,
+      patch('reverie.cli.schema_validate._load_schemas_from_file') as mock_load,
       patch('reverie.schema.validator.validate_schema') as mock_validate,
     ):
       mock_load.return_value = {'user': TableDefinition(name='user', mode=TableMode.SCHEMAFULL)}
@@ -1355,9 +1355,9 @@ class TestValidateCLIExitCodes:
     schema_file.write_text('# empty schema')
 
     with (
-      patch('reverie.cli.schema.get_db_config'),
-      patch('reverie.cli.schema.get_client') as mock_get_client,
-      patch('reverie.cli.schema._load_schemas_from_file') as mock_load,
+      patch('reverie.cli.schema_validate.get_db_config'),
+      patch('reverie.cli.schema_validate.get_client') as mock_get_client,
+      patch('reverie.cli.schema_validate._load_schemas_from_file') as mock_load,
       patch('reverie.schema.validator.validate_schema') as mock_validate,
     ):
       mock_load.return_value = {'user': TableDefinition(name='user', mode=TableMode.SCHEMAFULL)}
@@ -1375,9 +1375,9 @@ class TestValidateCLIExitCodes:
     schema_file.write_text('# empty schema')
 
     with (
-      patch('reverie.cli.schema.get_db_config'),
-      patch('reverie.cli.schema.get_client') as mock_get_client,
-      patch('reverie.cli.schema._load_schemas_from_file') as mock_load,
+      patch('reverie.cli.schema_validate.get_db_config'),
+      patch('reverie.cli.schema_validate.get_client') as mock_get_client,
+      patch('reverie.cli.schema_validate._load_schemas_from_file') as mock_load,
       patch('reverie.schema.validator.validate_schema') as mock_validate,
     ):
       mock_load.return_value = {'user': TableDefinition(name='user', mode=TableMode.SCHEMAFULL)}
@@ -1399,9 +1399,9 @@ class TestValidateCLIExitCodes:
     schema_file.write_text('# empty schema')
 
     with (
-      patch('reverie.cli.schema.get_db_config'),
-      patch('reverie.cli.schema.get_client') as mock_get_client,
-      patch('reverie.cli.schema._load_schemas_from_file') as mock_load,
+      patch('reverie.cli.schema_validate.get_db_config'),
+      patch('reverie.cli.schema_validate.get_client') as mock_get_client,
+      patch('reverie.cli.schema_validate._load_schemas_from_file') as mock_load,
       patch('reverie.schema.validator.validate_schema') as mock_validate,
     ):
       mock_load.return_value = {'user': TableDefinition(name='user', mode=TableMode.SCHEMAFULL)}

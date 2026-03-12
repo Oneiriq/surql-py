@@ -549,5 +549,5 @@ def _generate_diff_summary(file_path: Path) -> str | None:
       return f'Schema file defines table: {table_names[0]}'
     return f'Schema file defines tables: {", ".join(table_names)}'
 
-  except Exception:
+  except (OSError, KeyError, AttributeError):
     return None

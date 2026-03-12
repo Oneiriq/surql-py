@@ -224,6 +224,7 @@ def vector_search_query(
   k: int = 10,
   distance: VectorDistanceType = 'COSINE',
   fields: list[str] | None = None,
+  threshold: float | None = None,
 ) -> Query[Any]:
   """Create a vector similarity search query.
 
@@ -236,6 +237,7 @@ def vector_search_query(
     k: Number of nearest neighbors to return (default: 10)
     distance: Distance metric (default: COSINE)
     fields: List of fields to select (default: all fields)
+    threshold: Optional similarity threshold for filtering results
 
   Returns:
     Query instance configured for vector search
@@ -246,10 +248,63 @@ def vector_search_query(
     ...     field='embedding',
     ...     vector=[0.1, 0.2, 0.3],
     ...     k=10,
-    ...     distance='COSINE'
+    ...     distance='COSINE',
+    ...     threshold=0.7,
     ... )
-    >>> # Generates: SELECT * FROM documents WHERE embedding <|10,COSINE|> [0.1, 0.2, 0.3]
+    >>> # Generates: SELECT * FROM documents WHERE embedding <|10,COSINE,0.7|> [0.1, 0.2, 0.3]
   """
   from reverie.query.builder import Query
 
-  return Query().select(fields).from_table(table).vector_search(field, vector, k, distance)
+  return (
+    Query().select(fields).from_table(table).vector_search(field, vector, k, distance, threshold)
+  )
+
+
+def similarity_search_query(
+  table: str,
+  field: str,
+  vector: list[float],
+  k: int = 10,
+  distance: VectorDistanceType = 'COSINE',
+  threshold: float | None = None,
+  fields: list[str] | None = None,
+  alias: str = 'similarity',
+) -> Query[Any]:
+  """Create a vector search query with similarity scoring.
+
+  Combines vector_search() with similarity_score() for queries that need
+  both MTREE filtering and similarity score calculation in the results.
+
+  Args:
+    table: Table name to search
+    field: The field containing the vector embedding
+    vector: The query vector to compare against
+    k: Number of nearest neighbors to return (default: 10)
+    distance: Distance metric (default: COSINE)
+    threshold: Optional similarity threshold for filtering results
+    fields: List of fields to select (default: all fields)
+    alias: Column alias for the similarity score (default: 'similarity')
+
+  Returns:
+    Query instance configured for vector search with similarity scoring
+
+  Examples:
+    >>> query = similarity_search_query(
+    ...     table='chunk',
+    ...     field='embedding',
+    ...     vector=[0.1, 0.2, 0.3],
+    ...     k=20,
+    ...     distance='COSINE',
+    ...     threshold=0.7,
+    ...     fields=['id', 'text'],
+    ... )
+  """
+  from reverie.query.builder import Query
+
+  return (
+    Query()
+    .select(fields)
+    .from_table(table)
+    .similarity_score(field, vector, distance, alias)
+    .vector_search(field, vector, k, distance, threshold)
+  )

@@ -296,7 +296,7 @@ def _find_migrations_dir() -> Path | None:
 
     if resolved_path.exists() and resolved_path.is_dir():
       return resolved_path
-  except Exception:
+  except (OSError, AttributeError, KeyError):
     # Fall back to common locations if settings fail
     pass
 

@@ -100,6 +100,7 @@ from reverie.query.helpers import (  # Query builder helpers and shared types
   order_by,
   relate,
   select,
+  similarity_search_query,
   update,
   upsert,
   vector_search_query,
@@ -159,6 +160,7 @@ __all__ = [
   'upsert',
   'relate',
   'vector_search_query',
+  'similarity_search_query',
   'VectorDistanceType',
   # Query hints
   'QueryHint',

@@ -5,6 +5,47 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.9.0] - 2026-03-11
+
+### Added
+
+- **Vector search threshold**: `vector_search()` now accepts a `threshold` parameter for
+  MTREE similarity filtering, generating `<|K,DISTANCE,threshold|>` syntax
+- **Similarity scoring**: `similarity_score()` method on Query adds
+  `vector::similarity::{metric}(field, vector) AS alias` to SELECT fields
+- **similarity_search_query()**: Convenience function combining `vector_search()` and
+  `similarity_score()` for common vector search patterns (replaces manual SurrealQL
+  construction in consumer projects like driftnet)
+
+### Fixed
+
+- **Edge diff returns empty for modified edges**: `diff_edges()` now compares fields,
+  indexes, events, and permissions when both old and new edges exist (previously returned
+  an empty list with a TODO comment)
+- **Event condition/action SQL injection**: Added `_validate_event_expression()` that
+  rejects statement separators and SQL comments before interpolation into generated SQL
+- **Permission rollback SQL always empty**: `_generate_modify_permissions_diff()` now
+  generates rollback SQL from old permissions instead of always producing empty backward SQL
+- **Bare exception blocks**: Narrowed 9 bare `except Exception:` blocks across migration/
+  and connection/ modules to specific exception types
+
+### Changed
+
+- **Split cli/schema.py** (1954 LOC): Extracted into `schema_inspect.py`, `schema_diff.py`,
+  `schema_validate.py`, `schema_watch.py`, `schema_visualize.py` with thin command wrappers
+- **Split cli/migrate.py** (1232 LOC): Extracted into `migrate_core.py`, `migrate_squash.py`,
+  `migrate_advanced.py` with thin command wrappers
+- **Split schema/validator.py** (1029 LOC): Extracted utility functions into
+  `schema/validator_utils.py`. All files now comply with the 1000 LOC limit
+
+### Testing
+
+- **Test coverage**: 2191 tests passing (up from 2161 in 0.8.0)
+- New test suites: `test_edge_diff.py` (edge diff, event validation, permission rollback)
+- Extended: `test_query.py` with vector threshold and similarity scoring tests
+
+---
+
 ## [0.8.0] - 2026-03-11
 
 ### Added

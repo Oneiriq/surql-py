@@ -174,8 +174,8 @@ class TestMigrateCommands:
   def test_migrate_create_success(self, tmp_path: Path) -> None:
     """Test successful migration creation."""
     with (
-      patch('reverie.cli.migrate.get_migrations_directory', return_value=tmp_path),
-      patch('reverie.cli.migrate.create_blank_migration') as mock_create,
+      patch('reverie.cli.migrate_core.get_migrations_directory', return_value=tmp_path),
+      patch('reverie.cli.migrate_core.create_blank_migration') as mock_create,
     ):
       mock_file = tmp_path / '20260102_120000_test.py'
       mock_create.return_value = mock_file
@@ -225,7 +225,7 @@ class TestMigrateCommands:
     migrations_dir = tmp_path / 'migrations'
     migrations_dir.mkdir()
 
-    with patch('reverie.cli.migrate.get_migrations_directory', return_value=migrations_dir):
+    with patch('reverie.cli.migrate_core.get_migrations_directory', return_value=migrations_dir):
       result = self.runner.invoke(migrate_app, ['validate'])
 
       # Should succeed with warning about no files
@@ -239,7 +239,7 @@ class TestMigrateCommands:
     # Create invalid migration file
     (migrations_dir / 'invalid.py').write_text('# invalid')
 
-    with patch('reverie.cli.migrate.get_migrations_directory', return_value=migrations_dir):
+    with patch('reverie.cli.migrate_core.get_migrations_directory', return_value=migrations_dir):
       result = self.runner.invoke(migrate_app, ['validate'])
 
       # Should fail validation
@@ -264,8 +264,8 @@ def down():
     migration_file.write_text(migration_content)
 
     with (
-      patch('reverie.cli.migrate.get_migrations_directory', return_value=temp_migration_dir),
-      patch('reverie.cli.migrate.validate_migrations', return_value=[]),
+      patch('reverie.cli.migrate_core.get_migrations_directory', return_value=temp_migration_dir),
+      patch('reverie.cli.migrate_core.validate_migrations', return_value=[]),
     ):
       result = self.runner.invoke(migrate_app, ['validate'])
 
@@ -281,7 +281,9 @@ class TestCLIErrorHandling:
 
   def test_migrate_create_error_handling(self) -> None:
     """Test error handling in migrate create."""
-    with patch('reverie.cli.migrate.get_migrations_directory', side_effect=Exception('Test error')):
+    with patch(
+      'reverie.cli.migrate_core.get_migrations_directory', side_effect=Exception('Test error')
+    ):
       result = self.runner.invoke(migrate_app, ['create', 'test'])
 
       assert result.exit_code == 1
@@ -289,8 +291,8 @@ class TestCLIErrorHandling:
   def test_migrate_status_with_invalid_directory(self) -> None:
     """Test status command with non-existent directory."""
     with (
-      patch('reverie.cli.migrate.get_migrations_directory', return_value=Path('/nonexistent')),
-      patch('reverie.cli.migrate.discover_migrations', return_value=[]),
+      patch('reverie.cli.migrate_core.get_migrations_directory', return_value=Path('/nonexistent')),
+      patch('reverie.cli.migrate_core.discover_migrations', return_value=[]),
     ):
       result = self.runner.invoke(migrate_app, ['status'])
 
@@ -338,8 +340,8 @@ class TestCLIVerboseOption:
   def test_migrate_create_verbose(self, tmp_path: Path) -> None:
     """Test migrate create with verbose option."""
     with (
-      patch('reverie.cli.migrate.get_migrations_directory', return_value=tmp_path),
-      patch('reverie.cli.migrate.create_blank_migration') as mock_create,
+      patch('reverie.cli.migrate_core.get_migrations_directory', return_value=tmp_path),
+      patch('reverie.cli.migrate_core.create_blank_migration') as mock_create,
     ):
       mock_file = tmp_path / '20260102_120000_test.py'
       mock_create.return_value = mock_file
@@ -397,8 +399,10 @@ class TestCLIDirectoryOption:
     custom_dir = tmp_path / 'custom'
 
     with (
-      patch('reverie.cli.migrate.get_migrations_directory', return_value=custom_dir) as mock_get,
-      patch('reverie.cli.migrate.create_blank_migration') as mock_create,
+      patch(
+        'reverie.cli.migrate_core.get_migrations_directory', return_value=custom_dir
+      ) as mock_get,
+      patch('reverie.cli.migrate_core.create_blank_migration') as mock_create,
     ):
       mock_file = custom_dir / '20260102_120000_test.py'
       mock_create.return_value = mock_file
@@ -449,8 +453,8 @@ class TestCLIGenerateCommand:
   def test_generate_creates_blank_migration(self, tmp_path: Path) -> None:
     """Test that generate creates blank migration (current implementation)."""
     with (
-      patch('reverie.cli.migrate.get_migrations_directory', return_value=tmp_path),
-      patch('reverie.cli.migrate.create_blank_migration') as mock_create,
+      patch('reverie.cli.migrate_core.get_migrations_directory', return_value=tmp_path),
+      patch('reverie.cli.migrate_core.create_blank_migration') as mock_create,
     ):
       mock_file = tmp_path / '20260102_120000_test.py'
       mock_create.return_value = mock_file
@@ -587,7 +591,7 @@ register_table(user_table)
 """
     schema_file.write_text(schema_content)
 
-    with patch('reverie.cli.schema.display_code'):
+    with patch('reverie.cli.schema_visualize.display_code'):
       result = self.runner.invoke(
         schema_app,
         ['visualize', '--schema', str(schema_file), '--theme', 'modern'],
@@ -613,7 +617,7 @@ register_table(user_table)
 """
     schema_file.write_text(schema_content)
 
-    with patch('reverie.cli.schema.display_code'):
+    with patch('reverie.cli.schema_visualize.display_code'):
       result = self.runner.invoke(
         schema_app,
         ['visualize', '--schema', str(schema_file), '--theme', 'dark'],
@@ -638,7 +642,7 @@ register_table(user_table)
 """
     schema_file.write_text(schema_content)
 
-    with patch('reverie.cli.schema.display_code'):
+    with patch('reverie.cli.schema_visualize.display_code'):
       result = self.runner.invoke(
         schema_app,
         ['visualize', '--schema', str(schema_file), '--theme', 'none'],
@@ -663,7 +667,7 @@ register_table(user_table)
 """
     schema_file.write_text(schema_content)
 
-    with patch('reverie.cli.schema.display_code'):
+    with patch('reverie.cli.schema_visualize.display_code'):
       result = self.runner.invoke(
         schema_app,
         [
@@ -697,7 +701,7 @@ register_table(user_table)
 """
     schema_file.write_text(schema_content)
 
-    with patch('reverie.cli.schema.display_panel'):
+    with patch('reverie.cli.schema_visualize.display_panel'):
       result = self.runner.invoke(
         schema_app,
         [
@@ -730,7 +734,7 @@ register_table(user_table)
 """
     schema_file.write_text(schema_content)
 
-    with patch('reverie.cli.schema.display_panel'):
+    with patch('reverie.cli.schema_visualize.display_panel'):
       result = self.runner.invoke(
         schema_app,
         [
@@ -762,7 +766,7 @@ register_table(user_table)
 """
     schema_file.write_text(schema_content)
 
-    with patch('reverie.cli.schema.display_panel'):
+    with patch('reverie.cli.schema_visualize.display_panel'):
       result = self.runner.invoke(
         schema_app,
         [
@@ -794,7 +798,7 @@ register_table(user_table)
 """
     schema_file.write_text(schema_content)
 
-    with patch('reverie.cli.schema.display_panel'):
+    with patch('reverie.cli.schema_visualize.display_panel'):
       result = self.runner.invoke(
         schema_app,
         [
@@ -850,7 +854,7 @@ register_table(user_table)
 """
     schema_file.write_text(schema_content)
 
-    with patch('reverie.cli.schema.display_panel'):
+    with patch('reverie.cli.schema_visualize.display_panel'):
       result = self.runner.invoke(
         schema_app,
         [

@@ -190,7 +190,7 @@ async def transaction(client: DatabaseClient) -> AsyncIterator[Transaction]:
     yield txn
     if txn.is_active:
       await txn.commit()
-  except Exception:
+  except BaseException:
     if txn.is_active:
       await txn.cancel()
     raise

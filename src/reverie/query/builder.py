@@ -102,6 +102,7 @@ class Query[T: BaseModel](BaseModel):
   vector_value: list[float] = Field(default_factory=list)
   vector_k: int | None = None
   vector_distance: VectorDistanceType | None = None
+  vector_threshold: float | None = None
   # Query optimization hints
   hints: list[Any] = Field(default_factory=list)
 
@@ -441,6 +442,7 @@ class Query[T: BaseModel](BaseModel):
     vector: list[float],
     k: int = 10,
     distance: VectorDistanceType = 'COSINE',
+    threshold: float | None = None,
   ) -> Query[T]:
     """Add vector similarity search clause using MTREE operator.
 
@@ -452,6 +454,7 @@ class Query[T: BaseModel](BaseModel):
       vector: The query vector to compare against
       k: Number of nearest neighbors to return (default: 10)
       distance: Distance metric (default: COSINE)
+      threshold: Optional similarity threshold for filtering results
 
     Returns:
       New Query instance with vector search configured
@@ -464,9 +467,10 @@ class Query[T: BaseModel](BaseModel):
       ...     field='embedding',
       ...     vector=[0.1, 0.2, 0.3],
       ...     k=10,
-      ...     distance='COSINE'
+      ...     distance='COSINE',
+      ...     threshold=0.7,
       ... )
-      >>> # Generates: SELECT * FROM documents WHERE embedding <|10,COSINE|> [0.1, 0.2, 0.3]
+      >>> # Generates: SELECT * FROM documents WHERE embedding <|10,COSINE,0.7|> [0.1, 0.2, 0.3]
     """
     if k < 1:
       raise ValueError(f'k must be at least 1, got {k}')
@@ -480,8 +484,39 @@ class Query[T: BaseModel](BaseModel):
         'vector_value': vector,
         'vector_k': k,
         'vector_distance': distance,
+        'vector_threshold': threshold,
       }
     )
+
+  def similarity_score(
+    self,
+    field: str,
+    vector: list[float],
+    metric: VectorDistanceType = 'COSINE',
+    alias: str = 'similarity',
+  ) -> Query[T]:
+    """Add a vector similarity score calculation to SELECT fields.
+
+    Adds vector::similarity::{metric}(field, vector) AS alias to the query,
+    allowing similarity scores to be returned alongside results.
+
+    Args:
+      field: The field containing the vector embedding
+      vector: The query vector to compare against
+      metric: Similarity metric (default: COSINE)
+      alias: Column alias for the similarity score (default: 'similarity')
+
+    Returns:
+      New Query instance with similarity score field added
+
+    Examples:
+      >>> query = Query().select(['id', 'text']).from_table('chunk') \\
+      ...   .similarity_score('embedding', [0.1, 0.2], 'COSINE', 'score')
+      >>> # Adds: vector::similarity::cosine(embedding, [0.1, 0.2]) AS score
+    """
+    vector_str = '[' + ', '.join(str(v) for v in vector) + ']'
+    score_expr = f'vector::similarity::{metric.lower()}({field}, {vector_str}) AS {alias}'
+    return self.model_copy(update={'fields': [*self.fields, score_expr]})
 
   def return_none(self) -> Query[T]:
     """Set RETURN NONE for the query.
@@ -787,9 +822,11 @@ class Query[T: BaseModel](BaseModel):
     # Add vector search condition if present
     if self.vector_field and self.vector_value and self.vector_k and self.vector_distance:
       vector_str = '[' + ', '.join(str(v) for v in self.vector_value) + ']'
-      vector_condition = (
-        f'{self.vector_field} <|{self.vector_k},{self.vector_distance}|> {vector_str}'
-      )
+      if self.vector_threshold is not None:
+        operator = f'<|{self.vector_k},{self.vector_distance},{self.vector_threshold}|>'
+      else:
+        operator = f'<|{self.vector_k},{self.vector_distance}|>'
+      vector_condition = f'{self.vector_field} {operator} {vector_str}'
       where_conditions.append(vector_condition)
 
     # Add regular conditions

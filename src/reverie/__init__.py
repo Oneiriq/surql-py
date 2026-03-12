@@ -53,6 +53,7 @@ from reverie.query import (
   relate,
   remove_relation,
   select,
+  similarity_search_query,
   traverse,
   update,
   update_record,
@@ -76,7 +77,7 @@ from reverie.types import (
   or_,
 )
 
-__version__ = '0.8.0'
+__version__ = '0.9.0'
 
 __all__ = [
   # Configuration
@@ -104,6 +105,7 @@ __all__ = [
   # Query builder
   'Query',
   'select',
+  'similarity_search_query',
   'insert',
   'update',
   'delete',

@@ -464,7 +464,7 @@ def _extract_table_name(statement: str) -> str:
       idx = parts.index('TABLE')
       if idx + 1 < len(parts):
         return parts[idx + 1].strip(';').lower()
-  except Exception:
+  except (ValueError, IndexError):
     pass
   return 'unknown'
 
@@ -489,7 +489,7 @@ def _extract_field_name(statement: str) -> str:
           return field_part.strip(';').lower()
         # Or just field name with ON TABLE following
         return field_part.strip(';').lower()
-  except Exception:
+  except (ValueError, IndexError):
     pass
   return 'unknown'
 
