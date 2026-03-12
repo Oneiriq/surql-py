@@ -45,6 +45,7 @@ from reverie.types.operators import (
   or_,
 )
 from reverie.types.record_id import RecordID
+from reverie.types.reserved import SURREAL_RESERVED_WORDS, check_reserved_word
 
 __all__ = [
   # RecordID
@@ -91,4 +92,7 @@ __all__ = [
   # Coercion utilities
   'coerce_datetime',
   'coerce_record_datetimes',
+  # Reserved word validation
+  'SURREAL_RESERVED_WORDS',
+  'check_reserved_word',
 ]

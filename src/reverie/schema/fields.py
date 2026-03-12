@@ -5,9 +5,12 @@ type-safe field definitions in table schemas.
 """
 
 import re
+import warnings
 from enum import Enum
 
 from pydantic import BaseModel, ConfigDict
+
+from reverie.types.reserved import check_reserved_word
 
 _FIELD_NAME_PART_PATTERN = re.compile(r'^[a-zA-Z_][a-zA-Z0-9_]*$')
 
@@ -109,6 +112,10 @@ def field(
     FieldDefinition(name='age', type=FieldType.INT, assertion='$value >= 0 AND $value <= 150', ...)
   """
   _validate_field_name(name)
+
+  reserved_warning = check_reserved_word(name)
+  if reserved_warning is not None:
+    warnings.warn(reserved_warning, stacklevel=2)
 
   return FieldDefinition(
     name=name,
