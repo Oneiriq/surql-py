@@ -5,6 +5,36 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.8.0] - 2026-03-11
+
+### Added
+
+- **Typed Pydantic CRUD**: `create_typed()`, `get_typed()`, `query_typed()`, `update_typed()`,
+  `upsert_typed()` functions that accept Pydantic model types and return validated model
+  instances instead of raw dicts
+- **DEFINE ACCESS support**: `AccessDefinition`, `AccessType`, `JwtConfig`, `RecordAccessConfig`
+  schema types with `access_schema()`, `jwt_access()`, `record_access()` builders and
+  `generate_access_sql()` for SurrealQL generation
+- **IF NOT EXISTS support**: `if_not_exists` parameter on `generate_table_sql()`,
+  `generate_edge_sql()`, and `generate_schema_sql()` for idempotent schema migrations
+- **Reserved word validation**: `check_reserved_word()` and `SURREAL_RESERVED_WORDS` for
+  detecting field names that collide with SurrealDB reserved words (emits warnings, not errors)
+
+### Changed
+
+- **Split query/builder.py**: Extracted `ReturnFormat` enum and 12 standalone free functions
+  into `query/helpers.py`, bringing builder.py from 1137 to 947 LOC
+- **Split query/graph.py**: Extracted `GraphQuery` class into `query/graph_query.py`, bringing
+  graph.py from 1151 to 794 LOC. All files now comply with the 1000 LOC limit
+
+### Testing
+
+- **Test coverage**: 2161 tests passing (up from 2089 in 0.7.0)
+- New test suites: `test_typed_crud.py`, `test_access.py`, `test_reserved_words.py`
+- Extended: `test_schema_sql.py` with IF NOT EXISTS tests
+
+---
+
 ## [0.7.0] - 2026-03-11
 
 ### Added
