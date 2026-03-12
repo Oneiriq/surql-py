@@ -1061,7 +1061,7 @@ class TestGraphQueryFetch:
       return_value=[{'result': [{'name': 'Bob', 'email': 'bob@example.com'}]}]
     )
 
-    with patch('reverie.query.graph.get_db', return_value=mock_db_client):
+    with patch('reverie.query.graph_query.get_db', return_value=mock_db_client):
       users = await GraphQuery('user:alice').out('follows').fetch(User)
 
     assert len(users) == 1
