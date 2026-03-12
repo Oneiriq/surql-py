@@ -1,9 +1,18 @@
 """Schema definition layer for reverie ORM.
 
-This package provides functions and types for defining table and edge schemas
-in a functional, composable way.
+This package provides functions and types for defining table, edge, and access
+schemas in a functional, composable way.
 """
 
+from reverie.schema.access import (
+  AccessDefinition,
+  AccessType,
+  JwtConfig,
+  RecordAccessConfig,
+  access_schema,
+  jwt_access,
+  record_access,
+)
 from reverie.schema.edge import (
   EdgeDefinition,
   EdgeMode,
@@ -46,6 +55,7 @@ from reverie.schema.registry import (
   register_table,
 )
 from reverie.schema.sql import (
+  generate_access_sql,
   generate_edge_sql,
   generate_schema_sql,
   generate_table_sql,
@@ -153,8 +163,17 @@ __all__ = [
   'MINIMAL_THEME',
   'get_theme',
   'list_themes',
+  # Access schema
+  'AccessType',
+  'JwtConfig',
+  'RecordAccessConfig',
+  'AccessDefinition',
+  'access_schema',
+  'jwt_access',
+  'record_access',
   # SQL generation
   'generate_table_sql',
   'generate_edge_sql',
+  'generate_access_sql',
   'generate_schema_sql',
 ]

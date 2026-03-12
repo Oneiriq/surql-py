@@ -1,10 +1,11 @@
 """SQL generation from schema definitions.
 
-Generates SurrealQL DEFINE statements from TableDefinition and EdgeDefinition
-objects. This enables consumers to create database schemas directly from
-reverie schema definitions without using the migration system.
+Generates SurrealQL DEFINE statements from TableDefinition, EdgeDefinition,
+and AccessDefinition objects. This enables consumers to create database schemas
+directly from reverie schema definitions without using the migration system.
 """
 
+from reverie.schema.access import AccessDefinition, AccessType
 from reverie.schema.edge import EdgeDefinition, EdgeMode
 from reverie.schema.fields import FieldDefinition
 from reverie.schema.table import (
@@ -233,6 +234,51 @@ def generate_edge_sql(
     statements.append(_generate_event_sql(edge.name, event_def, if_not_exists=if_not_exists))
 
   return statements
+
+
+def generate_access_sql(access: AccessDefinition) -> list[str]:
+  """Generate SurrealQL DEFINE ACCESS statement.
+
+  Args:
+    access: Access definition to generate SQL for
+
+  Returns:
+    List containing the DEFINE ACCESS statement
+
+  Examples:
+    >>> from reverie.schema.access import jwt_access
+    >>> a = jwt_access('api', key='secret')
+    >>> stmts = generate_access_sql(a)
+    >>> stmts[0]
+    "DEFINE ACCESS api ON DATABASE TYPE JWT ALGORITHM HS256 KEY 'secret';"
+  """
+  sql = f'DEFINE ACCESS {access.name} ON DATABASE TYPE {access.type.value}'
+
+  if access.type == AccessType.JWT and access.jwt:
+    sql += f' ALGORITHM {access.jwt.algorithm}'
+    if access.jwt.key:
+      sql += f" KEY '{access.jwt.key}'"
+    if access.jwt.url:
+      sql += f" URL '{access.jwt.url}'"
+    if access.jwt.issuer:
+      sql += f" WITH ISSUER '{access.jwt.issuer}'"
+
+  if access.type == AccessType.RECORD and access.record:
+    if access.record.signup:
+      sql += f' SIGNUP ({access.record.signup})'
+    if access.record.signin:
+      sql += f' SIGNIN ({access.record.signin})'
+
+  if access.duration_session or access.duration_token:
+    duration_parts: list[str] = []
+    if access.duration_session:
+      duration_parts.append(f'FOR SESSION {access.duration_session}')
+    if access.duration_token:
+      duration_parts.append(f'FOR TOKEN {access.duration_token}')
+    sql += f' DURATION {", ".join(duration_parts)}'
+
+  sql += ';'
+  return [sql]
 
 
 def generate_schema_sql(
