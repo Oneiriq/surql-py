@@ -1,7 +1,7 @@
 [project]
 name = "oneiriq-surql"
 
-version = "1.0.0rc4"
+version = "1.0.0rc5"
 description = "Code-first database toolkit for SurrealDB - schema definitions, migrations, query building, and typed CRUD."
 authors = [
   { name = "Shon Thomas", email = "shon@oneiriq.com" }
