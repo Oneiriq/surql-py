@@ -44,11 +44,11 @@ dependencies = [
 cache = ["redis>=5.0.0"]
 
 [project.urls]
-Homepage = "https://github.com/Oneiriq/surql-python"
-Repository = "https://github.com/Oneiriq/surql-python"
-Documentation = "https://github.com/Oneiriq/surql-python#readme"
-Issues = "https://github.com/Oneiriq/surql-python/issues"
-Changelog = "https://github.com/Oneiriq/surql-python/blob/main/CHANGES"
+Homepage = "https://github.com/Oneiriq/surql-py"
+Repository = "https://github.com/Oneiriq/surql-py"
+Documentation = "https://github.com/Oneiriq/surql-py#readme"
+Issues = "https://github.com/Oneiriq/surql-py/issues"
+Changelog = "https://github.com/Oneiriq/surql-py/blob/main/CHANGES"
 
 [project.scripts]
 surql = "surql.__main__:cli"
