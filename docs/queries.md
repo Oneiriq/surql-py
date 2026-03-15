@@ -13,7 +13,6 @@ This guide covers querying and manipulating data using surql's type-safe query b
 - [Transactions](#transactions)
 - [Named Connections](#named-connections)
 - [Type Safety](#type-safety)
-- [Query Optimization Hints](#query-optimization-hints)
 - [Advanced Queries](#advanced-queries)
 - [Best Practices](#best-practices)
 
@@ -561,7 +560,7 @@ SurrealDB returns results in two different formats depending on the method used:
 1. **Flat format** (from `db.select()`): `[{"id": "...", ...}]`
 2. **Nested format** (from `db.query()`): `[{"result": [{"id": "...", ...}]}]`
 
-surql automatically handles both formats in its high-level functions ([`fetch_one()`](src/query/executor.py:59), [`fetch_all()`](src/query/executor.py:107), etc.), but provides utilities for manual extraction when needed.
+surql automatically handles both formats in its high-level functions (`fetch_one()`, `fetch_all()`, etc.), but provides utilities for manual extraction when needed.
 
 ### Automatic Result Extraction
 
@@ -710,10 +709,10 @@ async def comprehensive_query_example():
 
 | Utility | Use Case | Returns |
 |---------|----------|---------|
-| [`extract_result()`](src/query/results.py:363) | Get all records from any query | `list[dict]` |
-| [`extract_one()`](src/query/results.py:416) | Get single record or None | `dict \| None` |
-| [`extract_scalar()`](src/query/results.py:448) | Get single value from aggregate | `Any` |
-| [`has_results()`](src/query/results.py:490) | Check if results exist | `bool` |
+| `extract_result()` | Get all records from any query | `list[dict]` |
+| `extract_one()` | Get single record or None | `dict \| None` |
+| `extract_scalar()` | Get single value from aggregate | `Any` |
+| `has_results()` | Check if results exist | `bool` |
 
 ### Migration from Direct surrealdb-py
 

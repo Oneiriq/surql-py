@@ -9,7 +9,7 @@ The visualization examples generate **source code** (DOT, Mermaid, ASCII) that n
 **What you see in the files**: Source code with styling directives
 **What you should see**: Rendered diagrams with colors, gradients, and beautiful formatting
 
-📖 **See the full guide**: [`docs/VISUALIZATION_RENDERING_GUIDE.md`](../VISUALIZATION_RENDERING_GUIDE.md)
+See the full guide: [`docs/visualization.md`](../visualization.md)
 
 ---
 
@@ -27,7 +27,7 @@ python docs/examples/visualization_example.py | less -R
 
 ### Render Sample Output Files
 
-This directory contains pre-generated sample outputs in the [`output/`](output/) subdirectory.
+This directory contains pre-generated sample outputs in the `output/` subdirectory.
 
 #### GraphViz (`.dot` files)
 
@@ -87,16 +87,16 @@ bat docs/examples/output/schema_forest_ascii.txt
 
 ### Sample Output Files (in `output/` directory)
 
-- **[`schema_dark_graphviz.dot`](output/schema_dark_graphviz.dot)** - GraphViz DOT format with dark theme
-- **[`schema_modern_mermaid.md`](output/schema_modern_mermaid.md)** - Mermaid ER diagram with modern theme
-- **[`schema_forest_ascii.txt`](output/schema_forest_ascii.txt)** - ASCII art with forest theme
+- **`schema_dark_graphviz.dot`** - GraphViz DOT format with dark theme
+- **`schema_modern_mermaid.md`** - Mermaid ER diagram with modern theme
+- **`schema_forest_ascii.txt`** - ASCII art with forest theme
 
 ### Legacy Sample Files (Top-Level)
 
 These are earlier examples showing different themes:
-- [`schema_modern_graphviz.dot`](schema_modern_graphviz.dot) - Modern theme GraphViz
-- [`schema_dark_mermaid.md`](schema_dark_mermaid.md) - Dark theme Mermaid
-- [`schema_forest_ascii.txt`](schema_forest_ascii.txt) - Forest theme ASCII
+- `schema_modern_graphviz.dot` - Modern theme GraphViz
+- `schema_dark_mermaid.md` - Dark theme Mermaid
+- `schema_forest_ascii.txt` - Forest theme ASCII
 
 ---
 
@@ -190,10 +190,10 @@ python -c "print('╭─╮')"
 
 ## Need Help?
 
-- 📖 **Full Rendering Guide**: [`docs/VISUALIZATION_RENDERING_GUIDE.md`](../VISUALIZATION_RENDERING_GUIDE.md)
-- 📋 **Troubleshooting**: See the Troubleshooting section in the rendering guide
-- 🎨 **Theme Documentation**: Check [`src/surql/schema/themes.py`](../../src/surql/schema/themes.py)
-- 🔧 **Visualization API**: See [`src/surql/schema/visualize.py`](../../src/surql/schema/visualize.py)
+- **Full Rendering Guide**: [`docs/visualization.md`](../visualization.md)
+- **Troubleshooting**: See the Troubleshooting section in the rendering guide
+- **Theme Documentation**: Check `src/surql/schema/themes.py`
+- **Visualization API**: See `src/surql/schema/visualize.py`
 
 ---
 

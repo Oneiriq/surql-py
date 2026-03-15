@@ -62,7 +62,7 @@ config = ConnectionConfig(
 
 ### Configuration Validation
 
-The [`ConnectionConfig`](src/surql/connection/config.py:9) automatically validates that live queries are only enabled with WebSocket connections:
+The `ConnectionConfig` automatically validates that live queries are only enabled with WebSocket connections:
 
 ```python
 # This will raise a validation error
@@ -129,7 +129,7 @@ await client.delete('user:alice')
 
 ### StreamingManager
 
-The [`StreamingManager`](src/surql/connection/streaming.py:95) class handles all live query operations. It is automatically initialized when you connect with `enable_live_queries=True`.
+The `StreamingManager` class handles all live query operations. It is automatically initialized when you connect with `enable_live_queries=True`.
 
 ```python
 from surql.connection.streaming import StreamingManager
@@ -141,7 +141,7 @@ async with DatabaseClient(config) as client:
 
 ### Starting a Live Query
 
-Use the [`live()`](src/surql/connection/streaming.py:109) method to start watching a table:
+Use the `live()` method to start watching a table:
 
 ```python
 # Watch all changes on a table
@@ -158,7 +158,7 @@ query = await streaming.live('user', diff=True)
 
 ### LiveQuery Object
 
-The [`LiveQuery`](src/surql/connection/streaming.py:20) object represents an active subscription:
+The `LiveQuery` object represents an active subscription:
 
 ```python
 query = await streaming.live('user')
@@ -174,7 +174,7 @@ print(query.is_active)   # Whether query is still active
 
 #### Async Iterator Subscription
 
-Use [`subscribe()`](src/surql/connection/streaming.py:155) for async iteration:
+Use `subscribe()` for async iteration:
 
 ```python
 query = await streaming.live('user')
@@ -185,7 +185,7 @@ async for notification in streaming.subscribe(query):
 
 #### Callback-Based Subscription
 
-Use [`subscribe_with_callback()`](src/surql/connection/streaming.py:198) for event-driven handling:
+Use `subscribe_with_callback()` for event-driven handling:
 
 ```python
 def on_change(notification):
@@ -202,7 +202,7 @@ await streaming.subscribe_with_callback(query, on_change)
 
 #### Kill Single Query
 
-Use [`kill()`](src/surql/connection/streaming.py:227) to stop a specific subscription:
+Use `kill()` to stop a specific subscription:
 
 ```python
 await streaming.kill(query)
@@ -210,7 +210,7 @@ await streaming.kill(query)
 
 #### Kill All Queries
 
-Use [`kill_all()`](src/surql/connection/streaming.py:263) to stop all active subscriptions:
+Use `kill_all()` to stop all active subscriptions:
 
 ```python
 await streaming.kill_all()
@@ -469,7 +469,7 @@ config = ConnectionConfig(
 
 ### StreamingError Exception
 
-The [`StreamingError`](src/surql/connection/streaming.py:14) exception is raised for streaming-related failures:
+The `StreamingError` exception is raised for streaming-related failures:
 
 ```python
 from surql.connection.streaming import StreamingError
@@ -1036,12 +1036,12 @@ if __name__ == '__main__':
 
 | Method | Description |
 |--------|-------------|
-| [`live(table, diff=False)`](src/surql/connection/streaming.py:109) | Start a live query on a table |
-| [`subscribe(query)`](src/surql/connection/streaming.py:155) | Subscribe to query as async iterator |
-| [`subscribe_with_callback(query, callback)`](src/surql/connection/streaming.py:198) | Subscribe with callback function |
-| [`kill(query)`](src/surql/connection/streaming.py:227) | Stop a live query |
-| [`kill_all()`](src/surql/connection/streaming.py:263) | Stop all active queries |
-| [`get_active_queries()`](src/surql/connection/streaming.py:272) | Get list of active queries |
+| `live(table, diff=False)` | Start a live query on a table |
+| `subscribe(query)` | Subscribe to query as async iterator |
+| `subscribe_with_callback(query, callback)` | Subscribe with callback function |
+| `kill(query)` | Stop a live query |
+| `kill_all()` | Stop all active queries |
+| `get_active_queries()` | Get list of active queries |
 
 ### LiveQuery
 
@@ -1054,10 +1054,10 @@ if __name__ == '__main__':
 
 | Method | Description |
 |--------|-------------|
-| [`add_callback(callback)`](src/surql/connection/streaming.py:48) | Add notification callback |
-| [`remove_callback(callback)`](src/surql/connection/streaming.py:56) | Remove notification callback |
-| [`notify(notification)`](src/surql/connection/streaming.py:65) | Notify all callbacks (internal) |
-| [`deactivate()`](src/surql/connection/streaming.py:84) | Mark query as inactive |
+| `add_callback(callback)` | Add notification callback |
+| `remove_callback(callback)` | Remove notification callback |
+| `notify(notification)` | Notify all callbacks (internal) |
+| `deactivate()` | Mark query as inactive |
 
 ### StreamingError
 

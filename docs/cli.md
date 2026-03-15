@@ -7,7 +7,6 @@ Complete reference for the surql command-line interface.
 - [Overview](#overview)
 - [Global Options](#global-options)
 - [Migration Commands](#migration-commands)
-- [Orchestration Commands](#orchestration-commands)
 - [Schema Commands](#schema-commands)
 - [Database Commands](#database-commands)
 - [Common Workflows](#common-workflows)
@@ -854,4 +853,4 @@ if __name__ == '__main__':
 - Learn about [Migrations](migrations.md) in detail
 - Explore [Schema Definition](schema.md)
 - See [Query Building](queries.md) for data operations
-- Check [Examples](examples/) for common patterns
+- Check [Examples](examples/index.md) for common patterns

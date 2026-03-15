@@ -66,6 +66,9 @@ plugins:
   - minify:
       minify_html: true
 
+exclude_docs: |
+  examples/output/
+
 nav:
   - Home: index.md
   - Getting Started:

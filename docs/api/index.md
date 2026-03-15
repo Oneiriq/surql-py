@@ -13,13 +13,13 @@ This document provides an overview of surql's API modules. For detailed implemen
 
 ## Schema Module
 
-**Location:** [`src/schema/`](../../src/schema/)
+**Location:** `src/schema/`
 
 Defines database schemas using functional composition.
 
 ### Key Files
 
-#### [`fields.py`](../../src/schema/fields.py)
+#### `fields.py`
 
 Field type definitions and builder functions.
 
@@ -50,7 +50,7 @@ name_field = string_field('name', assertion='string::len($value) > 0')
 age_field = int_field('age', assertion='$value >= 0')
 ```
 
-#### [`table.py`](../../src/schema/table.py)
+#### `table.py`
 
 Table schema composition and builders.
 
@@ -87,7 +87,7 @@ schema = table_schema(
 )
 ```
 
-#### [`edge.py`](../../src/schema/edge.py)
+#### `edge.py`
 
 Edge (relationship) schema definitions.
 
@@ -109,13 +109,13 @@ follows = edge_schema('follows', from_table='user', to_table='user')
 
 ## Migration Module
 
-**Location:** [`src/migration/`](../../src/migration/)
+**Location:** `src/migration/`
 
 Database migration generation, execution, and tracking.
 
 ### Key Migration Files
 
-#### [`generator.py`](../../src/migration/generator.py)
+#### `generator.py`
 
 Migration file generation.
 
@@ -123,7 +123,7 @@ Migration file generation.
 
 - `create_blank_migration()` - Create a blank migration file
 
-#### [`executor.py`](../../src/migration/executor.py)
+#### `executor.py`
 
 Migration execution engine.
 
@@ -133,7 +133,7 @@ Migration execution engine.
 - `create_migration_plan()` - Create a migration execution plan
 - `validate_migrations()` - Validate migration files
 
-#### [`discovery.py`](../../src/migration/discovery.py)
+#### `discovery.py`
 
 Migration file discovery and loading.
 
@@ -146,7 +146,7 @@ Migration file discovery and loading.
 - `discover_migrations()` - Find and load migration files
 - `validate_migration_name()` - Validate migration filename
 
-#### [`history.py`](../../src/migration/history.py)
+#### `history.py`
 
 Migration history tracking.
 
@@ -160,7 +160,7 @@ Migration history tracking.
 - `get_applied_migrations()` - Get list of applied migrations
 - `record_migration()` - Record a migration as applied
 
-#### [`models.py`](../../src/migration/models.py)
+#### `models.py`
 
 Migration data models.
 
@@ -172,13 +172,13 @@ Migration data models.
 
 ## Query Module
 
-**Location:** [`src/query/`](../../src/query/)
+**Location:** `src/query/`
 
 Query building and ORM operations.
 
 ### Key Query Files
 
-#### [`crud.py`](../../src/query/crud.py)
+#### `crud.py`
 
 High-level CRUD operations.
 
@@ -206,7 +206,7 @@ user = await create_record('user', user_data, client=client)
 users = await query_records('user', User, conditions=['age >= 18'], client=client)
 ```
 
-#### [`results.py`](../../src/query/results.py)
+#### `results.py`
 
 Result wrapper classes and extraction utilities for SurrealDB responses.
 
@@ -257,7 +257,7 @@ SurrealDB returns responses in different formats depending on the operation:
 
 The extraction utilities handle both formats seamlessly, eliminating the need for custom workarounds and making code robust across SurrealDB response formats.
 
-#### [`builder.py`](../../src/query/builder.py)
+#### `builder.py`
 
 Composable query builder.
 
@@ -290,7 +290,7 @@ query = (
 )
 ```
 
-#### [`executor.py`](../../src/query/executor.py)
+#### `executor.py`
 
 Query execution.
 
@@ -299,7 +299,7 @@ Query execution.
 - `fetch_all()` - Execute query and return all results
 - `fetch_one()` - Execute query and return first result
 
-#### [`expressions.py`](../../src/query/expressions.py)
+#### `expressions.py`
 
 Type-safe query expressions.
 
@@ -309,13 +309,13 @@ Type-safe query expressions.
 
 ## Connection Module
 
-**Location:** [`src/connection/`](../../src/connection/)
+**Location:** `src/connection/`
 
 Database connection management.
 
 ### Key Connection Files
 
-#### [`client.py`](../../src/connection/client.py)
+#### `client.py`
 
 Async database client.
 
@@ -351,7 +351,7 @@ async with get_client(config) as client:
   result = await client.execute('SELECT * FROM user')
 ```
 
-#### [`config.py`](../../src/connection/config.py)
+#### `config.py`
 
 Connection configuration.
 
@@ -359,7 +359,7 @@ Connection configuration.
 
 - `ConnectionConfig` - Database connection configuration
 
-#### [`context.py`](../../src/connection/context.py)
+#### `context.py`
 
 Connection context management.
 
@@ -369,7 +369,7 @@ Connection context management.
 - `set_db()` - Set database client in context
 - `db_context()` - Context manager for scoped connections
 
-#### [`transaction.py`](../../src/connection/transaction.py)
+#### `transaction.py`
 
 Transaction support.
 
@@ -393,13 +393,13 @@ async with transaction(client):
 
 ## Types Module
 
-**Location:** [`src/types/`](../../src/types/)
+**Location:** `src/types/`
 
 Type definitions and utilities.
 
 ### Key Types Files
 
-#### [`record_id.py`](../../src/types/record_id.py)
+#### `record_id.py`
 
 RecordID type for SurrealDB record identifiers with angle bracket support.
 
@@ -445,7 +445,7 @@ print(doc_rid)  # document:⟨alaskabeacon.com:01HQXYZ...⟩
 
 The angle bracket format is valid SurrealDB syntax for escaping complex identifiers. This feature enables support for record IDs that contain special characters such as domain names, URLs, and compound keys.
 
-#### [`operators.py`](../../src/types/operators.py)
+#### `operators.py`
 
 Query operators for type-safe conditions.
 
@@ -466,13 +466,13 @@ Query operators for type-safe conditions.
 
 ## CLI Module
 
-**Location:** [`src/cli/`](../../src/cli/)
+**Location:** `src/cli/`
 
 Command-line interface implementation.
 
 ### Key CLI Files
 
-#### [`migrate.py`](../../src/cli/migrate.py)
+#### `migrate.py`
 
 Migration CLI commands.
 
@@ -485,7 +485,7 @@ Migration CLI commands.
 - `migrate create` - Create new migration
 - `migrate validate` - Validate migrations
 
-#### [`schema.py`](../../src/cli/schema.py)
+#### `schema.py`
 
 Schema inspection commands.
 
@@ -493,7 +493,7 @@ Schema inspection commands.
 
 - `schema show` - Show database schema
 
-#### [`db.py`](../../src/cli/db.py)
+#### `db.py`
 
 Database management commands.
 
@@ -502,7 +502,7 @@ Database management commands.
 - `db ping` - Check database connection
 - `db info` - Show database information
 
-#### [`common.py`](../../src/cli/common.py)
+#### `common.py`
 
 Common CLI utilities.
 
@@ -517,7 +517,7 @@ Common CLI utilities.
 
 ## Settings
 
-**Location:** [`src/settings.py`](../../src/settings.py)
+**Location:** `src/settings.py`
 
 Application settings management.
 
@@ -603,4 +603,4 @@ mypy src/
 - [Migration System Guide](../migrations.md)
 - [Query Builder Guide](../queries.md)
 - [CLI Reference](../cli.md)
-- [Examples](../examples/)
+- [Examples](../examples/index.md)

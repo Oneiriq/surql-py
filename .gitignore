@@ -29,6 +29,7 @@ dmypy.json
 .ruff_cache/
 dist/
 build/
+site/
 *.egg-info/
 .eggs/
 

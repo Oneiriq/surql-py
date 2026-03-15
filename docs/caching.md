@@ -81,7 +81,7 @@ await clear_cache()
 
 ### CacheConfig Options
 
-The [`CacheConfig`](src/surql/cache/config.py:15) dataclass controls global cache behavior:
+The `CacheConfig` dataclass controls global cache behavior:
 
 ```python
 from surql.cache import CacheConfig
@@ -107,7 +107,7 @@ config = CacheConfig(
 
 ### Per-Query Options
 
-The [`CacheOptions`](src/surql/cache/config.py:47) dataclass allows per-query customization:
+The `CacheOptions` dataclass allows per-query customization:
 
 ```python
 from surql.cache import CacheOptions
@@ -146,7 +146,7 @@ configure_cache(config)
 
 ### Memory Backend (LRU)
 
-The [`MemoryCache`](src/surql/cache/backends.py:87) backend uses an in-memory LRU (Least Recently Used) cache. It's ideal for single-instance applications.
+The `MemoryCache` backend uses an in-memory LRU (Least Recently Used) cache. It's ideal for single-instance applications.
 
 ```python
 from surql.cache import configure_cache, CacheConfig
@@ -182,7 +182,7 @@ configure_cache(config)
 
 ### Redis Backend
 
-The [`RedisCache`](src/surql/cache/backends.py:219) backend uses Redis for distributed caching. It's ideal for multi-instance deployments.
+The `RedisCache` backend uses Redis for distributed caching. It's ideal for multi-instance deployments.
 
 ```python
 from surql.cache import configure_cache, CacheConfig
@@ -247,7 +247,7 @@ config = CacheConfig(
 
 ## The @cache_query Decorator
 
-The [`@cache_query`](src/surql/cache/decorator.py:89) decorator provides automatic caching for async functions.
+The `@cache_query` decorator provides automatic caching for async functions.
 
 ### Basic Usage
 
@@ -334,7 +334,7 @@ await get_users()  # Works fine, just no caching
 
 ## Manual Cache Management
 
-For advanced use cases, use the [`CacheManager`](src/surql/cache/manager.py:30) directly.
+For advanced use cases, use the `CacheManager` directly.
 
 ### Getting the Manager
 
@@ -350,7 +350,7 @@ manager = get_cache_manager()
 
 ### Get or Set Pattern
 
-The most common pattern using [`get_or_set()`](src/surql/cache/manager.py:112):
+The most common pattern using `get_or_set()`:
 
 ```python
 async def get_user_stats(user_id: str) -> dict:
@@ -588,10 +588,10 @@ async def log_cache_stats():
 
 | Function | Description |
 |----------|-------------|
-| [`configure_cache(config)`](src/surql/cache/__init__.py:80) | Initialize global cache manager |
-| [`get_cache_manager()`](src/surql/cache/__init__.py:110) | Get the global cache manager |
-| [`invalidate(key, table, pattern)`](src/surql/cache/__init__.py:124) | Invalidate cache entries |
-| [`clear_cache()`](src/surql/cache/__init__.py:160) | Clear all cache entries |
+| `configure_cache(config)` | Initialize global cache manager |
+| `get_cache_manager()` | Get the global cache manager |
+| `invalidate(key, table, pattern)` | Invalidate cache entries |
+| `clear_cache()` | Clear all cache entries |
 
 ### CacheConfig
 
@@ -634,16 +634,16 @@ class CacheStats:
 
 | Method | Description |
 |--------|-------------|
-| [`get_or_set(key, factory, ttl, tables)`](src/surql/cache/manager.py:112) | Get from cache or execute factory |
-| [`get(key)`](src/surql/cache/manager.py:177) | Get value from cache |
-| [`set(key, value, ttl, tables)`](src/surql/cache/manager.py:203) | Set value in cache |
-| [`delete(key)`](src/surql/cache/manager.py:236) | Delete key from cache |
-| [`invalidate(key, table, pattern)`](src/surql/cache/manager.py:256) | Invalidate cache entries |
-| [`clear()`](src/surql/cache/manager.py:316) | Clear all cache entries |
-| [`exists(key)`](src/surql/cache/manager.py:333) | Check if key exists |
-| [`build_key(*parts)`](src/surql/cache/manager.py:349) | Build a prefixed cache key |
-| [`track_table(table, key)`](src/surql/cache/manager.py:370) | Associate key with table |
-| [`close()`](src/surql/cache/manager.py:395) | Close manager and release resources |
+| `get_or_set(key, factory, ttl, tables)` | Get from cache or execute factory |
+| `get(key)` | Get value from cache |
+| `set(key, value, ttl, tables)` | Set value in cache |
+| `delete(key)` | Delete key from cache |
+| `invalidate(key, table, pattern)` | Invalidate cache entries |
+| `clear()` | Clear all cache entries |
+| `exists(key)` | Check if key exists |
+| `build_key(*parts)` | Build a prefixed cache key |
+| `track_table(table, key)` | Associate key with table |
+| `close()` | Close manager and release resources |
 
 ### cache_query Decorator
 
@@ -665,8 +665,8 @@ async def func(x): ...
 
 | Function | Description |
 |----------|-------------|
-| [`cache_key_for(func, *args, **kwargs)`](src/surql/cache/decorator.py:186) | Get cache key for a function call |
-| [`is_cached(func)`](src/surql/cache/decorator.py:226) | Check if function is decorated |
+| `cache_key_for(func, *args, **kwargs)` | Get cache key for a function call |
+| `is_cached(func)` | Check if function is decorated |
 
 ## Complete Example
 

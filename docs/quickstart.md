@@ -628,7 +628,7 @@ Now that you've completed the quick start, explore these topics:
 
 4. **[CLI Reference](cli.md)** - Complete CLI documentation
 
-5. **[Examples](examples/)** - More working examples:
+5. **[Examples](examples/index.md)** - More working examples:
    - Advanced schema patterns
    - Graph queries
    - Complex relationships

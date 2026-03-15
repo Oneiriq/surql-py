@@ -996,4 +996,4 @@ likes_edge = edge_schema(
 
 - Learn about [Migrations](migrations.md) to apply your schemas to the database
 - Explore [Query Building](queries.md) to work with your schema data
-- Check out [Examples](examples/) for more complex schema patterns
+- Check out [Examples](examples/index.md) for more complex schema patterns

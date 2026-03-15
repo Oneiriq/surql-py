@@ -402,7 +402,7 @@ Now that you have surql installed and configured:
 1. Follow the [Quick Start Tutorial](quickstart.md) to create your first schema and migration
 2. Read the [Schema Definition Guide](schema.md) to learn about schema features
 3. Explore the [Query Builder & ORM Guide](queries.md) for data operations
-4. Check out the [Examples](examples/) for working code samples
+4. Check out the [Examples](examples/index.md) for working code samples
 
 ## Additional Resources
 
