@@ -13,7 +13,11 @@ classifiers = [
   "Development Status :: 5 - Production/Stable",
   "Intended Audience :: Developers",
   "Topic :: Database",
+  "Topic :: Database :: Database Engines/Servers",
+  "Topic :: Database :: Front-Ends",
+  "Topic :: Software Development :: Code Generators",
   "Topic :: Software Development :: Libraries",
+  "Topic :: Software Development :: Libraries :: Application Frameworks",
   "Operating System :: POSIX :: Linux",
   "Operating System :: MacOS :: MacOS X",
   "Operating System :: Microsoft :: Windows",
@@ -23,7 +27,10 @@ classifiers = [
   "Programming Language :: Python :: 3.13",
   "Typing :: Typed",
 ]
-keywords = ["surrealdb", "database", "orm", "query-builder", "migrations", "schema"]
+keywords = [
+  "surrealdb", "database", "orm", "query-builder", "migrations", "schema",
+  "graph-database", "vector-search", "pydantic", "async", "cli", "code-first",
+]
 
 dependencies = [
   "cachetools>=5.0.0",
