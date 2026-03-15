@@ -1,15 +1,15 @@
 """Multi-Database Migration Orchestration Examples.
 
-This example demonstrates how to use Reverie's orchestration features to
+This example demonstrates how to use surql's orchestration features to
 deploy migrations across multiple database environments.
 """
 
 import asyncio
 from pathlib import Path
 
-from reverie.connection.config import ConnectionConfig
-from reverie.migration.discovery import discover_migrations
-from reverie.orchestration import (
+from surql.connection.config import ConnectionConfig
+from surql.migration.discovery import discover_migrations
+from surql.orchestration import (
   EnvironmentConfig,
   EnvironmentRegistry,
   MigrationCoordinator,
@@ -245,7 +245,7 @@ async def example_health_checks() -> None:
   """Example: Health checking before deployment."""
   print('\n=== Health Check Example ===\n')
 
-  from reverie.orchestration import HealthCheck
+  from surql.orchestration import HealthCheck
 
   registry = EnvironmentRegistry()
 
@@ -309,7 +309,7 @@ async def example_using_global_registry() -> None:
 
 async def main() -> None:
   """Run all examples."""
-  print('Reverie Multi-Database Orchestration Examples\n')
+  print('surql Multi-Database Orchestration Examples\n')
   print('=' * 60)
 
   # Note: These examples use dry_run=True so they won't actually
@@ -328,7 +328,7 @@ async def main() -> None:
   print('\nAll examples completed!')
   print(
     '\nTip: Use the CLI for interactive orchestration:'
-    '\n  reverie orchestrate deploy -e staging,production --strategy rolling --batch-size 2'
+    '\n  surql orchestrate deploy -e staging,production --strategy rolling --batch-size 2'
   )
 
 

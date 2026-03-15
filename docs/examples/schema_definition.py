@@ -1,4 +1,4 @@
-"""Schema definition example for reverie.
+"""Schema definition example for surql.
 
 This example demonstrates:
 - Defining table schemas
@@ -9,8 +9,8 @@ This example demonstrates:
 - Edge schemas for relationships
 """
 
-from reverie.schema.edge import edge_schema
-from reverie.schema.fields import (
+from surql.schema.edge import edge_schema
+from surql.schema.fields import (
   array_field,
   bool_field,
   computed_field,
@@ -21,7 +21,7 @@ from reverie.schema.fields import (
   record_field,
   string_field,
 )
-from reverie.schema.table import (
+from surql.schema.table import (
   TableMode,
   event,
   index,
@@ -321,7 +321,7 @@ def print_schema_info(schema, schema_name):
 
 
 if __name__ == '__main__':
-  print('reverie Schema Definition Example')
+  print('surql Schema Definition Example')
   print('=' * 60)
 
   # Display schema information

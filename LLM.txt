@@ -1,8 +1,8 @@
-# Reverie - Code-First Database Toolkit for SurrealDB
+# surql - Code-First Database Toolkit for SurrealDB
 
 # Library Overview
 
-- Reverie is a code-first database toolkit for building modern applications with SurrealDB
+- surqlis a code-first database toolkit for building modern applications with SurrealDB
 - Provides type-safe schema definitions, code-first migrations, and async-first database operations
 - Built on functional composition patterns with immutable data structures
 - Integrates Pydantic for runtime validation and type safety
@@ -19,29 +19,29 @@
 # Installation
 
 ## Using pip
-- Install via pip: `pip install reverie`
-- Verify installation: `reverie --version`
+- Install via pip: `pip install surql`
+- Verify installation: `surql --version`
 
 ## Using uv (Recommended)
-- Install via uv: `uv add reverie`
-- Install with dev dependencies: `uv add reverie --dev`
-- Install with cache backend: `uv add "reverie[cache]"` (includes Redis support)
+- Install via uv: `uv add surql`
+- Install with dev dependencies: `uv add surql --dev`
+- Install with cache backend: `uv add "surql[cache]"` (includes Redis support)
 - Sync dependencies: `uv sync`
 
 ## From Source
-- Clone repository: `git clone https://github.com/albedosehen/reverie.git`
-- Navigate to directory: `cd reverie`
+- Clone repository: `git clone https://github.com/Oneiriq/surql-py.git`
+- Navigate to directory: `cd surql-py`
 - Install with uv: `uv sync`
 - Install in editable mode: `pip install -e .`
 
 ## From Source with pyproject.toml (Currently Recommended)
-- Update the other project's `pyproject.toml` to include reverie as a dependency with:
+- Update the other project's `pyproject.toml` to include surql as a dependency with:
     ```toml
     # Other project's pyproject.toml
     [project]
     dependencies = [
         #...
-        "reverie @ git+https://github.com/albedosehen/reverie.git@v0.1.0",
+        "surql @ git+https://github.com/Oneiriq/surql-py.git@v0.1.0",
     ]
 - Then install with uv: `uv sync`
 
@@ -68,13 +68,13 @@
 - `DB_RETRY_MULTIPLIER`: Exponential backoff multiplier (default: `2.0`, min: `1.0`)
 
 ## Named Connection Environment Variables
-- Use `REVERIE_{NAME}_` prefix for named connections (also supports legacy `DB_{NAME}_` prefix)
+- Use `SURQL_{NAME}_` prefix for named connections (also supports legacy `DB_{NAME}_` prefix)
 - Example for "analytics" connection:
-  * `REVERIE_ANALYTICS_URL`: URL for analytics database
-  * `REVERIE_ANALYTICS_NAMESPACE`: Namespace for analytics
-  * `REVERIE_ANALYTICS_DATABASE`: Database name for analytics
-  * `REVERIE_ANALYTICS_USERNAME`: Username for analytics
-  * `REVERIE_ANALYTICS_PASSWORD`: Password for analytics
+  * `SURQL_ANALYTICS_URL`: URL for analytics database
+  * `SURQL_ANALYTICS_NAMESPACE`: Namespace for analytics
+  * `SURQL_ANALYTICS_DATABASE`: Database name for analytics
+  * `SURQL_ANALYTICS_USERNAME`: Username for analytics
+  * `SURQL_ANALYTICS_PASSWORD`: Password for analytics
 - Load via: `NamedConnectionConfig.from_env("analytics")`
 
 ## .env File
@@ -84,7 +84,7 @@
 - Create environment-specific files: `.env.development`, `.env.staging`, `.env.production`
 
 ## Connection Configuration
-- Import: `from reverie.connection.config import ConnectionConfig`
+- Import: `from surql.connection.config import ConnectionConfig`
 - Create programmatically: `config = ConnectionConfig(url='ws://localhost:8000/rpc', namespace='test', database='test', username='root', password='root')`
 - Load from environment: `config = ConnectionConfig()` (automatically loads from env vars)
 - Validates URL format (must start with `ws://`, `wss://`, `http://`, or `https://`)
@@ -94,7 +94,7 @@
 # Schema Definition
 
 ## Field Types Overview
-- Import field types: `from reverie.schema.fields import FieldType`
+- Import field types: `from surql.schema.fields import FieldType`
 - Available types: `STRING`, `INT`, `FLOAT`, `BOOL`, `DATETIME`, `DURATION`, `DECIMAL`, `NUMBER`, `OBJECT`, `ARRAY`, `RECORD`, `GEOMETRY`, `ANY`
 - All field functions in: `src.schema.fields`
 
@@ -106,7 +106,7 @@
 - `permissions`: Dictionary of permission rules with keys `select`, `create`, `update`, `delete` (optional)
 
 ## String Fields
-- Import: `from reverie.schema.fields import string_field`
+- Import: `from surql.schema.fields import string_field`
 - Create: `string_field('name', assertion='string::len($value) > 0')`
 - Email validation: `string_field('email', assertion='string::is::email($value)')`
 - Length validation: `string_field('username', assertion='string::len($value) >= 3 AND string::len($value) <= 20')`
@@ -115,54 +115,54 @@
 - Readonly: `string_field('id_number', readonly=True)`
 
 ## Integer Fields
-- Import: `from reverie.schema.fields import int_field`
+- Import: `from surql.schema.fields import int_field`
 - Create: `int_field('age', assertion='$value >= 0 AND $value <= 150')`
 - Range validation: `int_field('score', assertion='$value >= 0 AND $value <= 100')`
 - Default value: `int_field('attempts', default='0')`
 - Positive only: `int_field('quantity', assertion='$value > 0')`
 
 ## Float Fields
-- Import: `from reverie.schema.fields import float_field`
+- Import: `from surql.schema.fields import float_field`
 - Create: `float_field('price', assertion='$value >= 0.0')`
 - Precision: `float_field('latitude', assertion='$value >= -90.0 AND $value <= 90.0')`
 - Default value: `float_field('rating', default='0.0')`
 
 ## Boolean Fields
-- Import: `from reverie.schema.fields import bool_field`
+- Import: `from surql.schema.fields import bool_field`
 - Create: `bool_field('is_active', default='true')`
 - Default to false: `bool_field('is_deleted', default='false')`
 - Readonly: `bool_field('is_verified', readonly=True)`
 
 ## Datetime Fields
-- Import: `from reverie.schema.fields import datetime_field`
+- Import: `from surql.schema.fields import datetime_field`
 - Create: `datetime_field('created_at', default='time::now()', readonly=True)`
 - Auto timestamp: `datetime_field('updated_at', default='time::now()')`
 - Future date: `datetime_field('expires_at', assertion='$value > time::now()')`
 - Past date: `datetime_field('birth_date', assertion='$value < time::now()')`
 
 ## Record Fields (Foreign Keys)
-- Import: `from reverie.schema.fields import record_field`
+- Import: `from surql.schema.fields import record_field`
 - Create: `record_field('author', table='user')`
 - Any table: `record_field('related_item')`
 - With custom assertion: `record_field('owner', table='user', assertion='$value.id != NONE')`
 - The `table` parameter automatically generates assertion: `$value.table = "table_name"`
 
 ## Array Fields
-- Import: `from reverie.schema.fields import array_field`
+- Import: `from surql.schema.fields import array_field`
 - Create: `array_field('tags', default='[]')`
 - Length validation: `array_field('items', assertion='array::len($value) > 0')`
 - Type validation: `array_field('scores', assertion='array::all($value, |$v| type::is::number($v))')`
 - Default empty: `array_field('permissions', default='[]')`
 
 ## Object Fields
-- Import: `from reverie.schema.fields import object_field`
+- Import: `from surql.schema.fields import object_field`
 - Create: `object_field('metadata', flexible=True)`
 - Strict schema: `object_field('settings', flexible=False)`
 - Default value: `object_field('config', default='{}')`
 - Nested validation: `object_field('address', assertion='$value.city != NONE AND $value.country != NONE')`
 
 ## Computed Fields
-- Import: `from reverie.schema.fields import computed_field`
+- Import: `from surql.schema.fields import computed_field`
 - Create: `computed_field('full_name', 'string::concat(first_name, " ", last_name)', FieldType.STRING)`
 - Count calculation: `computed_field('post_count', 'count(<-authored<-post)', FieldType.INT)`
 - Date calculation: `computed_field('age', 'time::year() - time::year(birth_date)', FieldType.INT)`
@@ -175,20 +175,20 @@
 - Access: Query returns nested structure automatically
 
 ## Generic Field Definition
-- Import: `from reverie.schema.fields import field, FieldType`
+- Import: `from surql.schema.fields import field, FieldType`
 - Create: `field('custom_field', FieldType.STRING, assertion='...', default='...', readonly=False)`
 - All parameters: `field(name, field_type, assertion=None, default=None, value=None, permissions=None, readonly=False, flexible=False)`
 
 ## Table Schemas
 
 ### Basic Table Schema
-- Import: `from reverie.schema.table import table_schema, TableMode`
+- Import: `from surql.schema.table import table_schema, TableMode`
 - Create: `table_schema('user', mode=TableMode.SCHEMAFULL, fields=[...], indexes=[...], events=[...])`
 - Schemaless mode: `table_schema('logs', mode=TableMode.SCHEMALESS)`
 - Drop table: `table_schema('old_table', drop=True)`
 
 ### Table Modes
-- Import: `from reverie.schema.table import TableMode`
+- Import: `from surql.schema.table import TableMode`
 - `TableMode.SCHEMAFULL`: Enforces strict schema validation (recommended)
 - `TableMode.SCHEMALESS`: Allows any fields
 - `TableMode.DROP`: Marks table for deletion in migration
@@ -200,7 +200,7 @@
 - Example public read: `{'select': 'true', 'create': '$auth != NONE'}`
 
 ### Functional Table Composition
-- Import: `from reverie.schema.table import with_fields, with_indexes, with_events, with_permissions, set_mode`
+- Import: `from surql.schema.table import with_fields, with_indexes, with_events, with_permissions, set_mode`
 - Add fields: `with_fields(table, string_field('email'), int_field('age'))`
 - Add indexes: `with_indexes(table, unique_index('email_idx', ['email']))`
 - Add events: `with_events(table, event('audit', '$event = "CREATE"', '...'))`
@@ -211,13 +211,13 @@
 ## Indexes
 
 ### Index Types
-- Import: `from reverie.schema.table import IndexType`
+- Import: `from surql.schema.table import IndexType`
 - `IndexType.STANDARD`: Regular index for fast lookups
 - `IndexType.UNIQUE`: Enforces uniqueness constraint
 - `IndexType.SEARCH`: Full-text search index
 
 ### Creating Indexes
-- Import: `from reverie.schema.table import index, unique_index, search_index`
+- Import: `from surql.schema.table import index, unique_index, search_index`
 - Generic index: `index('name_idx', ['name'], IndexType.STANDARD)`
 - Unique index: `unique_index('email_idx', ['email'])`
 - Search index: `search_index('content_search', ['title', 'body'])`
@@ -227,7 +227,7 @@
 ## Events (Triggers)
 
 ### Event Definition
-- Import: `from reverie.schema.table import event`
+- Import: `from surql.schema.table import event`
 - Create: `event('audit_trail', '$event = "UPDATE"', 'CREATE audit_log SET ...')`
 - On insert: `event('new_user', '$event = "CREATE"', 'CREATE notification SET ...')`
 - On update: `event('email_changed', '$before.email != $after.email', 'CREATE email_verification SET ...')`
@@ -237,25 +237,25 @@
 ## Edge Schemas (Graph Relationships)
 
 ### Edge Modes
-- Import: `from reverie.schema.edge import EdgeMode`
+- Import: `from surql.schema.edge import EdgeMode`
 - `EdgeMode.RELATION`: Creates `TYPE RELATION` (default, recommended for graph relationships)
 - `EdgeMode.SCHEMAFULL`: Creates SCHEMAFULL edge table
 - `EdgeMode.SCHEMALESS`: Creates SCHEMALESS edge table
 
 ### Basic Edge Schema
-- Import: `from reverie.schema.edge import edge_schema`
+- Import: `from surql.schema.edge import edge_schema`
 - Create: `edge_schema('likes', from_table='user', to_table='post')`
 - With mode: `edge_schema('likes', from_table='user', to_table='post', mode=EdgeMode.RELATION)`
 - Unconstrained: `edge_schema('generic_relation')`
 - With fields: `edge_schema('follows', from_table='user', to_table='user', fields=[datetime_field('since', default='time::now()')])`
 
 ### Convenience Edge Functions
-- Import: `from reverie.schema.edge import bidirectional_edge, typed_edge`
+- Import: `from surql.schema.edge import bidirectional_edge, typed_edge`
 - Self-referential: `bidirectional_edge('follows', 'user', fields=[datetime_field('since')])`
 - Typed edge: `typed_edge('authored', from_table='user', to_table='post', fields=[datetime_field('published_at')])`
 
 ### Edge Composition
-- Import: `from reverie.schema.edge import with_from_table, with_to_table, with_edge_fields, with_edge_indexes, with_edge_events, with_edge_permissions`
+- Import: `from surql.schema.edge import with_from_table, with_to_table, with_edge_fields, with_edge_indexes, with_edge_events, with_edge_permissions`
 - Set source: `with_from_table(edge, 'user')`
 - Set target: `with_to_table(edge, 'post')`
 - Add fields: `with_edge_fields(edge, datetime_field('created_at'), int_field('weight'))`
@@ -268,7 +268,7 @@
 ## CRUD Operations
 
 ### Return Formats
-- Import: `from reverie.query.crud import ReturnFormat`
+- Import: `from surql.query.crud import ReturnFormat`
 - `ReturnFormat.NONE`: Returns nothing (default for delete operations)
 - `ReturnFormat.DIFF`: Returns only changed fields
 - `ReturnFormat.FULL`: Returns complete record after operation (default for create/update)
@@ -277,7 +277,7 @@
 - Usage: `await create_record('user', data, return_format=ReturnFormat.AFTER)`
 
 ### Create Records
-- Import: `from reverie.query.crud import create_record, create_records`
+- Import: `from surql.query.crud import create_record, create_records`
 - Single record: `created = await create_record('user', User(name='Alice', email='alice@example.com'))`
 - With dict: `created = await create_record('user', {'name': 'Bob', 'email': 'bob@example.com'})`
 - With return format: `created = await create_record('user', data, return_format=ReturnFormat.AFTER)`
@@ -285,7 +285,7 @@
 - Returns created record(s) with ID
 
 ### Read Records
-- Import: `from reverie.query.crud import get_record, query_records, first, last`
+- Import: `from surql.query.crud import get_record, query_records, first, last`
 - Get by ID: `user = await get_record('user', 'alice', User)`
 - With RecordID: `user = await get_record('user', RecordID('user', 'alice'), User)`
 - Query with filters: `users = await query_records('user', User, conditions=['age > 18', 'status = "active"'], order_by=('created_at', 'DESC'), limit=10)`
@@ -294,7 +294,7 @@
 - Returns `None` if not found
 
 ### Update Records
-- Import: `from reverie.query.crud import update_record, merge_record`
+- Import: `from surql.query.crud import update_record, merge_record`
 - Full update: `updated = await update_record('user', 'alice', User(name='Alice Updated', email='alice@new.com'))`
 - Partial update: `updated = await merge_record('user', 'alice', {'status': 'active'})`
 - With return format: `updated = await update_record('user', 'alice', data, return_format=ReturnFormat.DIFF)`
@@ -302,19 +302,19 @@
 - Returns updated record
 
 ### Delete Records
-- Import: `from reverie.query.crud import delete_record, delete_records`
+- Import: `from surql.query.crud import delete_record, delete_records`
 - Single delete: `await delete_record('user', 'alice')`
 - Bulk delete: `await delete_records('user', 'status = "inactive"')`
-- With operator: `from reverie.types.operators import eq; await delete_records('user', eq('status', 'inactive'))`
+- With operator: `from surql.types.operators import eq; await delete_records('user', eq('status', 'inactive'))`
 - Returns nothing (void)
 
 ### Check Existence
-- Import: `from reverie.query.crud import exists`
+- Import: `from surql.query.crud import exists`
 - Check if exists: `if await exists('user', 'alice'): print('User exists')`
 - Returns boolean
 
 ### Count Records
-- Import: `from reverie.query.crud import count_records`
+- Import: `from surql.query.crud import count_records`
 - Total count: `total = await count_records('user')`
 - With condition: `active = await count_records('user', 'status = "active"')`
 - Returns integer
@@ -322,28 +322,28 @@
 ## Query Result Extraction
 
 ### Extract Results from Response
-- Import: `from reverie.query.results import extract_result`
+- Import: `from surql.query.results import extract_result`
 - From list response: `records = extract_result([{'id': 'user:1', 'name': 'Alice'}])`
 - From dict response: `record = extract_result({'result': [{'id': 'user:1'}]})`
 - From nested: `records = extract_result({'ok': True, 'result': [{'data': [...]}]})`
 - Handles various SurrealDB response formats automatically
 
 ### Extract Single Record
-- Import: `from reverie.query.results import extract_one`
+- Import: `from surql.query.results import extract_one`
 - Without model: `record = extract_one(response)`
 - With model: `user = extract_one(response, User)`
 - Returns single record or None if empty
 - Validates with Pydantic model if provided
 
 ### Extract Scalar Value
-- Import: `from reverie.query.results import extract_scalar`
+- Import: `from surql.query.results import extract_scalar`
 - Get count: `count = extract_scalar(response)`
 - Get single value: `name = extract_scalar(response)`
 - Returns first value from first record
 - Useful for aggregations and single-value queries
 
 ### Check for Results
-- Import: `from reverie.query.results import has_results`
+- Import: `from surql.query.results import has_results`
 - Check if not empty: `if has_results(response): print('Has data')`
 - Returns boolean
 - Works with all response formats
@@ -351,26 +351,26 @@
 ## Batch Operations
 
 ### Batch Upsert
-- Import: `from reverie.query.batch import upsert_many`
+- Import: `from surql.query.batch import upsert_many`
 - Insert/update multiple: `results = await upsert_many('user', [User(...), User(...)])`
 - With dicts: `results = await upsert_many('user', [{'name': 'Alice'}, {'name': 'Bob'}])`
 - Conflict resolution: Uses UPSERT to handle existing records
 - Returns list of upserted records
 
 ### Batch Relate (Create Edges)
-- Import: `from reverie.query.batch import relate_many`
+- Import: `from surql.query.batch import relate_many`
 - Create multiple edges: `edges = await relate_many('likes', [('user:alice', 'post:1'), ('user:bob', 'post:2')])`
 - With properties: `edges = await relate_many('follows', [('user:alice', 'user:bob')], {'since': '2024-01-01'})`
 - Returns list of created edge records
 
 ### Batch Insert
-- Import: `from reverie.query.batch import insert_many`
+- Import: `from surql.query.batch import insert_many`
 - Insert multiple: `results = await insert_many('user', [User(...), User(...)])`
 - Fails if records exist: Unlike upsert, INSERT fails on conflicts
 - Returns list of inserted records
 
 ### Batch Delete
-- Import: `from reverie.query.batch import delete_many`
+- Import: `from surql.query.batch import delete_many`
 - Delete by IDs: `await delete_many('user', ['alice', 'bob', 'charlie'])`
 - With RecordID: `await delete_many('user', [RecordID('user', 'alice'), ...])`
 - Returns deleted records (RETURN BEFORE)
@@ -378,19 +378,19 @@
 ## Expression Builders
 
 ### Field References
-- Import: `from reverie.query.expressions import field`
+- Import: `from surql.query.expressions import field`
 - Reference field: `field('name')` → `name`
 - Nested field: `field('address.city')` → `address.city`
 - In queries: `Query().select([field('name'), field('email')])`
 
 ### Literal Values
-- Import: `from reverie.query.expressions import value`
+- Import: `from surql.query.expressions import value`
 - String value: `value('hello')` → `"hello"`
 - Number value: `value(42)` → `42`
 - Boolean value: `value(True)` → `true`
 
 ### Aggregate Functions
-- Import: `from reverie.query.expressions import count, sum_, avg, min_, max_`
+- Import: `from surql.query.expressions import count, sum_, avg, min_, max_`
 - Count all: `count()` → `count()`
 - Count field: `count('id')` → `count(id)`
 - Sum: `sum_('price')` → `sum(price)`
@@ -399,17 +399,17 @@
 - Maximum: `max_('score')` → `max(score)`
 
 ### String Functions
-- Import: `from reverie.query.expressions import concat, string_`
+- Import: `from surql.query.expressions import concat, string_`
 - Concatenate: `concat(field('first'), value(' '), field('last'))` → `string::concat(first, " ", last)`
 - String operation: `string_('upper', field('name'))` → `string::upper(name)`
 
 ### Array Functions
-- Import: `from reverie.query.expressions import array`
+- Import: `from surql.query.expressions import array`
 - Create array: `array([value(1), value(2), value(3)])` → `[1, 2, 3]`
 - With fields: `array([field('id'), field('name')])` → `[id, name]`
 
 ### Utility Functions
-- Import: `from reverie.query.expressions import time_now, rand_uuid`
+- Import: `from surql.query.expressions import time_now, rand_uuid`
 - Current time: `time_now()` → `time::now()`
 - Random UUID: `rand_uuid()` → `rand::uuid()`
 - In defaults: `datetime_field('created_at', default=time_now())`
@@ -417,7 +417,7 @@
 ## Query Builder
 
 ### Basic Query Building
-- Import: `from reverie.query.builder import Query`
+- Import: `from surql.query.builder import Query`
 - SELECT all: `query = Query().select().from_table('user')`
 - SELECT fields: `query = Query().select(['name', 'email']).from_table('user')`
 - Build to SurrealQL: `sql = query.to_surql()`
@@ -426,7 +426,7 @@
 - String condition: `query = Query().select().from_table('user').where('age > 18')`
 - Multiple conditions: `query.where('age > 18').where('status = "active"')`
 - Combined with AND: All conditions are ANDed together
-- Import operators: `from reverie.types.operators import eq, gt, lt, gte, lte, neq, contains, in_list`
+- Import operators: `from surql.types.operators import eq, gt, lt, gte, lte, neq, contains, in_list`
 - Operator usage: `query.where(gt('age', 18)).where(eq('status', 'active'))`
 
 ### Ordering
@@ -446,46 +446,46 @@
 - Multiple fields: `query.group_by('status', 'role')`
 
 ### Vector Similarity Search
-- Import: `from reverie.query.builder import Query, VectorDistanceType`
+- Import: `from surql.query.builder import Query, VectorDistanceType`
 - Basic search: `query = Query().from_('documents').vector_search('embedding', [0.1, 0.2, ...], k=10)`
 - With distance type: `query.vector_search('embedding', vector, k=5, distance=VectorDistanceType.COSINE)`
 - Distance types: `COSINE`, `EUCLIDEAN`, `MANHATTAN`, `HAMMING`, `MINKOWSKI`, `CHEBYSHEV`, `PEARSON`, `JACCARD`, `DOT`
-- Helper function: `from reverie.query.builder import vector_search_query; query = vector_search_query('documents', 'embedding', vector, k=10)`
+- Helper function: `from surql.query.builder import vector_search_query; query = vector_search_query('documents', 'embedding', vector, k=10)`
 - Generates: `SELECT * FROM documents WHERE embedding <|k,DISTANCE|> [vector]`
 
 ### INSERT Operations
-- Import: `from reverie.query.builder import insert`
+- Import: `from surql.query.builder import insert`
 - Create query: `query = Query().insert('user', {'name': 'Alice', 'email': 'alice@example.com'})`
 - Functional: `query = insert('user', data_dict)`
 - Execute: `result = await client.execute(query.to_surql())`
 
 ### UPDATE Operations
-- Import: `from reverie.query.builder import update`
+- Import: `from surql.query.builder import update`
 - Update record: `query = Query().update('user:alice', {'status': 'active'})`
 - Update with condition: `query = Query().update('user', {'status': 'inactive'}).where('last_login < "2024-01-01"')`
 - Functional: `query = update('user:alice', {'status': 'active'})`
 
 ### DELETE Operations
-- Import: `from reverie.query.builder import delete`
+- Import: `from surql.query.builder import delete`
 - Delete record: `query = Query().delete('user:alice')`
 - Delete with condition: `query = Query().delete('user').where('deleted_at IS NOT NULL')`
 - Functional: `query = delete('user:alice')`
 
 ### Query Execution
-- Import: `from reverie.query.executor import fetch_all, fetch_one`
+- Import: `from surql.query.executor import fetch_all, fetch_one`
 - Execute with model: `results = await fetch_all(query, User, client)`
 - Fetch single: `result = await fetch_one(query, User, client)`
 - Raw execution: `result = await client.execute(query.to_surql())`
 
 ### Functional Query Helpers
-- Import: `from reverie.query.builder import select, from_table, where, order_by, limit, offset`
+- Import: `from surql.query.builder import select, from_table, where, order_by, limit, offset`
 - Compose: `query = limit(order_by(where(from_table(select(['name']), 'user'), 'age > 18'), 'name'), 10)`
 - More readable with chaining: Use method chaining instead
 
 ## Query Operators
 
 ### Comparison Operators
-- Import: `from reverie.types.operators import eq, neq, gt, gte, lt, lte`
+- Import: `from surql.types.operators import eq, neq, gt, gte, lt, lte`
 - Equal: `eq('status', 'active')` → `status = "active"`
 - Not equal: `neq('status', 'deleted')` → `status != "deleted"`
 - Greater than: `gt('age', 18)` → `age > 18`
@@ -494,13 +494,13 @@
 - Less or equal: `lte('quantity', 10)` → `quantity <= 10`
 
 ### Collection Operators
-- Import: `from reverie.types.operators import contains, in_list, not_in`
+- Import: `from surql.types.operators import contains, in_list, not_in`
 - Contains: `contains('tags', 'python')` → `"python" IN tags`
 - In list: `in_list('status', ['active', 'pending'])` → `status IN ["active", "pending"]`
 - Not in: `not_in('role', ['admin', 'moderator'])`
 
 ### Logical Operators
-- Import: `from reverie.types.operators import and_op, or_op, not_op`
+- Import: `from surql.types.operators import and_op, or_op, not_op`
 - AND: `and_op(gt('age', 18), eq('status', 'active'))`
 - OR: `or_op(eq('role', 'admin'), eq('role', 'moderator'))`
 - NOT: `not_op(eq('deleted', true))`
@@ -516,7 +516,7 @@
 ## Graph Query Builder
 
 ### GraphQuery Class
-- Import: `from reverie.query.graph import GraphQuery`
+- Import: `from surql.query.graph import GraphQuery`
 - Create: `query = GraphQuery[User]('user:alice')`
 - Generic type support: `GraphQuery[T]` where T is your Pydantic model
 
@@ -541,7 +541,7 @@
 
 ### Example Usage
 ```python
-from reverie.query.graph import GraphQuery
+from surql.query.graph import GraphQuery
 from models import User, Post
 
 # Find all posts liked by users that alice follows
@@ -558,25 +558,25 @@ posts = await (
 ## Graph Helper Functions
 
 ### Find Mutual Connections
-- Import: `from reverie.query.graph import find_mutual_connections`
+- Import: `from surql.query.graph import find_mutual_connections`
 - Find mutual: `mutual = await find_mutual_connections('user:alice', 'user:bob', 'follows', User)`
 - Returns list of users that both alice and bob follow
 - Bidirectional detection
 
 ### Find Shortest Path
-- Import: `from reverie.query.graph import find_shortest_path`
+- Import: `from surql.query.graph import find_shortest_path`
 - Find path: `path = await find_shortest_path('user:alice', 'user:charlie', 'follows', max_depth=5)`
 - Returns list of record IDs in the path from source to target
 - Path reconstruction included
 
 ### Get Neighbors
-- Import: `from reverie.query.graph import get_neighbors`
+- Import: `from surql.query.graph import get_neighbors`
 - Get N-hop neighbors: `neighbors = await get_neighbors('user:alice', 'follows', depth=2, User)`
 - Direction: `neighbors = await get_neighbors('user:alice', 'follows', depth=1, User, direction='out')`
 - Returns list of neighbors at specified depth
 
 ### Compute Degree
-- Import: `from reverie.query.graph import compute_degree`
+- Import: `from surql.query.graph import compute_degree`
 - Total degree: `degree = await compute_degree('user:alice', 'follows')`
 - In-degree: `in_deg = await compute_degree('user:alice', 'follows', direction='in')`
 - Out-degree: `out_deg = await compute_degree('user:alice', 'follows', direction='out')`
@@ -585,27 +585,27 @@ posts = await (
 ## Graph Traversal
 
 ### Basic Traversal
-- Import: `from reverie.query.graph import traverse`
+- Import: `from surql.query.graph import traverse`
 - Outgoing: `posts = await traverse('user:alice', '->likes->post', Post)`
 - Incoming: `followers = await traverse('user:alice', '<-follows<-user', User)`
 - Multi-hop: `fof = await traverse('user:alice', '<-follows<-user<-follows<-user', User)`
 - Pattern: `start_record` + traversal_path + target_type
 
 ### Traversal with Depth
-- Import: `from reverie.query.graph import traverse_with_depth`
+- Import: `from surql.query.graph import traverse_with_depth`
 - Fixed depth: `posts = await traverse_with_depth('user:alice', 'likes', 'post', 'out', 1, Post)`
 - Direction options: `'out'` (outgoing), `'in'` (incoming), `'both'` (bidirectional)
 - Unlimited depth: `connected = await traverse_with_depth('user:alice', 'follows', 'user', 'both', None, User)`
 - Returns list of target records
 
 ### Get Related Records
-- Import: `from reverie.query.graph import get_related_records`
+- Import: `from surql.query.graph import get_related_records`
 - Outgoing relations: `posts = await get_related_records('user:alice', 'likes', 'post', 'out', Post)`
 - Incoming relations: `likers = await get_related_records('post:123', 'likes', 'user', 'in', User)`
 - Without model: `records = await get_related_records('user:alice', 'likes', 'post', 'out')`
 
 ### Count Related
-- Import: `from reverie.query.graph import count_related`
+- Import: `from surql.query.graph import count_related`
 - Outgoing count: `like_count = await count_related('user:alice', 'likes', 'out')`
 - Incoming count: `follower_count = await count_related('user:alice', 'follows', 'in')`
 - Returns integer
@@ -613,26 +613,26 @@ posts = await (
 ## Edge Operations
 
 ### Create Edges
-- Import: `from reverie.query.graph import relate`
+- Import: `from surql.query.graph import relate`
 - Simple edge: `edge = await relate('likes', 'user:alice', 'post:123')`
 - With properties: `edge = await relate('follows', 'user:alice', 'user:bob', {'since': '2024-01-01', 'weight': 1})`
 - Returns created edge record with ID
 
 ### Delete Edges
-- Import: `from reverie.query.graph import unrelate`
+- Import: `from surql.query.graph import unrelate`
 - Remove edge: `await unrelate('likes', 'user:alice', 'post:123')`
 - Specific direction only: Deletes the exact `from->edge->to` relationship
 - Returns nothing (void)
 
 ### Get Edges
-- Import: `from reverie.query.graph import get_outgoing_edges, get_incoming_edges`
+- Import: `from surql.query.graph import get_outgoing_edges, get_incoming_edges`
 - Outgoing: `likes = await get_outgoing_edges('user:alice', 'likes')`
 - Incoming: `liked_by = await get_incoming_edges('post:123', 'likes')`
 - With model: `likes = await get_outgoing_edges('user:alice', 'likes', LikeEdge)`
 - Returns list of edge records (not target records)
 
 ### Query Builder Graph Support
-- Import: `from reverie.query.builder import Query`
+- Import: `from surql.query.builder import Query`
 - RELATE: `query = Query().relate('likes', 'user:alice', 'post:123', {'created_at': 'time::now()'})`
 - Traverse: `query = Query().select().from_table('user:alice').traverse('->likes->post')`
 - Execute: `result = await client.execute(query.to_surql())`
@@ -642,20 +642,20 @@ posts = await (
 ## MTREE Vector Indexes
 
 ### Overview
-- Reverie supports vector similarity search through MTREE indexes in SurrealDB
+- surqlsupports vector similarity search through MTREE indexes in SurrealDB
 - MTREE indexes enable efficient nearest-neighbor search for embeddings and vectors
 - Supports multiple distance metrics and vector data types
 - Ideal for AI/ML applications with embeddings (OpenAI, sentence transformers, etc.)
 
 ### Distance Metrics
-- Import: `from reverie.schema.table import MTreeDistanceType`
+- Import: `from surql.schema.table import MTreeDistanceType`
 - `MTreeDistanceType.COSINE`: Cosine similarity (ideal for normalized vectors like embeddings)
 - `MTreeDistanceType.EUCLIDEAN`: Euclidean distance (L2 norm, default)
 - `MTreeDistanceType.MANHATTAN`: Manhattan distance (L1 norm)
 - `MTreeDistanceType.MINKOWSKI`: Minkowski distance
 
 ### Vector Data Types
-- Import: `from reverie.schema.table import MTreeVectorType`
+- Import: `from surql.schema.table import MTreeVectorType`
 - `MTreeVectorType.F64`: 64-bit floating point (default, highest precision)
 - `MTreeVectorType.F32`: 32-bit floating point (recommended for embeddings)
 - `MTreeVectorType.I64`: 64-bit integer
@@ -663,7 +663,7 @@ posts = await (
 - `MTreeVectorType.I16`: 16-bit integer
 
 ### Creating MTREE Indexes
-- Import: `from reverie.schema.table import mtree_index, MTreeDistanceType, MTreeVectorType`
+- Import: `from surql.schema.table import mtree_index, MTreeDistanceType, MTreeVectorType`
 - Basic: `mtree_index('embedding_idx', 'embedding', 1536)`
 - With distance metric: `mtree_index('embedding_idx', 'embedding', 1536, distance=MTreeDistanceType.COSINE)`
 - With vector type: `mtree_index('embedding_idx', 'embedding', 1536, distance=MTreeDistanceType.COSINE, vector_type=MTreeVectorType.F32)`
@@ -676,7 +676,7 @@ posts = await (
 
 ### OpenAI Embeddings Example
 ```python
-from reverie.schema import (
+from surql.schema import (
   table_schema,
   with_fields,
   with_indexes,
@@ -761,7 +761,7 @@ products = with_indexes(
 - MTREE indexes generate SurrealDB DEFINE INDEX statements
 - Example: `DEFINE INDEX embedding_idx ON TABLE documents FIELDS embedding MTREE DIMENSION 1536 DIST COSINE TYPE F32;`
 - Migrations automatically handle creation and removal
-- Use `reverie migrate up` to apply MTREE indexes to database
+- Use `surql migrate up` to apply MTREE indexes to database
 
 ### Vector Similarity Search
 - Use query builder's `vector_search()` method: `Query().from_('documents').vector_search('embedding', vector, k=10, distance=VectorDistanceType.COSINE)`
@@ -789,7 +789,7 @@ products = with_indexes(
 ### Migration Example
 ```python
 """Migration: Add vector search to documents"""
-from reverie.schema import (
+from surql.schema import (
   table_schema,
   with_fields,
   with_indexes,
@@ -849,7 +849,7 @@ def downgrade():
 ## Hint Types
 
 ### IndexHint
-- Import: `from reverie.query.hints import IndexHint`
+- Import: `from surql.query.hints import IndexHint`
 - Force/suggest specific index usage
 - Create: `IndexHint(table='user', index='email_idx', force=False)`
 - Query methods: `query.use_index('email_idx')` or `query.force_index('email_idx')`
@@ -857,7 +857,7 @@ def downgrade():
 - Use when: You know optimal index, query planner chooses suboptimal index
 
 ### ParallelHint
-- Import: `from reverie.query.hints import ParallelHint`
+- Import: `from surql.query.hints import ParallelHint`
 - Enable/configure parallel query execution
 - Create: `ParallelHint(enabled=True, max_workers=4)`
 - Query method: `query.parallel()` or `query.parallel(max_workers=8)`
@@ -866,7 +866,7 @@ def downgrade():
 - Sweet spot: 4-8 workers typically optimal
 
 ### TimeoutHint
-- Import: `from reverie.query.hints import TimeoutHint`
+- Import: `from surql.query.hints import TimeoutHint`
 - Set custom query timeout
 - Create: `TimeoutHint(seconds=30.0)`
 - Query method: `query.with_timeout(30.0)`
@@ -875,7 +875,7 @@ def downgrade():
 - Common values: Interactive (5-10s), Reports (30-60s), Batch (300+s)
 
 ### FetchHint
-- Import: `from reverie.query.hints import FetchHint`
+- Import: `from surql.query.hints import FetchHint`
 - Control how records are fetched from database
 - Strategies: `eager` (load all), `lazy` (on demand), `batch` (in chunks)
 - Create: `FetchHint(strategy='batch', batch_size=1000)`
@@ -886,7 +886,7 @@ def downgrade():
 - Lazy: Best for very large datasets, low memory, high latency
 
 ### ExplainHint
-- Import: `from reverie.query.hints import ExplainHint`
+- Import: `from surql.query.hints import ExplainHint`
 - Request query execution plan for performance analysis
 - Create: `ExplainHint()` or `ExplainHint(full=True)`
 - Query method: `query.explain()` or `query.explain(full=True)`
@@ -897,7 +897,7 @@ def downgrade():
 
 ### Single Hint
 ```python
-from reverie.query import Query
+from surql.query import Query
 
 query = (
   Query()
@@ -926,7 +926,7 @@ query = (
 
 ### with_hints() Method
 ```python
-from reverie.query.hints import IndexHint, TimeoutHint, ParallelHint
+from surql.query.hints import IndexHint, TimeoutHint, ParallelHint
 
 query = (
   Query()
@@ -944,21 +944,21 @@ query = (
 ## Hint Validation and Merging
 
 ### validate_hint()
-- Import: `from reverie.query.hints import validate_hint`
+- Import: `from surql.query.hints import validate_hint`
 - Validate hint applicable to query context
 - Usage: `errors = validate_hint(hint, table='user')`
 - Returns: List of validation error messages (empty if valid)
 - Checks: Index hint table matches query table
 
 ### merge_hints()
-- Import: `from reverie.query.hints import merge_hints`
+- Import: `from surql.query.hints import merge_hints`
 - Merge multiple hints, resolving conflicts
 - Usage: `merged = merge_hints([hint1, hint2, hint3])`
 - Behavior: Later hints override earlier hints of same type
 - Returns: Merged list with duplicates resolved
 
 ### render_hints()
-- Import: `from reverie.query.hints import render_hints`
+- Import: `from surql.query.hints import render_hints`
 - Render hints to SurrealQL comment string
 - Usage: `sql = render_hints([TimeoutHint(seconds=30), ParallelHint(enabled=True)])`
 - Returns: Space-separated hint comments
@@ -1058,7 +1058,7 @@ async def analyze_slow_query():
 # Query Result Caching
 
 ## Cache Overview
-- Reverie provides a flexible caching system for query results
+- surqlprovides a flexible caching system for query results
 - Supports multiple backends: in-memory LRU cache and Redis
 - Automatic cache invalidation by table name
 - TTL (time-to-live) support with customizable expiration
@@ -1067,7 +1067,7 @@ async def analyze_slow_query():
 ## Cache Backends
 
 ### Memory Cache (Default)
-- Import: `from reverie.cache.backends import MemoryCache`
+- Import: `from surql.cache.backends import MemoryCache`
 - In-memory LRU cache using `cachetools`
 - Fast, no external dependencies
 - Limited to single process
@@ -1075,8 +1075,8 @@ async def analyze_slow_query():
 - Example: `cache = MemoryCache(max_size=1000)`
 
 ### Redis Cache (Optional)
-- Import: `from reverie.cache.backends import RedisCache`
-- Requires: `pip install "reverie[cache]"` or `pip install redis>=5.0.0`
+- Import: `from surql.cache.backends import RedisCache`
+- Requires: `pip install "surql[cache]"` or `pip install redis>=5.0.0`
 - Distributed caching across processes/servers
 - Persistent storage option
 - Better for production deployments
@@ -1085,7 +1085,7 @@ async def analyze_slow_query():
 ## Cache Configuration
 
 ### CacheConfig
-- Import: `from reverie.cache.config import CacheConfig, CacheBackend`
+- Import: `from surql.cache.config import CacheConfig, CacheBackend`
 - Backend selection: `CacheConfig(backend=CacheBackend.MEMORY)` or `CacheBackend.REDIS`
 - TTL setting: `CacheConfig(default_ttl=300)` (seconds)
 - Max size: `CacheConfig(max_size=1000)` (memory backend only)
@@ -1093,7 +1093,7 @@ async def analyze_slow_query():
 - Key prefix: `CacheConfig(key_prefix='myapp')` (for namespacing)
 
 ### Configure Global Cache
-- Import: `from reverie.cache import configure_cache`
+- Import: `from surql.cache import configure_cache`
 - Set up: `configure_cache(CacheConfig(backend=CacheBackend.MEMORY, default_ttl=600))`
 - Call once at application startup
 - All cached queries use this configuration
@@ -1101,7 +1101,7 @@ async def analyze_slow_query():
 ## Cache Decorator
 
 ### @cache_query Decorator
-- Import: `from reverie.cache import cache_query`
+- Import: `from surql.cache import cache_query`
 - Basic usage: `@cache_query(ttl=60) async def get_users(): ...`
 - Custom key: `@cache_query(key='user_list', ttl=300) async def get_users(): ...`
 - No TTL: `@cache_query() async def get_static_data(): ...` (uses default)
@@ -1117,7 +1117,7 @@ async def analyze_slow_query():
 ## Manual Cache Management
 
 ### CacheManager
-- Import: `from reverie.cache import get_cache_manager`
+- Import: `from surql.cache import get_cache_manager`
 - Get instance: `manager = get_cache_manager()`
 - Get or set: `value = await manager.get_or_set('key', async_fn, ttl=300)`
 - Set value: `await manager.set('key', value, ttl=300, table='user')`
@@ -1127,7 +1127,7 @@ async def analyze_slow_query():
 ### Cache Invalidation
 
 #### By Key
-- Import: `from reverie.cache import invalidate`
+- Import: `from surql.cache import invalidate`
 - Invalidate key: `await invalidate('user_list')`
 - Pattern matching: `await invalidate('user_*')` (all keys starting with 'user_')
 - Explicit: `await get_cache_manager().delete('specific_key')`
@@ -1138,7 +1138,7 @@ async def analyze_slow_query():
 - Useful after bulk updates or schema changes
 
 #### Clear All
-- Import: `from reverie.cache import clear_cache`
+- Import: `from surql.cache import clear_cache`
 - Clear everything: `await clear_cache()`
 - Reset all cache entries
 - Use with caution in production
@@ -1146,7 +1146,7 @@ async def analyze_slow_query():
 ## Cache Statistics
 
 ### CacheStats
-- Import: `from reverie.cache.config import CacheStats`
+- Import: `from surql.cache.config import CacheStats`
 - Get stats: `stats = await get_cache_manager().get_stats()`
 - Access metrics:
   * `stats.hits`: Number of cache hits
@@ -1160,8 +1160,8 @@ async def analyze_slow_query():
 
 ### Basic Setup
 ```python
-from reverie.cache import configure_cache, cache_query
-from reverie.cache.config import CacheConfig, CacheBackend
+from surql.cache import configure_cache, cache_query
+from surql.cache.config import CacheConfig, CacheBackend
 
 # Configure at startup
 configure_cache(CacheConfig(
@@ -1188,7 +1188,7 @@ configure_cache(CacheConfig(
 
 ### Manual Caching
 ```python
-from reverie.cache import get_cache_manager
+from surql.cache import get_cache_manager
 
 manager = get_cache_manager()
 
@@ -1224,7 +1224,7 @@ print(f"Total hits: {stats.hits}, misses: {stats.misses}")
 # Real-Time Streaming
 
 ## Streaming Overview
-- Reverie supports SurrealDB's LIVE queries for real-time updates
+- surqlsupports SurrealDB's LIVE queries for real-time updates
 - Receive notifications when records are created, updated, or deleted
 - WebSocket-based streaming (requires `ws://` or `wss://` connection)
 - Both callback-based and async iteration patterns supported
@@ -1232,13 +1232,13 @@ print(f"Total hits: {stats.hits}, misses: {stats.misses}")
 ## StreamingManager
 
 ### Creating Streaming Manager
-- Import: `from reverie.connection.streaming import StreamingManager`
+- Import: `from surql.connection.streaming import StreamingManager`
 - Create: `manager = StreamingManager(client)`
 - Pass DatabaseClient instance
 - Manager handles query lifecycle
 
 ### Create Live Query
-- Import: `from reverie.connection.streaming import LiveQuery`
+- Import: `from surql.connection.streaming import LiveQuery`
 - Create: `live_query = await manager.live('user', callback=on_change)`
 - With conditions: `live_query = await manager.live('user', diff=True, callback=on_change)`
 - Returns LiveQuery object with query UUID
@@ -1252,7 +1252,7 @@ print(f"Total hits: {stats.hits}, misses: {stats.misses}")
 
 ### Callback Pattern
 ```python
-from reverie.connection.streaming import StreamingNotification
+from surql.connection.streaming import StreamingNotification
 
 async def on_user_change(notification: StreamingNotification):
     print(f"Action: {notification.action}")
@@ -1304,7 +1304,7 @@ async def process_notification(notif: StreamingNotification):
 
 ### Monitor Table Changes
 ```python
-from reverie.connection.streaming import StreamingManager
+from surql.connection.streaming import StreamingManager
 
 async with get_client(config) as client:
     manager = StreamingManager(client)
@@ -1346,13 +1346,13 @@ live_query = await manager.live(
 # Authentication
 
 ## Authentication Overview
-- Reverie supports all SurrealDB authentication types
+- surqlsupports all SurrealDB authentication types
 - Root, Namespace, Database, and Scope authentication
 - JWT token management with automatic refresh
 - Credential validation and type safety
 
 ## AuthType Enum
-- Import: `from reverie.connection.auth import AuthType`
+- Import: `from surql.connection.auth import AuthType`
 - `AuthType.ROOT`: Root-level access (highest privileges)
 - `AuthType.NAMESPACE`: Namespace-level access
 - `AuthType.DATABASE`: Database-level access
@@ -1361,25 +1361,25 @@ live_query = await manager.live(
 ## Credential Types
 
 ### RootCredentials
-- Import: `from reverie.connection.auth import RootCredentials`
+- Import: `from surql.connection.auth import RootCredentials`
 - Create: `creds = RootCredentials(username='root', password='root')`
 - Full system access
 - Use for administrative operations
 
 ### NamespaceCredentials
-- Import: `from reverie.connection.auth import NamespaceCredentials`
+- Import: `from surql.connection.auth import NamespaceCredentials`
 - Create: `creds = NamespaceCredentials(namespace='myapp', username='admin', password='secret')`
 - Access to specific namespace
 - Cannot access other namespaces
 
 ### DatabaseCredentials
-- Import: `from reverie.connection.auth import DatabaseCredentials`
+- Import: `from surql.connection.auth import DatabaseCredentials`
 - Create: `creds = DatabaseCredentials(namespace='myapp', database='prod', username='user', password='pass')`
 - Access to specific database within namespace
 - Most common for application auth
 
 ### ScopeCredentials
-- Import: `from reverie.connection.auth import ScopeCredentials`
+- Import: `from surql.connection.auth import ScopeCredentials`
 - Create: `creds = ScopeCredentials(namespace='myapp', database='prod', scope='user', params={'email': 'user@example.com', 'pass': 'password'})`
 - Custom authentication scopes
 - Flexible parameter passing
@@ -1388,7 +1388,7 @@ live_query = await manager.live(
 ## AuthManager
 
 ### Creating AuthManager
-- Import: `from reverie.connection.auth import AuthManager`
+- Import: `from surql.connection.auth import AuthManager`
 - Create: `auth = AuthManager(client)`
 - Pass DatabaseClient instance
 - Manages authentication state
@@ -1427,7 +1427,7 @@ live_query = await manager.live(
 
 ### Database Authentication
 ```python
-from reverie.connection.auth import AuthManager, DatabaseCredentials
+from surql.connection.auth import AuthManager, DatabaseCredentials
 
 async with get_client(config) as client:
     auth = AuthManager(client)
@@ -1451,7 +1451,7 @@ async with get_client(config) as client:
 
 ### Scope-Based User Registration
 ```python
-from reverie.connection.auth import ScopeCredentials
+from surql.connection.auth import ScopeCredentials
 
 # Sign up new user
 creds = ScopeCredentials(
@@ -1486,7 +1486,7 @@ await auth.authenticate(saved_token)
 ## Named Connections and Registry
 
 ### ConnectionRegistry
-- Import: `from reverie.connection.registry import ConnectionRegistry`
+- Import: `from surql.connection.registry import ConnectionRegistry`
 - Singleton pattern: `registry = ConnectionRegistry()`
 - Manages multiple named database connections
 - Thread-safe with async locks
@@ -1499,15 +1499,15 @@ await auth.authenticate(saved_token)
 - Unregister: `await registry.unregister('analytics')`
 
 ### NamedConnectionConfig
-- Import: `from reverie.connection.config import NamedConnectionConfig`
+- Import: `from surql.connection.config import NamedConnectionConfig`
 - From environment: `config = NamedConnectionConfig.from_env('analytics')`
-- Loads from `REVERIE_ANALYTICS_*` or `DB_ANALYTICS_*` env vars
+- Loads from `SURQL_ANALYTICS_*` or `DB_ANALYTICS_*` env vars
 - Supports all ConnectionConfig options
 
 ### Multiple Connection Example
 ```python
-from reverie.connection.registry import ConnectionRegistry
-from reverie.connection.config import NamedConnectionConfig
+from surql.connection.registry import ConnectionRegistry
+from surql.connection.config import NamedConnectionConfig
 
 # Load connections from environment
 primary_config = NamedConnectionConfig.from_env('primary')
@@ -1538,7 +1538,7 @@ default_client = registry.get()  # Returns 'primary'
 ## Connection Override Context
 
 ### connection_override Context Manager
-- Import: `from reverie.connection.context import connection_override`
+- Import: `from surql.connection.context import connection_override`
 - Override connection: `async with connection_override(test_client): result = await execute_query()`
 - Temporary override for specific block
 - Automatically restores previous connection
@@ -1546,7 +1546,7 @@ default_client = registry.get()  # Returns 'primary'
 
 ### Override Example
 ```python
-from reverie.connection.context import connection_override, get_db
+from surql.connection.context import connection_override, get_db
 
 # Normal execution uses default client
 result1 = await query_records('user', User)
@@ -1564,7 +1564,7 @@ result3 = await query_records('user', User)
 ### Testing with Override
 ```python
 import pytest
-from reverie.connection.context import connection_override
+from surql.connection.context import connection_override
 
 @pytest.mark.asyncio
 async def test_query_logic():
@@ -1579,7 +1579,7 @@ async def test_query_logic():
 ## Database Client
 
 ### Creating Client
-- Import: `from reverie.connection.client import DatabaseClient, get_client`
+- Import: `from surql.connection.client import DatabaseClient, get_client`
 - From config: `client = DatabaseClient(config)`
 - Context manager: `async with get_client(config) as client: ...`
 - Manual: `client = DatabaseClient(config); await client.connect()`
@@ -1615,26 +1615,26 @@ async def test_query_logic():
 ## Context Management
 
 ### Using get_db()
-- Import: `from reverie.connection.context import get_db`
+- Import: `from surql.connection.context import get_db`
 - Get current client: `client = get_db()`
 - Used internally by CRUD operations
 - Requires client to be set in context first
 
 ### Setting Context Client
-- Import: `from reverie.connection.context import set_db`
+- Import: `from surql.connection.context import set_db`
 - Set client: `set_db(client)`
 - Use in application startup
 - Scope: Per async context
 
 ## Error Handling
-- Import: `from reverie.connection.client import DatabaseError, ConnectionError, QueryError`
+- Import: `from surql.connection.client import DatabaseError, ConnectionError, QueryError`
 - `ConnectionError`: Connection failures
 - `QueryError`: Query execution failures
 - `DatabaseError`: Base exception for all database errors
 - Catch and handle: `try: ... except QueryError as e: ...`
 
 ## Transactions
-- Import: `from reverie.connection.transaction import Transaction, transaction`
+- Import: `from surql.connection.transaction import Transaction, transaction`
 - Create transaction: `tx = Transaction(client)`
 - Begin: `await tx.begin()`
 - Commit: `await tx.commit()`
@@ -1646,20 +1646,20 @@ async def test_query_logic():
 # Schema Validation
 
 ## Overview
-- Reverie provides schema validation to compare Python schemas against database
+- surqlprovides schema validation to compare Python schemas against database
 - Detects schema drift between code and deployed database
 - Validates tables, fields, indexes, edges, and constraints
 - Generates detailed validation reports with severity levels
 - Integrates with CI/CD pipelines via CLI
 
 ## ValidationSeverity
-- Import: `from reverie.schema.validator import ValidationSeverity`
+- Import: `from surql.schema.validator import ValidationSeverity`
 - `ValidationSeverity.ERROR`: Critical issues requiring immediate action
 - `ValidationSeverity.WARNING`: Potential problems or inconsistencies
 - `ValidationSeverity.INFO`: Informational messages about schema state
 
 ## ValidationResult
-- Import: `from reverie.schema.validator import ValidationResult`
+- Import: `from surql.schema.validator import ValidationResult`
 - Properties:
   * `severity`: ValidationSeverity enum value
   * `message`: Human-readable description
@@ -1668,7 +1668,7 @@ async def test_query_logic():
   * `details`: Additional context dictionary (optional)
 
 ## validate_schema()
-- Import: `from reverie.schema.validator import validate_schema`
+- Import: `from surql.schema.validator import validate_schema`
 - Usage: `results = await validate_schema(code_tables, client)`
 - Parameters:
   * `code_tables`: Dict of table schemas from Python code
@@ -1683,14 +1683,14 @@ async def test_query_logic():
   * Edge constraint validation
 
 ## format_validation_report()
-- Import: `from reverie.schema.validator import format_validation_report`
+- Import: `from surql.schema.validator import format_validation_report`
 - Usage: `report = format_validation_report(results)`
 - Generates human-readable text report
 - Groups results by severity
 - Color-coded output for terminals
 
 ## CLI Integration
-- Command: `reverie schema validate`
+- Command: `surql schema validate`
 - Options:
   * `--schema PATH`: Path to schema module
   * `--format FORMAT`: Output format (table/json)
@@ -1702,8 +1702,8 @@ async def test_query_logic():
 
 ## Usage Example
 ```python
-from reverie.schema.validator import validate_schema, format_validation_report
-from reverie.schema.registry import get_all_tables
+from surql.schema.validator import validate_schema, format_validation_report
+from surql.schema.registry import get_all_tables
 
 # Get schemas from registry
 code_tables = get_all_tables()
@@ -1725,19 +1725,19 @@ if results:
 # Schema Visualization
 
 ## Overview
-- Reverie provides schema visualization to generate diagrams of database structure
+- surqlprovides schema visualization to generate diagrams of database structure
 - Supports multiple output formats: Mermaid, GraphViz, ASCII
 - Visualizes tables, fields, indexes, edges, and relationships
 - Useful for documentation and understanding complex schemas
 
 ## OutputFormat
-- Import: `from reverie.schema.visualize import OutputFormat`
+- Import: `from surql.schema.visualize import OutputFormat`
 - `OutputFormat.MERMAID`: Mermaid.js ER diagram syntax
 - `OutputFormat.GRAPHVIZ`: GraphViz DOT format
 - `OutputFormat.ASCII`: Terminal-friendly ASCII art
 
 ## visualize_schema()
-- Import: `from reverie.schema.visualize import visualize_schema`
+- Import: `from surql.schema.visualize import visualize_schema`
 - Usage: `diagram = visualize_schema(tables, edges, format=OutputFormat.MERMAID)`
 - Parameters:
   * `tables`: Dict of table schemas
@@ -1748,13 +1748,13 @@ if results:
 - Returns: String containing diagram in specified format
 
 ## visualize_from_registry()
-- Import: `from reverie.schema.visualize import visualize_from_registry`
+- Import: `from surql.schema.visualize import visualize_from_registry`
 - Usage: `diagram = visualize_from_registry(format=OutputFormat.MERMAID)`
 - Automatically retrieves schemas from global SchemaRegistry
 - Convenient for visualizing entire schema
 
 ## CLI Integration
-- Command: `reverie schema visualize`
+- Command: `surql schema visualize`
 - Options:
   * `--schema PATH`: Path to schema module
   * `--format FORMAT`: Output format (mermaid/graphviz/ascii)
@@ -1783,7 +1783,7 @@ if results:
 
 ## Usage Example
 ```python
-from reverie.schema.visualize import visualize_from_registry, OutputFormat
+from surql.schema.visualize import visualize_from_registry, OutputFormat
 
 # Generate Mermaid diagram
 mermaid = visualize_from_registry(format=OutputFormat.MERMAID)
@@ -1798,14 +1798,14 @@ print(ascii_diagram)
 # Schema File Watcher
 
 ## Overview
-- Reverie provides automatic schema change detection via file watching
+- surqlprovides automatic schema change detection via file watching
 - Monitors Python schema files for modifications
 - Detects drift between code and database schemas
 - Can automatically generate migrations on changes
 - Integrates with development workflows
 
 ## SchemaWatcher
-- Import: `from reverie.migration.watcher import SchemaWatcher`
+- Import: `from surql.migration.watcher import SchemaWatcher`
 - Create: `watcher = SchemaWatcher(schema_path, migrations_path, debounce=1.0)`
 - Parameters:
   * `schema_path`: Path to schema module or directory
@@ -1825,7 +1825,7 @@ print(ascii_diagram)
 - Automatically stops file monitoring
 
 ## SchemaChange
-- Import: `from reverie.migration.watcher import SchemaChange`
+- Import: `from surql.migration.watcher import SchemaChange`
 - Properties:
   * `type`: Change type (modified, created, deleted)
   * `table`: Affected table name (optional)
@@ -1833,7 +1833,7 @@ print(ascii_diagram)
   * `diff_summary`: Summary of changes
 
 ## CLI Integration
-- Command: `reverie schema watch`
+- Command: `surql schema watch`
 - Options:
   * `--schema PATH`: Path to schema module (required)
   * `--migrations PATH`: Path to migrations directory (default: migrations/)
@@ -1845,7 +1845,7 @@ print(ascii_diagram)
 
 ## Usage Example
 ```python
-from reverie.migration.watcher import SchemaWatcher
+from surql.migration.watcher import SchemaWatcher
 
 async def on_schema_change(change: SchemaChange):
     print(f"Schema changed: {change.table}")
@@ -1867,13 +1867,13 @@ await watcher.stop()
 # Git Hooks Integration
 
 ## Overview
-- Reverie provides Git pre-commit hooks for schema drift detection
+- surqlprovides Git pre-commit hooks for schema drift detection
 - Prevents commits with unmigrated schema changes
 - Generates pre-commit configuration files
 - Integrates with CI/CD pipelines
 
 ## check_schema_drift()
-- Import: `from reverie.migration.hooks import check_schema_drift`
+- Import: `from surql.migration.hooks import check_schema_drift`
 - Usage: `result = check_schema_drift(schema_path, migrations_path)`
 - Parameters:
   * `schema_path`: Path to schema module
@@ -1883,7 +1883,7 @@ await watcher.stop()
 - Works without database connection by comparing file timestamps
 
 ## HookCheckResult
-- Import: `from reverie.migration.hooks import HookCheckResult`
+- Import: `from surql.migration.hooks import HookCheckResult`
 - Properties:
   * `has_drift`: Boolean indicating if drift detected
   * `message`: Human-readable description
@@ -1892,14 +1892,14 @@ await watcher.stop()
   * `details`: Additional context
 
 ## generate_precommit_config()
-- Import: `from reverie.migration.hooks import generate_precommit_config`
+- Import: `from surql.migration.hooks import generate_precommit_config`
 - Usage: `config = generate_precommit_config(schema_path, migrations_path)`
 - Generates `.pre-commit-config.yaml` content
 - Compatible with pre-commit framework
-- Includes reverie drift check hook
+- Includes surql drift check hook
 
 ## CLI Integration
-- Command: `reverie schema check`
+- Command: `surql schema check`
 - Options:
   * `--schema PATH`: Path to schema module
   * `--migrations PATH`: Path to migrations directory
@@ -1911,7 +1911,7 @@ await watcher.stop()
   * 1: Drift detected (with `--fail-on-drift`)
   * 2: Command execution error
 
-- Command: `reverie schema hook-config`
+- Command: `surql schema hook-config`
 - Generates pre-commit configuration
 - Options:
   * `--schema PATH`: Path to schema module
@@ -1924,9 +1924,9 @@ await watcher.stop()
 repos:
   - repo: local
     hooks:
-      - id: reverie-schema-check
+      - id: surql-schema-check
         name: Check for schema drift
-        entry: reverie schema check --fail-on-drift
+        entry: surql schema check --fail-on-drift
         language: system
         pass_filenames: false
         always_run: true
@@ -1934,7 +1934,7 @@ repos:
 
 ## Usage Example
 ```python
-from reverie.migration.hooks import check_schema_drift, generate_precommit_config
+from surql.migration.hooks import check_schema_drift, generate_precommit_config
 
 # Check for drift
 result = check_schema_drift('myapp/schemas', 'migrations')
@@ -1953,13 +1953,13 @@ with open('.pre-commit-config.yaml', 'w') as f:
 # Migration Squashing
 
 ## Overview
-- Reverie provides migration squashing to combine multiple migrations
+- surqlprovides migration squashing to combine multiple migrations
 - Reduces migration file count for better performance
 - Optimizes redundant operations
 - Validates safety before squashing
 
 ## squash_migrations()
-- Import: `from reverie.migration.squash import squash_migrations`
+- Import: `from surql.migration.squash import squash_migrations`
 - Usage: `await squash_migrations(directory, from_version, to_version, output_path)`
 - Parameters:
   * `directory`: Path to migrations directory
@@ -1973,7 +1973,7 @@ with open('.pre-commit-config.yaml', 'w') as f:
 - Preserves logical order
 
 ## optimize_statements()
-- Import: `from reverie.migration.squash import optimize_statements`
+- Import: `from surql.migration.squash import optimize_statements`
 - Usage: `optimized = optimize_statements(statements)`
 - Removes redundant operations:
   * Drop table followed by create table → single create
@@ -1982,7 +1982,7 @@ with open('.pre-commit-config.yaml', 'w') as f:
 - Returns optimized list of statements
 
 ## validate_squash_safety()
-- Import: `from reverie.migration.squash import validate_squash_safety`
+- Import: `from surql.migration.squash import validate_squash_safety`
 - Usage: `warnings = validate_squash_safety(migrations)`
 - Checks for:
   * Data migrations (cannot be safely squashed)
@@ -1991,7 +1991,7 @@ with open('.pre-commit-config.yaml', 'w') as f:
 - Returns list of warnings with severity levels
 
 ## CLI Integration
-- Command: `reverie migrate squash`
+- Command: `surql migrate squash`
 - Options:
   * `--migrations PATH`: Migrations directory (default: migrations/)
   * `--from VERSION`: Starting version (optional)
@@ -2016,10 +2016,10 @@ with open('.pre-commit-config.yaml', 'w') as f:
 
 ## Usage Example
 ```python
-from reverie.migration.squash import squash_migrations, validate_squash_safety
+from surql.migration.squash import squash_migrations, validate_squash_safety
 
 # Validate safety first
-from reverie.migration.discovery import discover_migrations
+from surql.migration.discovery import discover_migrations
 migrations = discover_migrations('migrations')
 warnings = validate_squash_safety(migrations[5:10])
 
@@ -2051,8 +2051,8 @@ await squash_migrations(
 ### Migration File Template
 ```python
 """Migration: Create user table"""
-from reverie.schema.fields import string_field, int_field, datetime_field
-from reverie.schema.table import table_schema, unique_index, TableMode
+from surql.schema.fields import string_field, int_field, datetime_field
+from surql.schema.table import table_schema, unique_index, TableMode
 
 def upgrade():
   """Apply migration."""
@@ -2088,13 +2088,13 @@ def downgrade():
 ## Creating Migrations
 
 ### Via CLI
-- Create migration: `reverie migrate create "Add user table"`
+- Create migration: `surql migrate create "Add user table"`
 - Creates file: `migrations/YYYYMMDD_HHMMSS_add_user_table.py`
 - Edit file to add schema definitions
 - Auto-generates timestamp
 
 ### Programmatically
-- Import: `from reverie.migration.generator import create_migration_file`
+- Import: `from surql.migration.generator import create_migration_file`
 - Create: `path = create_migration_file('Add user table', 'migrations/')`
 - Returns path to created file
 - Edit file manually after creation
@@ -2108,45 +2108,45 @@ def downgrade():
 ## Applying Migrations
 
 ### Apply All Pending
-- Command: `reverie migrate up`
+- Command: `surql migrate up`
 - Applies all pending migrations in order
 - Tracks applied migrations in `_migration_history` table
 - Idempotent: Safe to run multiple times
 
 ### Apply Specific Number
-- Command: `reverie migrate up --steps 1`
+- Command: `surql migrate up --steps 1`
 - Apply next migration only: `--steps 1`
 - Apply next 3: `--steps 3`
 - Useful for gradual rollout
 
 ### Dry Run
-- Command: `reverie migrate up --dry-run`
+- Command: `surql migrate up --dry-run`
 - Preview what will be applied
 - No database changes
 - Shows SQL that would be executed
 
 ### With Custom Directory
-- Command: `reverie migrate up --directory ./db/migrations`
+- Command: `surql migrate up --directory ./db/migrations`
 - Specify migration directory location
 - Useful for multi-environment setups
 
 ## Rolling Back Migrations
 
 ### Rollback Last Migration
-- Command: `reverie migrate down`
+- Command: `surql migrate down`
 - Rolls back most recent migration
 - Executes downgrade function
 - Requires confirmation by default
 - Use `--yes` flag to skip confirmation
 
 ### Rollback Multiple
-- Command: `reverie migrate down --steps 3`
+- Command: `surql migrate down --steps 3`
 - Rollback last 3 migrations
 - Applied in reverse order
 - Use with caution
 
 ### Dry Run Rollback
-- Command: `reverie migrate down --dry-run`
+- Command: `surql migrate down --dry-run`
 - Preview rollback operations
 - No database changes
 - Recommended before actual rollback
@@ -2154,20 +2154,20 @@ def downgrade():
 ## Migration Status and History
 
 ### Check Status
-- Command: `reverie migrate status`
+- Command: `surql migrate status`
 - Shows applied vs pending migrations
 - Table format by default
-- JSON format: `reverie migrate status --format json`
+- JSON format: `surql migrate status --format json`
 
 ### View History
-- Command: `reverie migrate history`
+- Command: `surql migrate history`
 - Shows all applied migrations
 - Includes timestamps and execution time
 - Stored in `_migration_history` table
 - Supports `--directory` option for consistency
 
 ### Validate Migrations
-- Command: `reverie migrate validate`
+- Command: `surql migrate validate`
 - Checks migration files for errors
 - Validates file naming
 - Checks for duplicate versions
@@ -2185,12 +2185,12 @@ def downgrade():
 
 ### Environment
 - Represents a single database instance or cluster
-- Import: `from reverie.orchestration import EnvironmentConfig`
+- Import: `from surql.orchestration import EnvironmentConfig`
 - Create: `EnvironmentConfig(name='production', connection=conn_config, priority=1, tags={'production'}, require_approval=True, allow_destructive=False)`
 - Properties: `name`, `connection`, `priority` (lower = higher priority), `tags`, `require_approval`, `allow_destructive`
 
 ### Environment Registry
-- Import: `from reverie.orchestration import EnvironmentRegistry`
+- Import: `from surql.orchestration import EnvironmentRegistry`
 - Singleton pattern manages all configured environments
 - Register: `registry.register_environment(name='staging', connection=config, priority=50)`
 - Get: `client = registry.get('analytics')`
@@ -2198,7 +2198,7 @@ def downgrade():
 - Set default: `await registry.set_default('analytics')`
 
 ### Migration Coordinator
-- Import: `from reverie.orchestration import MigrationCoordinator`
+- Import: `from surql.orchestration import MigrationCoordinator`
 - Orchestrates deployments across environments
 - Create: `coordinator = MigrationCoordinator(registry)`
 - Deploy: `results = await coordinator.deploy_to_environments(environments=['staging', 'production'], migrations=migrations, strategy='sequential')`
@@ -2228,8 +2228,8 @@ def downgrade():
 ```
 
 ### Loading Configuration
-- From file: `from reverie.orchestration import configure_environments; configure_environments(Path('environments.json'))`
-- Programmatically: `from reverie.orchestration import register_environment; register_environment(name='production', connection=ConnectionConfig(...), priority=1)`
+- From file: `from surql.orchestration import configure_environments; configure_environments(Path('environments.json'))`
+- Programmatically: `from surql.orchestration import register_environment; register_environment(name='production', connection=ConnectionConfig(...), priority=1)`
 - Use environment variables for sensitive data: `"password": "${PROD_PASSWORD}"`
 
 ## Deployment Strategies
@@ -2238,25 +2238,25 @@ def downgrade():
 - Deploy one at a time in priority order
 - Use cases: Multi-stage deployments (dev → staging → production), maximum safety
 - Behavior: Deploys in priority order (lowest first), waits for each, stops on first failure
-- CLI: `reverie orchestrate deploy -e dev,staging,production --strategy sequential`
+- CLI: `surql orchestrate deploy -e dev,staging,production --strategy sequential`
 
 ### Parallel Strategy
 - Deploy to all environments simultaneously
 - Use cases: Independent environments (different tenants, regions), fast deployments
 - Behavior: Deploys to all at once, configurable concurrency limit
-- CLI: `reverie orchestrate deploy -e tenant1,tenant2,tenant3 --strategy parallel --max-concurrent 3`
+- CLI: `surql orchestrate deploy -e tenant1,tenant2,tenant3 --strategy parallel --max-concurrent 3`
 
 ### Rolling Strategy
 - Deploy in batches, waiting for each batch to complete
 - Use cases: Database replicas, maintaining service availability
 - Behavior: Divides into batches, deploys one batch at a time
-- CLI: `reverie orchestrate deploy -e db1,db2,db3,db4 --strategy rolling --batch-size 2`
+- CLI: `surql orchestrate deploy -e db1,db2,db3,db4 --strategy rolling --batch-size 2`
 
 ### Canary Strategy
 - Deploy to small percentage first, then to rest
 - Use cases: High-risk deployments, testing in production with limited impact
 - Behavior: Deploys to specified percentage first, waits for verification
-- CLI: `reverie orchestrate deploy -e prod1,prod2,prod3,prod4,prod5 --strategy canary --canary-percent 20`
+- CLI: `surql orchestrate deploy -e prod1,prod2,prod3,prod4,prod5 --strategy canary --canary-percent 20`
 
 ### Strategy Comparison
 - Sequential: Slowest speed, highest safety, multi-stage deployments
@@ -2266,13 +2266,13 @@ def downgrade():
 
 ## Health Checking
 - Checks: Connectivity, authentication, migration table existence, database state
-- CLI validate: `reverie orchestrate validate`
-- CLI deploy: `reverie orchestrate deploy -e production --verify-health`
-- Programmatic: `from reverie.orchestration import HealthCheck; status = await HealthCheck().check_environment(env_config)`
+- CLI validate: `surql orchestrate validate`
+- CLI deploy: `surql orchestrate deploy -e production --verify-health`
+- Programmatic: `from surql.orchestration import HealthCheck; status = await HealthCheck().check_environment(env_config)`
 
 ## Best Practices
 - Use configuration files stored in version control
-- Always test with dry run: `reverie orchestrate deploy -e production --dry-run`
+- Always test with dry run: `surql orchestrate deploy -e production --dry-run`
 - Use environment priorities to control deployment order
 - Enable health checks in production
 - Secure sensitive credentials with environment variables
@@ -2290,13 +2290,13 @@ def downgrade():
 ## Core Concepts
 
 ### Schema Snapshot
-- Import: `from reverie.migration.versioning import SchemaSnapshot`
+- Import: `from surql.migration.versioning import SchemaSnapshot`
 - Captures complete database schema at specific version
 - Properties: `version`, `created_at`, `tables`, `edges`, `indexes`, `checksum`, `migration_count`
 - Create: `snapshot = await create_snapshot(client, version='20260109_120000', migration_count=5)`
 
 ### Rollback Plan
-- Import: `from reverie.migration.rollback import create_rollback_plan`
+- Import: `from surql.migration.rollback import create_rollback_plan`
 - Plan for safely rolling back to previous version
 - Create: `plan = await create_rollback_plan(client, migrations, target_version='20260108_120000')`
 - Properties: `from_version`, `to_version`, `migration_count`, `overall_safety`, `issues`, `requires_approval`
@@ -2343,7 +2343,7 @@ def downgrade():
 - Result properties: `success`, `rolled_back_count`, `actual_duration_ms`, `errors`
 
 ## Auto-Snapshots
-- Enable: `from reverie.migration.history import enable_auto_snapshots; enable_auto_snapshots()`
+- Enable: `from surql.migration.history import enable_auto_snapshots; enable_auto_snapshots()`
 - Disable: `disable_auto_snapshots()`
 - Behavior: Automatically creates snapshot after each successful migration
 - Benefits: No manual steps, complete history, easy rollback
@@ -2367,84 +2367,84 @@ def downgrade():
 
 ## Migration Commands
 
-### reverie migrate up
+### surql migrate up
 - Apply pending migrations to database
 - Options: `--directory PATH`, `--steps N`, `--dry-run`, `--verbose`
-- Example: `reverie migrate up --steps 3 --dry-run`
+- Example: `surql migrate up --steps 3 --dry-run`
 
-### reverie migrate down
+### surql migrate down
 - Rollback last applied migration(s)
 - Options: `--directory PATH`, `--steps N` (default: 1), `--dry-run`, `--yes`, `--verbose`
-- Example: `reverie migrate down --steps 2 --yes`
+- Example: `surql migrate down --steps 2 --yes`
 
-### reverie migrate status
+### surql migrate status
 - Show migration status (applied vs pending)
 - Options: `--directory PATH`, `--format FORMAT` (table/json/yaml), `--verbose`
-- Example: `reverie migrate status --format json`
+- Example: `surql migrate status --format json`
 
-### reverie migrate history
+### surql migrate history
 - Show applied migrations from database
 - Options: `--directory PATH`, `--format FORMAT` (table/json/yaml), `--verbose`
-- Example: `reverie migrate history`
+- Example: `surql migrate history`
 
-### reverie migrate create
+### surql migrate create
 - Create new migration file
-- Usage: `reverie migrate create "Description"`
+- Usage: `surql migrate create "Description"`
 - Options: `--directory PATH`, `--verbose`
-- Example: `reverie migrate create "Add indexes"`
+- Example: `surql migrate create "Add indexes"`
 
-### reverie migrate validate
+### surql migrate validate
 - Validate migration files for errors
 - Options: `--directory PATH`, `--verbose`
-- Example: `reverie migrate validate`
+- Example: `surql migrate validate`
 
-### reverie migrate generate
+### surql migrate generate
 - Generate migration from schema changes (auto-migration)
-- Usage: `reverie migrate generate "Description"`
+- Usage: `surql migrate generate "Description"`
 - Options: `--schema PATH`, `--directory PATH`, `--verbose`
 - Compares code schemas to database and generates migration
 
-### reverie migrate squash
+### surql migrate squash
 - Combine multiple migrations into one
 - Options: `--migrations PATH`, `--from VERSION`, `--to VERSION`, `--output FILE`, `--dry-run`, `--no-optimize`, `--keep-originals`, `--force`
-- Example: `reverie migrate squash --from 001 --to 010`
+- Example: `surql migrate squash --from 001 --to 010`
 
-### reverie migrate snapshot create
+### surql migrate snapshot create
 - Create schema snapshot at current version
 - Options: `--directory PATH`, `--verbose`
-- Example: `reverie migrate snapshot create`
+- Example: `surql migrate snapshot create`
 
-### reverie migrate snapshot list
+### surql migrate snapshot list
 - List all stored schema snapshots
 - Options: `--format FORMAT` (table/json), `--verbose`
-- Example: `reverie migrate snapshot list`
+- Example: `surql migrate snapshot list`
 
-### reverie migrate rollback plan
+### surql migrate rollback plan
 - Plan rollback to a target version
 - Options: `--to VERSION` (required), `--directory PATH`, `--verbose`
-- Example: `reverie migrate rollback plan --to 20260108_120000`
+- Example: `surql migrate rollback plan --to 20260108_120000`
 
-### reverie migrate rollback execute
+### surql migrate rollback execute
 - Execute rollback to a target version
 - Options: `--to VERSION` (required), `--directory PATH`, `--force`, `--verbose`
-- Example: `reverie migrate rollback execute --to 20260108_120000`
-- Force unsafe: `reverie migrate rollback execute --to 20260107_120000 --force`
+- Example: `surql migrate rollback execute --to 20260108_120000`
+- Force unsafe: `surql migrate rollback execute --to 20260107_120000 --force`
 
-### reverie migrate version show
+### surql migrate version show
 - Show current schema version
 - Options: `--directory PATH`, `--verbose`
-- Example: `reverie migrate version show`
+- Example: `surql migrate version show`
 
-### reverie migrate version compare
+### surql migrate version compare
 - Compare two schema versions
-- Usage: `reverie migrate version compare VERSION1 VERSION2`
-- Example: `reverie migrate version compare 20260108_120000 20260109_120000`
+- Usage: `surql migrate version compare VERSION1 VERSION2`
+- Example: `surql migrate version compare 20260108_120000 20260109_120000`
 
 ## Orchestration Commands
 
-### reverie orchestrate deploy
+### surql orchestrate deploy
 - Deploy migrations to multiple environments
-- Usage: `reverie orchestrate deploy -e ENVIRONMENTS [OPTIONS]`
+- Usage: `surql orchestrate deploy -e ENVIRONMENTS [OPTIONS]`
 - Options:
   * `--environments, -e`: Comma-separated environment names (required)
   * `--strategy`: Deployment strategy (sequential/parallel/rolling/canary, default: sequential)
@@ -2457,114 +2457,114 @@ def downgrade():
   * `--config`: Config file path (default: environments.json)
   * `--migrations-dir, -m`: Migrations directory (default: migrations)
 - Examples:
-  * Basic: `reverie orchestrate deploy -e staging,production`
-  * Rolling: `reverie orchestrate deploy -e db1,db2,db3,db4 --strategy rolling --batch-size 2`
-  * Canary: `reverie orchestrate deploy -e prod1,prod2,prod3 --strategy canary --canary-percent 33`
-  * Dry run: `reverie orchestrate deploy -e production --dry-run`
+  * Basic: `surql orchestrate deploy -e staging,production`
+  * Rolling: `surql orchestrate deploy -e db1,db2,db3,db4 --strategy rolling --batch-size 2`
+  * Canary: `surql orchestrate deploy -e prod1,prod2,prod3 --strategy canary --canary-percent 33`
+  * Dry run: `surql orchestrate deploy -e production --dry-run`
 
-### reverie orchestrate status
+### surql orchestrate status
 - Check deployment status of environments
-- Usage: `reverie orchestrate status -e ENVIRONMENTS [OPTIONS]`
+- Usage: `surql orchestrate status -e ENVIRONMENTS [OPTIONS]`
 - Options: `--environments, -e` (required), `--config`
-- Example: `reverie orchestrate status -e staging,production`
+- Example: `surql orchestrate status -e staging,production`
 
-### reverie orchestrate validate
+### surql orchestrate validate
 - Validate environment configuration and connectivity
-- Usage: `reverie orchestrate validate [OPTIONS]`
+- Usage: `surql orchestrate validate [OPTIONS]`
 - Options: `--config` (default: environments.json)
-- Example: `reverie orchestrate validate`
+- Example: `surql orchestrate validate`
 
 ## Schema Commands
 
-### reverie schema show
+### surql schema show
 - Display database or table schema
-- Usage: `reverie schema show [TABLE]`
-- Show all: `reverie schema show`
-- Show table: `reverie schema show user`
+- Usage: `surql schema show [TABLE]`
+- Show all: `surql schema show`
+- Show table: `surql schema show user`
 
-### reverie schema diff
+### surql schema diff
 - Show differences between code and database schemas
 - Options: `--schema PATH`, `--table TABLE`, `--format FORMAT`
-- Example: `reverie schema diff --table user`
+- Example: `surql schema diff --table user`
 
-### reverie schema generate
+### surql schema generate
 - Generate schema definitions from database
 - Options: `--output PATH`, `--tables TABLE1,TABLE2`
-- Example: `reverie schema generate --output schemas/`
+- Example: `surql schema generate --output schemas/`
 
-### reverie schema tables
+### surql schema tables
 - List all tables in database
 - Options: `--format FORMAT` (table/json/yaml)
-- Example: `reverie schema tables --format json`
+- Example: `surql schema tables --format json`
 
-### reverie schema inspect
+### surql schema inspect
 - Inspect specific table schema
-- Usage: `reverie schema inspect TABLE`
-- Example: `reverie schema inspect user`
+- Usage: `surql schema inspect TABLE`
+- Example: `surql schema inspect user`
 
-### reverie schema export
+### surql schema export
 - Export schema to file
 - Options: `--output FILE`, `--format FORMAT` (surql/json)
-- Example: `reverie schema export --output schema.surql`
+- Example: `surql schema export --output schema.surql`
 
-### reverie schema validate
+### surql schema validate
 - Validate code schemas against database
 - Options: `--schema PATH`, `--format FORMAT`, `--fail-on-error`
-- Example: `reverie schema validate --fail-on-error`
+- Example: `surql schema validate --fail-on-error`
 
-### reverie schema check
+### surql schema check
 - Check for schema drift (for CI/CD)
 - Options: `--schema PATH`, `--migrations PATH`, `--fail-on-drift`, `--show-diff`, `--format FORMAT`
-- Example: `reverie schema check --fail-on-drift`
+- Example: `surql schema check --fail-on-drift`
 
-### reverie schema hook-config
+### surql schema hook-config
 - Generate Git pre-commit hook configuration
 - Options: `--schema PATH`, `--migrations PATH`, `--output FILE`
-- Example: `reverie schema hook-config --output .pre-commit-config.yaml`
+- Example: `surql schema hook-config --output .pre-commit-config.yaml`
 
-### reverie schema watch
+### surql schema watch
 - Watch schema files and detect changes
 - Options: `--schema PATH`, `--migrations  PATH`, `--debounce SECONDS`, `--auto-generate`, `--no-prompt`
-- Example: `reverie schema watch --schema myapp/schemas --auto-generate`
+- Example: `surql schema watch --schema myapp/schemas --auto-generate`
 
-### reverie schema visualize
+### surql schema visualize
 - Generate visual diagram of schema
 - Options: `--schema PATH`, `--format FORMAT` (mermaid/graphviz/ascii), `--output FILE`, `--no-fields`, `--no-edges`, `--tables TABLE1,TABLE2`
-- Example: `reverie schema visualize --format mermaid --output schema.mmd`
+- Example: `surql schema visualize --format mermaid --output schema.mmd`
 
 ## Database Commands
 
-### reverie db init
+### surql db init
 - Initialize database with required tables
 - Options: `--drop-existing`
-- Example: `reverie db init`
+- Example: `surql db init`
 
-### reverie db ping
+### surql db ping
 - Check database connection
-- Usage: `reverie db ping`
+- Usage: `surql db ping`
 - Returns connection status
 
-### reverie db info
+### surql db info
 - Show database information
-- Usage: `reverie db info`
+- Usage: `surql db info`
 - Shows connection details and statistics
 
-### reverie db reset
+### surql db reset
 - Reset database (drop all tables)
 - Options: `--yes` (skip confirmation)
-- Example: `reverie db reset --yes`
+- Example: `surql db reset --yes`
 - WARNING: Destructive operation
 
-### reverie db query
+### surql db query
 - Execute raw SurrealQL query
-- Usage: `reverie db query "SELECT * FROM user"`
+- Usage: `surql db query "SELECT * FROM user"`
 - Options: `--format FORMAT` (table/json/yaml)
-- Example: `reverie db query "SELECT count() FROM user"`
+- Example: `surql db query "SELECT count() FROM user"`
 
-### reverie db version
+### surql db version
 - Show SurrealDB server version
-- Usage: `reverie db version`
-- Example: `reverie db version`
+- Usage: `surql db version`
+- Example: `surql db version`
 
 ## Output Formats
 - `table`: Human-readable table (default)
@@ -2685,7 +2685,7 @@ def downgrade():
 - Test squashed migrations thoroughly
 
 ### Schema Drift Detection
-- Use `reverie schema check` in CI/CD
+- Use `surql schema check` in CI/CD
 - Add pre-commit hooks for drift detection
 - Watch schema files during development
 - Regularly validate schemas
@@ -2721,13 +2721,13 @@ def downgrade():
 # Architecture
 
 ## Project Structure
-- `src/reverie/schema/`: Schema definition layer with `fields.py`, `table.py`, `edge.py`, `validator.py`, `visualize.py`, `utils.py`
-- `src/reverie/migration/`: Migration system with `generator.py`, `executor.py`, `discovery.py`, `history.py`, `diff.py`, `squash.py`, `hooks.py`, `watcher.py`
-- `src/reverie/query/`: Query builder and ORM with `builder.py`, `crud.py`, `executor.py`, `graph.py`, `batch.py`, `results.py`, `expressions.py`
-- `src/reverie/connection/`: Database connection with `client.py`, `config.py`, `context.py`, `registry.py`, `auth.py`, `streaming.py`, `transaction.py`
-- `src/reverie/cache/`: Caching system with `backends.py`, `config.py`, `decorator.py`, `manager.py`
-- `src/reverie/types/`: Type definitions with `record_id.py`, `operators.py`
-- `src/reverie/cli/`: CLI commands with `migrate.py`, `schema.py`, `db.py`, `common.py`
+- `src/surql/schema/`: Schema definition layer with `fields.py`, `table.py`, `edge.py`, `validator.py`, `visualize.py`, `utils.py`
+- `src/surql/migration/`: Migration system with `generator.py`, `executor.py`, `discovery.py`, `history.py`, `diff.py`, `squash.py`, `hooks.py`, `watcher.py`
+- `src/surql/query/`: Query builder and ORM with `builder.py`, `crud.py`, `executor.py`, `graph.py`, `batch.py`, `results.py`, `expressions.py`
+- `src/surql/connection/`: Database connection with `client.py`, `config.py`, `context.py`, `registry.py`, `auth.py`, `streaming.py`, `transaction.py`
+- `src/surql/cache/`: Caching system with `backends.py`, `config.py`, `decorator.py`, `manager.py`
+- `src/surql/types/`: Type definitions with `record_id.py`, `operators.py`
+- `src/surql/cli/`: CLI commands with `migrate.py`, `schema.py`, `db.py`, `common.py`
 - `tests/`: Test suite with unit and integration tests
 - `docs/`: Documentation with guides and examples
 - `migrations/`: User migration files (created by user)
@@ -2803,7 +2803,7 @@ def downgrade():
 ### src.connection.config
 - Connection configuration
 - Exports: `ConnectionConfig`, `NamedConnectionConfig` Pydantic settings classes
-- Environment variable loading with `DB_` and `REVERIE_` prefixes
+- Environment variable loading with `DB_` and `SURQL_` prefixes
 
 ### src.connection.registry
 - Named connection management

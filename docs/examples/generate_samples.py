@@ -6,10 +6,10 @@ in all three formats with different themes.
 
 from pathlib import Path
 
-from reverie.schema.edge import edge_schema
-from reverie.schema.fields import datetime_field, record_field, string_field
-from reverie.schema.table import table_schema
-from reverie.schema.visualize import OutputFormat, visualize_schema
+from surql.schema.edge import edge_schema
+from surql.schema.fields import datetime_field, record_field, string_field
+from surql.schema.table import table_schema
+from surql.schema.visualize import OutputFormat, visualize_schema
 
 # Define a simple blog schema
 user_table = table_schema(

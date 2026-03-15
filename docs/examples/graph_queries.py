@@ -12,9 +12,9 @@ import asyncio
 
 from pydantic import BaseModel, EmailStr
 
-from reverie.connection.client import get_client
-from reverie.connection.config import ConnectionConfig
-from reverie.query.crud import create_record
+from surql.connection.client import get_client
+from surql.connection.config import ConnectionConfig
+from surql.query.crud import create_record
 
 # Database configuration
 config = ConnectionConfig(
@@ -329,7 +329,7 @@ async def main():
 
 
 if __name__ == '__main__':
-  print('reverie Graph Queries Example')
+  print('surql Graph Queries Example')
   print('=' * 60)
   print()
 

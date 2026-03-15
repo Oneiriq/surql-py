@@ -10,7 +10,7 @@ MTREE indexes are used for:
 - claim.embedding (1024 dimensions, COSINE)
 """
 
-from reverie.schema import (
+from surql.schema import (
   MTreeDistanceType,
   MTreeVectorType,
   array_field,
@@ -205,7 +205,7 @@ WHERE embedding <|1024,COSINE,{similarity_threshold}|> $embedding
 ORDER BY similarity DESC
 LIMIT 10;
 
-Note: Vector search query helpers are not yet implemented in Reverie.
+Note: Vector search query helpers are not yet implemented in surql.
 Use the query() method directly for vector similarity searches.
 """
 

@@ -7,16 +7,16 @@ including creating snapshots, planning rollbacks, and executing safe rollbacks.
 import asyncio
 from pathlib import Path
 
-from reverie.connection.client import get_client
-from reverie.connection.config import ConnectionConfig
-from reverie.migration.discovery import discover_migrations
-from reverie.migration.history import enable_auto_snapshots, get_applied_migrations
-from reverie.migration.rollback import (
+from surql.connection.client import get_client
+from surql.connection.config import ConnectionConfig
+from surql.migration.discovery import discover_migrations
+from surql.migration.history import enable_auto_snapshots, get_applied_migrations
+from surql.migration.rollback import (
   RollbackSafety,
   create_rollback_plan,
   execute_rollback,
 )
-from reverie.migration.versioning import (
+from surql.migration.versioning import (
   VersionGraph,
   compare_snapshots,
   create_snapshot,
@@ -303,7 +303,7 @@ async def example_auto_snapshots() -> None:
   print('All future migrations will create snapshots automatically')
 
   # You can disable it later
-  from reverie.migration.history import disable_auto_snapshots
+  from surql.migration.history import disable_auto_snapshots
 
   disable_auto_snapshots()
   print('Automatic snapshots disabled')

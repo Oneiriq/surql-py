@@ -1,4 +1,4 @@
-"""Basic usage example for reverie ORM.
+"""Basic usage example for surql ORM.
 
 This example demonstrates:
 - Connecting to SurrealDB
@@ -12,9 +12,9 @@ import asyncio
 
 from pydantic import BaseModel, EmailStr, Field
 
-from reverie.connection.client import get_client
-from reverie.connection.config import ConnectionConfig
-from reverie.query.crud import (
+from surql.connection.client import get_client
+from surql.connection.config import ConnectionConfig
+from surql.query.crud import (
   count_records,
   create_record,
   delete_record,
@@ -181,7 +181,7 @@ async def main() -> None:
 
 
 if __name__ == '__main__':
-  print('reverie Basic Usage Example')
+  print('surql Basic Usage Example')
   print('=' * 40)
   print()
 

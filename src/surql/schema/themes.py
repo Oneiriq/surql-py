@@ -1,6 +1,6 @@
 """Theme system for schema visualization.
 
-This module provides a comprehensive theming system for Reverie's schema visualization
+This module provides a comprehensive theming system for surql's schema visualization
 outputs, supporting GraphViz, Mermaid, and ASCII formats with multiple preset themes
 and customization options.
 """

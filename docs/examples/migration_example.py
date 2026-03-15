@@ -1,4 +1,4 @@
-"""Migration workflow example for reverie.
+"""Migration workflow example for surql.
 
 This example demonstrates:
 - Creating migration files programmatically
@@ -11,16 +11,16 @@ import asyncio
 from datetime import datetime
 from pathlib import Path
 
-from reverie.connection.client import get_client
-from reverie.connection.config import ConnectionConfig
-from reverie.migration.discovery import discover_migrations
-from reverie.migration.executor import (
+from surql.connection.client import get_client
+from surql.connection.config import ConnectionConfig
+from surql.migration.discovery import discover_migrations
+from surql.migration.executor import (
   create_migration_plan,
   execute_migration_plan,
   get_migration_status,
 )
-from reverie.migration.history import ensure_migration_table, get_applied_migrations
-from reverie.migration.models import MigrationDirection
+from surql.migration.history import ensure_migration_table, get_applied_migrations
+from surql.migration.models import MigrationDirection
 
 # Database configuration
 config = ConnectionConfig(
@@ -64,7 +64,7 @@ def down() -> list[str]:
 metadata = {{
   'version': '{version}',
   'description': 'Create user table',
-  'author': 'reverie',
+  'author': 'surql',
   'depends_on': [],
 }}
 '''
@@ -101,7 +101,7 @@ def down() -> list[str]:
 metadata = {{
   'version': '{version}',
   'description': 'Create post table',
-  'author': 'reverie',
+  'author': 'surql',
   'depends_on': [],
 }}
 '''
@@ -225,7 +225,7 @@ async def main():
 
 
 if __name__ == '__main__':
-  print('reverie Migration Workflow Example')
+  print('surql Migration Workflow Example')
   print('=' * 60)
   print()
 

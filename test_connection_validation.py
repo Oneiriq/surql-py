@@ -15,8 +15,8 @@ import asyncio
 import sys
 from typing import Any
 
-from reverie.connection.client import ConnectionError, DatabaseClient, QueryError
-from reverie.settings import get_db_config
+from surql.connection.client import ConnectionError, DatabaseClient, QueryError
+from surql.settings import get_db_config
 
 
 def print_header(text: str) -> None:

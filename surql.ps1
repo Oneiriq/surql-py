@@ -2,25 +2,25 @@
 
 <#
 .SYNOPSIS
-  Reverie PowerShell Development Helper Functions
+  Surql PowerShell Development Helper Functions
 .DESCRIPTION
-  This script provides convenient wrapper functions for common Reverie development tasks.
+  This script provides convenient wrapper functions for common Surql development tasks.
   Simply dot-source this file in your PowerShell session to load all functions.
 
-  Usage: . .\reverie.ps1
+  Usage: . .\surql.ps1
 
   All functions follow PowerShell best practices with proper Verb-Noun naming,
   CmdletBinding, parameter validation, and comprehensive help documentation.
 .NOTES
   Author: Shon Thomas
-  Project: Reverie
+  Project: Surql
   Python: 3.12 (Windows)
   Package Manager: uv
 #>
 
 #region Helper Functions
 
-function Write-ReverieMessage {
+function Write-SurqlMessage {
     <#
   .SYNOPSIS
     Writes a formatted message to the console with color coding.
@@ -32,16 +32,16 @@ function Write-ReverieMessage {
   .PARAMETER Type
     The type of message: Info, Success, Warning, or Error. Defaults to Info.
   .EXAMPLE
-    Write-ReverieMessage -Message 'Starting database...' -Type 'Info'
+    Write-SurqlMessage -Message 'Starting database...' -Type 'Info'
     Displays an informational message.
   .EXAMPLE
-    Write-ReverieMessage -Message 'Database started successfully' -Type 'Success'
+    Write-SurqlMessage -Message 'Database started successfully' -Type 'Success'
     Displays a success message.
   .EXAMPLE
-    Write-ReverieMessage -Message 'Linting found issues' -Type 'Warning'
+    Write-SurqlMessage -Message 'Linting found issues' -Type 'Warning'
     Displays a warning message.
   .EXAMPLE
-    Write-ReverieMessage -Message 'Command failed' -Type 'Error'
+    Write-SurqlMessage -Message 'Command failed' -Type 'Error'
     Displays an error message.
   #>
     [CmdletBinding()]
@@ -70,10 +70,10 @@ function Write-ReverieMessage {
 
   Write-Host "$prefix $Message" -ForegroundColor $colors[$Type]
 }
-Set-Alias -Name rvms -Value Write-ReverieMessage
+Set-Alias -Name sqms -Value Write-SurqlMessage
 
 
-function Invoke-ReverieCommand {
+function Invoke-SurqlCommand {
   <#
   .SYNOPSIS
     Executes a shell command with error handling.
@@ -89,10 +89,10 @@ function Invoke-ReverieCommand {
   .PARAMETER PassThru
     If specified, the function will not throw an exception on command failure.
   .EXAMPLE
-    Invoke-ReverieCommand -Command 'uv run ruff check .' -Description 'Running linter'
+    Invoke-SurqlCommand -Command 'uv run ruff check .' -Description 'Running linter'
     Executes the ruff linter command with a description.
   .EXAMPLE
-    Invoke-ReverieCommand -Command 'uv run pytest' -PassThru
+    Invoke-SurqlCommand -Command 'uv run pytest' -PassThru
     Executes the pytest command and does not throw on failure.
   #>
   [CmdletBinding()]
@@ -108,7 +108,7 @@ function Invoke-ReverieCommand {
   )
 
   if ($Description) {
-    Write-ReverieMessage -Message $Description -Type 'Info'
+    Write-SurqlMessage -Message $Description -Type 'Info'
   }
 
   Write-Verbose "Executing: $Command"
@@ -117,7 +117,7 @@ function Invoke-ReverieCommand {
   $exitCode = $LASTEXITCODE
 
   if ($exitCode -ne 0 -and $null -ne $exitCode) {
-    Write-ReverieMessage -Message "Command failed with exit code $exitCode" -Type 'Error'
+    Write-SurqlMessage -Message "Command failed with exit code $exitCode" -Type 'Error'
     if (-not $PassThru) {
       throw "Command failed: $Command"
     }
@@ -125,31 +125,31 @@ function Invoke-ReverieCommand {
 
   return $result
 }
-Set-Alias -Name rvcmd -Value Invoke-ReverieCommand
+Set-Alias -Name sqcmd -Value Invoke-SurqlCommand
 
 #endregion
 
 #region Project Management
 
-function Remove-ReverieArtifacts {
+function Remove-SurqlArtifacts {
   <#
   .SYNOPSIS
-    Removes Reverie project build artifacts and caches.
+    Removes Surql project build artifacts and caches.
   .DESCRIPTION
     Removes Python cache files, build artifacts, test caches, and other temporary files
     generated during development and testing.
   .EXAMPLE
-    Remove-ReverieArtifacts
+    Remove-SurqlArtifacts
     Removes all build artifacts and cache files from the project.
   .EXAMPLE
-    rvrm
+    sqrm
     Uses the alias to quickly clean the project.
   #>
   [CmdletBinding(SupportsShouldProcess)]
   param()
 
-  if ($PSCmdlet.ShouldProcess('Reverie project', 'Remove build artifacts and caches')) {
-    Write-ReverieMessage -Message 'Removing Reverie project artifacts...' -Type 'Info'
+  if ($PSCmdlet.ShouldProcess('Surql project', 'Remove build artifacts and caches')) {
+    Write-SurqlMessage -Message 'Removing Surql project artifacts...' -Type 'Info'
 
     $itemsToRemove = @(
       '__pycache__',
@@ -173,7 +173,7 @@ function Remove-ReverieArtifacts {
     foreach ($item in $itemsToRemove) {
       $currentItem++
       $percentComplete = ($currentItem / $totalItems) * 100
-      Write-Progress -Activity 'Removing Reverie Artifacts' -Status "Removing $item" -PercentComplete $percentComplete
+      Write-Progress -Activity 'Removing Surql Artifacts' -Status "Removing $item" -PercentComplete $percentComplete
 
       Get-ChildItem -Path . -Filter $item -Recurse -Force -ErrorAction SilentlyContinue |
       ForEach-Object {
@@ -182,16 +182,16 @@ function Remove-ReverieArtifacts {
       }
     }
 
-    Write-Progress -Activity 'Removing Reverie Artifacts' -Completed
-    Write-ReverieMessage -Message 'Project cleaned successfully' -Type 'Success'
+    Write-Progress -Activity 'Removing Surql Artifacts' -Completed
+    Write-SurqlMessage -Message 'Project cleaned successfully' -Type 'Success'
   }
 }
-Set-Alias -Name rvrm -Value Remove-ReverieArtifacts
+Set-Alias -Name sqrm -Value Remove-SurqlArtifacts
 
-function Install-ReverieDependencies {
+function Install-SurqlDependencies {
   <#
   .SYNOPSIS
-    Installs Reverie project dependencies using uv.
+    Installs Surql project dependencies using uv.
   .DESCRIPTION
     Synchronizes and installs all project dependencies and development dependencies
     using the uv package manager. This ensures the virtual environment matches
@@ -199,10 +199,10 @@ function Install-ReverieDependencies {
   .PARAMETER DevOnly
     Install only development dependencies.
   .EXAMPLE
-    Install-ReverieDependencies
+    Install-SurqlDependencies
     Installs all project dependencies.
   .EXAMPLE
-    rvinst
+    sqinst
     Uses the alias to quickly install dependencies.
   #>
   [CmdletBinding()]
@@ -211,37 +211,37 @@ function Install-ReverieDependencies {
     [switch]$DevOnly
   )
 
-  Write-ReverieMessage -Message 'Installing Reverie project dependencies...' -Type 'Info'
+  Write-SurqlMessage -Message 'Installing Surql project dependencies...' -Type 'Info'
 
   if ($DevOnly) {
-    Invoke-ReverieCommand -Command 'uv sync --only-dev' -Description 'Syncing development dependencies only'
+    Invoke-SurqlCommand -Command 'uv sync --only-dev' -Description 'Syncing development dependencies only'
   }
   else {
-    Invoke-ReverieCommand -Command 'uv sync' -Description 'Syncing all dependencies'
+    Invoke-SurqlCommand -Command 'uv sync' -Description 'Syncing all dependencies'
   }
 
-  Write-ReverieMessage -Message 'Dependencies installed successfully' -Type 'Success'
+  Write-SurqlMessage -Message 'Dependencies installed successfully' -Type 'Success'
 }
-Set-Alias -Name rvinst -Value Install-ReverieDependencies
+Set-Alias -Name sqinst -Value Install-SurqlDependencies
 
 #endregion
 
 #region Database Management
 
-function Initialize-ReverieDatabase {
+function Initialize-SurqlDatabase {
   <#
   .SYNOPSIS
-      Initializes the Reverie SurrealDB database.
+      Initializes the Surql SurrealDB database.
   .DESCRIPTION
       Runs the database initialization script to set up the SurrealDB schema
       and prepare the database for use. Requires SurrealDB to be running.
   .PARAMETER Force
       Force re-initialization even if database already exists.
   .EXAMPLE
-      Initialize-ReverieDatabase
+      Initialize-SurqlDatabase
       Initializes the database with default schema.
   .EXAMPLE
-      rvinit
+      sqinit
       Uses the alias to quickly initialize the database.
   #>
   [CmdletBinding(SupportsShouldProcess)]
@@ -251,35 +251,35 @@ function Initialize-ReverieDatabase {
   )
 
   if ($PSCmdlet.ShouldProcess('SurrealDB database', 'Initialize schema')) {
-    Write-ReverieMessage -Message 'Initializing Reverie database...' -Type 'Info'
+    Write-SurqlMessage -Message 'Initializing Surql database...' -Type 'Info'
 
     $initScript = Join-Path $PSScriptRoot 'scripts' 'init_db.py'
 
     if (-not (Test-Path $initScript)) {
-      Write-ReverieMessage -Message "Init script not found: $initScript" -Type 'Error'
+      Write-SurqlMessage -Message "Init script not found: $initScript" -Type 'Error'
       throw "Database initialization script not found"
     }
 
     $command = "uv run python `"$initScript`""
-    Invoke-ReverieCommand -Command $command -Description 'Running database initialization script'
+    Invoke-SurqlCommand -Command $command -Description 'Running database initialization script'
 
-    Write-ReverieMessage -Message 'Database initialized successfully' -Type 'Success'
+    Write-SurqlMessage -Message 'Database initialized successfully' -Type 'Success'
   }
 }
-Set-Alias -Name rvinit -Value Initialize-ReverieDatabase
+Set-Alias -Name sqinit -Value Initialize-SurqlDatabase
 
-function Invoke-ReverieMigration {
+function Invoke-SurqlMigration {
   <#
   .SYNOPSIS
-    Runs Reverie database migrations.
+    Runs Surql database migrations.
   .DESCRIPTION
     Applies pending database schema migrations to SurrealDB. This ensures
     the database schema is up to date with the latest application requirements.
   .EXAMPLE
-    Invoke-ReverieMigration
+    Invoke-SurqlMigration
     Runs all pending migrations.
   .EXAMPLE
-    rvmig
+    sqmig
     Uses the alias to quickly run migrations.
   .NOTES
     Migration scripts are expected to be in the scripts/ directory.
@@ -289,34 +289,34 @@ function Invoke-ReverieMigration {
   param()
 
   if ($PSCmdlet.ShouldProcess('SurrealDB database', 'Apply migrations')) {
-    Write-ReverieMessage -Message 'Running database migrations...' -Type 'Info'
+    Write-SurqlMessage -Message 'Running database migrations...' -Type 'Info'
 
     # For now, migrations are handled through schema re-initialization
     # In the future, dedicated migration scripts would go here
-    Initialize-ReverieDatabase -Force
+    Initialize-SurqlDatabase -Force
 
-    Write-ReverieMessage -Message 'Migrations completed successfully' -Type 'Success'
+    Write-SurqlMessage -Message 'Migrations completed successfully' -Type 'Success'
   }
 }
-Set-Alias -Name rvmig -Value Invoke-ReverieMigration
+Set-Alias -Name sqmig -Value Invoke-SurqlMigration
 
-function Start-ReverieDatabase {
+function Start-SurqlDatabase {
   <#
   .SYNOPSIS
-    Starts the Reverie SurrealDB database via Docker Compose.
+    Starts the Surql SurrealDB database via Docker Compose.
   .DESCRIPTION
     Starts the SurrealDB database container using docker-compose.
     This is required before running the application or tests.
   .PARAMETER Detached
     Run containers in detached mode (background).
   .EXAMPLE
-    Start-ReverieDatabase
+    Start-SurqlDatabase
     Starts the database in the foreground.
   .EXAMPLE
-    Start-ReverieDatabase -Detached
+    Start-SurqlDatabase -Detached
     Starts the database in the background.
   .EXAMPLE
-    rvstart -Detached
+    sqstart -Detached
     Uses the alias to start the database in the background.
   #>
   [CmdletBinding()]
@@ -325,12 +325,12 @@ function Start-ReverieDatabase {
     [switch]$Detached
   )
 
-  Write-ReverieMessage -Message 'Starting Reverie database...' -Type 'Info'
+  Write-SurqlMessage -Message 'Starting Surql database...' -Type 'Info'
 
   $composeFile = Join-Path $PSScriptRoot 'docker-compose.yml'
 
   if (-not (Test-Path $composeFile)) {
-    Write-ReverieMessage -Message "Docker Compose file not found: $composeFile" -Type 'Error'
+    Write-SurqlMessage -Message "Docker Compose file not found: $composeFile" -Type 'Error'
     throw "docker-compose.yml not found"
   }
 
@@ -341,103 +341,103 @@ function Start-ReverieDatabase {
     "docker-compose up"
   }
 
-  Invoke-ReverieCommand -Command $command -Description 'Starting database containers'
+  Invoke-SurqlCommand -Command $command -Description 'Starting database containers'
 
   if ($Detached) {
-    Write-ReverieMessage -Message 'Database started in background' -Type 'Success'
+    Write-SurqlMessage -Message 'Database started in background' -Type 'Success'
   }
 }
-Set-Alias -Name rvstart -Value Start-ReverieDatabase
+Set-Alias -Name sqstart -Value Start-SurqlDatabase
 
-function Stop-ReverieDatabase {
+function Stop-SurqlDatabase {
   <#
   .SYNOPSIS
-    Stops the Reverie SurrealDB database containers.
+    Stops the Surql SurrealDB database containers.
   .DESCRIPTION
     Stops and removes the SurrealDB database containers started via Docker Compose.
   .EXAMPLE
-    Stop-ReverieDatabase
+    Stop-SurqlDatabase
     Stops the database containers.
   .EXAMPLE
-    rvstop
+    sqstop
     Uses the alias to quickly stop the database.
   #>
   [CmdletBinding(SupportsShouldProcess)]
   param()
 
   if ($PSCmdlet.ShouldProcess('Database containers', 'Stop')) {
-    Write-ReverieMessage -Message 'Stopping Reverie database...' -Type 'Info'
+    Write-SurqlMessage -Message 'Stopping Surql database...' -Type 'Info'
 
-    Invoke-ReverieCommand -Command 'docker-compose down' -Description 'Stopping database containers'
+    Invoke-SurqlCommand -Command 'docker-compose down' -Description 'Stopping database containers'
 
-    Write-ReverieMessage -Message 'Database stopped successfully' -Type 'Success'
+    Write-SurqlMessage -Message 'Database stopped successfully' -Type 'Success'
   }
 }
-Set-Alias -Name rvstop -Value Stop-ReverieDatabase
+Set-Alias -Name sqstop -Value Stop-SurqlDatabase
 
 #endregion
 
 #region CLI Commands
 
-function Test-ReverieConnection {
+function Test-SurqlConnection {
   <#
   .SYNOPSIS
-    Tests the database connection using reverie CLI.
+    Tests the database connection using surql CLI.
   .DESCRIPTION
-    Executes 'reverie db ping' to verify database connectivity.
+    Executes 'surql db ping' to verify database connectivity.
     This is the first step in UAT to confirm SurrealDB is accessible.
   .EXAMPLE
-    Test-ReverieConnection
+    Test-SurqlConnection
     Tests the database connection.
   .EXAMPLE
-    rvping
+    sqping
     Uses the alias to quickly test connection.
   #>
   [CmdletBinding()]
   param()
 
-  Write-ReverieMessage -Message 'Testing database connection...' -Type 'Info'
+  Write-SurqlMessage -Message 'Testing database connection...' -Type 'Info'
 
-  Invoke-ReverieCommand -Command 'uv run reverie db ping' -PassThru
+  Invoke-SurqlCommand -Command 'uv run surql db ping' -PassThru
 
   if ($LASTEXITCODE -eq 0) {
-    Write-ReverieMessage -Message 'Database connection successful' -Type 'Success'
+    Write-SurqlMessage -Message 'Database connection successful' -Type 'Success'
   }
   else {
-    Write-ReverieMessage -Message 'Database connection failed' -Type 'Error'
+    Write-SurqlMessage -Message 'Database connection failed' -Type 'Error'
   }
 }
-Set-Alias -Name rvping -Value Test-ReverieConnection
+Set-Alias -Name sqping -Value Test-SurqlConnection
 
-function Get-ReverieDatabaseInfo {
+function Get-SurqlDatabaseInfo {
   <#
   .SYNOPSIS
-    Shows database information using reverie CLI.
+    Shows database information using surql CLI.
   .DESCRIPTION
-    Executes 'reverie db info' to display database details including
+    Executes 'surql db info' to display database details including
     connection info, tables, and migration count.
   .EXAMPLE
-    Get-ReverieDatabaseInfo
+    Get-SurqlDatabaseInfo
     Shows database information.
   .EXAMPLE
-    rvdbinfo
+    sqdbinfo
     Uses the alias to quickly show database info.
   #>
   [CmdletBinding()]
   param()
 
-  Write-ReverieMessage -Message 'Fetching database information...' -Type 'Info'
+  Write-SurqlMessage -Message 'Fetching database information...' -Type 'Info'
 
-  Invoke-ReverieCommand -Command 'uv run reverie db info' -PassThru
+  Invoke-SurqlCommand -Command 'uv run surql db info' -PassThru
 }
-Set-Alias -Name rvdbinfo -Value Get-ReverieDatabaseInfo
+Set-Alias -Name sqdbinfo -Value Get-SurqlDatabaseInfo
 
-function New-ReverieMigration {
+function New-SurqlMigration {
   <#
   .SYNOPSIS
-    Creates a new migration file using reverie CLI.
+    Creates a new migration file using surql CLI.
   .DESCRIPTION
-    Executes 'reverie migrate create' to generate a new migration file
+    Executes 'surql migrate create' to generate a new migration file
     with the specified description. The file is created in the migrations
     directory with a timestamp-based filename.
   .PARAMETER Description
@@ -445,10 +445,10 @@ function New-ReverieMigration {
   .PARAMETER Directory
     The migrations directory path. Defaults to 'migrations'.
   .EXAMPLE
-    New-ReverieMigration -Description "Create user table"
+    New-SurqlMigration -Description "Create user table"
     Creates a new migration file for creating the user table.
   .EXAMPLE
-    rvmigcreate "Add post table" -Directory uat_migrations
+    sqmigcreate "Add post table" -Directory uat_migrations
     Uses the alias with a custom directory.
   #>
   [CmdletBinding()]
@@ -460,39 +460,39 @@ function New-ReverieMigration {
     [string]$Directory = 'migrations'
   )
 
-  Write-ReverieMessage -Message "Creating migration: $Description" -Type 'Info'
+  Write-SurqlMessage -Message "Creating migration: $Description" -Type 'Info'
 
-  $command = "uv run reverie migrate create `"$Description`" --directory `"$Directory`""
-  Invoke-ReverieCommand -Command $command -PassThru
+  $command = "uv run surql migrate create `"$Description`" --directory `"$Directory`""
+  Invoke-SurqlCommand -Command $command -PassThru
 
   if ($LASTEXITCODE -eq 0) {
-    Write-ReverieMessage -Message 'Migration file created successfully' -Type 'Success'
+    Write-SurqlMessage -Message 'Migration file created successfully' -Type 'Success'
   }
   else {
-    Write-ReverieMessage -Message 'Failed to create migration file' -Type 'Error'
+    Write-SurqlMessage -Message 'Failed to create migration file' -Type 'Error'
   }
 }
-Set-Alias -Name rvmigcreate -Value New-ReverieMigration
+Set-Alias -Name sqmigcreate -Value New-SurqlMigration
 
-function Get-ReverieMigrationStatus {
+function Get-SurqlMigrationStatus {
   <#
   .SYNOPSIS
-    Shows migration status using reverie CLI.
+    Shows migration status using surql CLI.
   .DESCRIPTION
-    Executes 'reverie migrate status' to display which migrations have
+    Executes 'surql migrate status' to display which migrations have
     been applied and which are pending.
   .PARAMETER Directory
     The migrations directory path. Defaults to 'migrations'.
   .PARAMETER Format
     Output format: table, json, or yaml. Defaults to 'table'.
   .EXAMPLE
-    Get-ReverieMigrationStatus
+    Get-SurqlMigrationStatus
     Shows migration status in table format.
   .EXAMPLE
-    rvmigstatus -Format json
+    sqmigstatus -Format json
     Shows migration status in JSON format.
   .EXAMPLE
-    rvmigstatus -Directory uat_migrations
+    sqmigstatus -Directory uat_migrations
     Shows status for migrations in custom directory.
   #>
   [CmdletBinding()]
@@ -505,19 +505,19 @@ function Get-ReverieMigrationStatus {
     [string]$Format = 'table'
   )
 
-  Write-ReverieMessage -Message 'Checking migration status...' -Type 'Info'
+  Write-SurqlMessage -Message 'Checking migration status...' -Type 'Info'
 
-  $command = "uv run reverie migrate status --directory `"$Directory`" --format $Format"
-  Invoke-ReverieCommand -Command $command -PassThru
+  $command = "uv run surql migrate status --directory `"$Directory`" --format $Format"
+  Invoke-SurqlCommand -Command $command -PassThru
 }
-Set-Alias -Name rvmigstatus -Value Get-ReverieMigrationStatus
+Set-Alias -Name sqmigstatus -Value Get-SurqlMigrationStatus
 
-function Invoke-ReverieMigrationUp {
+function Invoke-SurqlMigrationUp {
   <#
   .SYNOPSIS
-    Applies pending migrations using reverie CLI.
+    Applies pending migrations using surql CLI.
   .DESCRIPTION
-    Executes 'reverie migrate up' to apply pending migrations to the database.
+    Executes 'surql migrate up' to apply pending migrations to the database.
     Can optionally perform a dry run to preview changes without applying them.
   .PARAMETER Directory
     The migrations directory path. Defaults to 'migrations'.
@@ -526,13 +526,13 @@ function Invoke-ReverieMigrationUp {
   .PARAMETER DryRun
     Preview changes without applying them.
   .EXAMPLE
-    Invoke-ReverieMigrationUp
+    Invoke-SurqlMigrationUp
     Applies all pending migrations.
   .EXAMPLE
-    rvmigup -DryRun
+    sqmigup -DryRun
     Previews migrations without applying.
   .EXAMPLE
-    rvmigup -Steps 1 -Directory uat_migrations
+    sqmigup -Steps 1 -Directory uat_migrations
     Applies only the next pending migration from custom directory.
   #>
   [CmdletBinding(SupportsShouldProcess)]
@@ -551,9 +551,9 @@ function Invoke-ReverieMigrationUp {
 
   if ($DryRun -or $PSCmdlet.ShouldProcess('Database', $action)) {
     $message = if ($DryRun) { 'Previewing migrations (dry run)...' } else { 'Applying migrations...' }
-    Write-ReverieMessage -Message $message -Type 'Info'
+    Write-SurqlMessage -Message $message -Type 'Info'
 
-    $command = "uv run reverie migrate up --directory `"$Directory`""
+    $command = "uv run surql migrate up --directory `"$Directory`""
 
     if ($Steps) {
       $command += " --steps $Steps"
@@ -563,25 +563,25 @@ function Invoke-ReverieMigrationUp {
       $command += ' --dry-run'
     }
 
-    Invoke-ReverieCommand -Command $command -PassThru
+    Invoke-SurqlCommand -Command $command -PassThru
 
     if ($LASTEXITCODE -eq 0) {
       $successMsg = if ($DryRun) { 'Dry run completed' } else { 'Migrations applied successfully' }
-      Write-ReverieMessage -Message $successMsg -Type 'Success'
+      Write-SurqlMessage -Message $successMsg -Type 'Success'
     }
     else {
-      Write-ReverieMessage -Message 'Migration failed' -Type 'Error'
+      Write-SurqlMessage -Message 'Migration failed' -Type 'Error'
     }
   }
 }
-Set-Alias -Name rvmigup -Value Invoke-ReverieMigrationUp
+Set-Alias -Name sqmigup -Value Invoke-SurqlMigrationUp
 
-function Invoke-ReverieMigrationDown {
+function Invoke-SurqlMigrationDown {
   <#
   .SYNOPSIS
-    Rolls back migrations using reverie CLI.
+    Rolls back migrations using surql CLI.
   .DESCRIPTION
-    Executes 'reverie migrate down' to rollback the last applied migration(s).
+    Executes 'surql migrate down' to rollback the last applied migration(s).
     Can optionally perform a dry run to preview the rollback without executing.
   .PARAMETER Directory
     The migrations directory path. Defaults to 'migrations'.
@@ -592,16 +592,16 @@ function Invoke-ReverieMigrationDown {
   .PARAMETER Yes
     Skip confirmation prompt.
   .EXAMPLE
-    Invoke-ReverieMigrationDown
+    Invoke-SurqlMigrationDown
     Rolls back the last migration.
   .EXAMPLE
-    rvmigdown -Steps 3
+    sqmigdown -Steps 3
     Rolls back the last 3 migrations.
   .EXAMPLE
-    rvmigdown -DryRun
+    sqmigdown -DryRun
     Previews rollback without executing.
   .EXAMPLE
-    rvmigdown -Yes
+    sqmigdown -Yes
     Rolls back without confirmation prompt.
   #>
   [CmdletBinding(SupportsShouldProcess)]
@@ -624,9 +624,9 @@ function Invoke-ReverieMigrationDown {
 
   if ($DryRun -or $Yes -or $PSCmdlet.ShouldProcess('Database', $action)) {
     $message = if ($DryRun) { 'Previewing rollback (dry run)...' } else { "Rolling back $Steps migration(s)..." }
-    Write-ReverieMessage -Message $message -Type 'Info'
+    Write-SurqlMessage -Message $message -Type 'Info'
 
-    $command = "uv run reverie migrate down --directory `"$Directory`" --steps $Steps"
+    $command = "uv run surql migrate down --directory `"$Directory`" --steps $Steps"
 
     if ($DryRun) {
       $command += ' --dry-run'
@@ -636,35 +636,35 @@ function Invoke-ReverieMigrationDown {
       $command += ' --yes'
     }
 
-    Invoke-ReverieCommand -Command $command -PassThru
+    Invoke-SurqlCommand -Command $command -PassThru
 
     if ($LASTEXITCODE -eq 0) {
       $successMsg = if ($DryRun) { 'Dry run completed' } else { 'Rollback completed successfully' }
-      Write-ReverieMessage -Message $successMsg -Type 'Success'
+      Write-SurqlMessage -Message $successMsg -Type 'Success'
     }
     else {
-      Write-ReverieMessage -Message 'Rollback failed' -Type 'Error'
+      Write-SurqlMessage -Message 'Rollback failed' -Type 'Error'
     }
   }
 }
-Set-Alias -Name rvmigdown -Value Invoke-ReverieMigrationDown
+Set-Alias -Name sqmigdown -Value Invoke-SurqlMigrationDown
 
-function Get-ReverieMigrationHistory {
+function Get-SurqlMigrationHistory {
   <#
   .SYNOPSIS
-    Shows migration history using reverie CLI.
+    Shows migration history using surql CLI.
   .DESCRIPTION
-    Executes 'reverie migrate history' to display the history of applied
+    Executes 'surql migrate history' to display the history of applied
     migrations including timestamps and execution times.
   .PARAMETER Directory
     The migrations directory path. Defaults to 'migrations'.
   .PARAMETER Format
     Output format: table, json, or yaml. Defaults to 'table'.
   .EXAMPLE
-    Get-ReverieMigrationHistory
+    Get-SurqlMigrationHistory
     Shows migration history in table format.
   .EXAMPLE
-    rvmighist -Format json
+    sqmighist -Format json
     Shows migration history in JSON format.
   #>
   [CmdletBinding()]
@@ -677,31 +677,31 @@ function Get-ReverieMigrationHistory {
     [string]$Format = 'table'
   )
 
-  Write-ReverieMessage -Message 'Fetching migration history...' -Type 'Info'
+  Write-SurqlMessage -Message 'Fetching migration history...' -Type 'Info'
 
-  $command = "uv run reverie migrate history --directory `"$Directory`" --format $Format"
-  Invoke-ReverieCommand -Command $command -PassThru
+  $command = "uv run surql migrate history --directory `"$Directory`" --format $Format"
+  Invoke-SurqlCommand -Command $command -PassThru
 }
-Set-Alias -Name rvmighist -Value Get-ReverieMigrationHistory
+Set-Alias -Name sqmighist -Value Get-SurqlMigrationHistory
 
-function Get-ReverieSchema {
+function Get-SurqlSchema {
   <#
   .SYNOPSIS
-    Shows database or table schema using reverie CLI.
+    Shows database or table schema using surql CLI.
   .DESCRIPTION
-    Executes 'reverie schema show' to display the database schema or
+    Executes 'surql schema show' to display the database schema or
     a specific table's schema including fields, indexes, and constraints.
   .PARAMETER Table
     Optional table name to show specific table schema.
     If not specified, shows the entire database schema.
   .EXAMPLE
-    Get-ReverieSchema
+    Get-SurqlSchema
     Shows the entire database schema.
   .EXAMPLE
-    rvschema user
+    sqschema user
     Shows the schema for the user table.
   .EXAMPLE
-    Get-ReverieSchema -Table post
+    Get-SurqlSchema -Table post
     Shows the schema for the post table.
   #>
   [CmdletBinding()]
@@ -711,32 +711,32 @@ function Get-ReverieSchema {
   )
 
   $target = if ($Table) { "table '$Table'" } else { 'database' }
-  Write-ReverieMessage -Message "Fetching schema for $target..." -Type 'Info'
+  Write-SurqlMessage -Message "Fetching schema for $target..." -Type 'Info'
 
-  $command = 'uv run reverie schema show'
+  $command = 'uv run surql schema show'
 
   if ($Table) {
     $command += " $Table"
   }
 
-  Invoke-ReverieCommand -Command $command -PassThru
+  Invoke-SurqlCommand -Command $command -PassThru
 }
-Set-Alias -Name rvschema -Value Get-ReverieSchema
+Set-Alias -Name sqschema -Value Get-SurqlSchema
 
-function Test-ReverieMigration {
+function Test-SurqlMigration {
   <#
   .SYNOPSIS
-    Validates migration files using reverie CLI.
+    Validates migration files using surql CLI.
   .DESCRIPTION
-    Executes 'reverie migrate validate' to check migration files for errors
+    Executes 'surql migrate validate' to check migration files for errors
     including syntax, missing functions, and metadata issues.
   .PARAMETER Directory
     The migrations directory path. Defaults to 'migrations'.
   .EXAMPLE
-    Test-ReverieMigration
+    Test-SurqlMigration
     Validates all migration files.
   .EXAMPLE
-    rvmigvalid -Directory uat_migrations
+    sqmigvalid -Directory uat_migrations
     Validates migrations in custom directory.
   #>
   [CmdletBinding()]
@@ -745,41 +745,41 @@ function Test-ReverieMigration {
     [string]$Directory = 'migrations'
   )
 
-  Write-ReverieMessage -Message 'Validating migration files...' -Type 'Info'
+  Write-SurqlMessage -Message 'Validating migration files...' -Type 'Info'
 
-  $command = "uv run reverie migrate validate --directory `"$Directory`""
-  Invoke-ReverieCommand -Command $command -PassThru
+  $command = "uv run surql migrate validate --directory `"$Directory`""
+  Invoke-SurqlCommand -Command $command -PassThru
 
   if ($LASTEXITCODE -eq 0) {
-    Write-ReverieMessage -Message 'All migrations are valid' -Type 'Success'
+    Write-SurqlMessage -Message 'All migrations are valid' -Type 'Success'
   }
   else {
-    Write-ReverieMessage -Message 'Migration validation failed' -Type 'Error'
+    Write-SurqlMessage -Message 'Migration validation failed' -Type 'Error'
   }
 }
-Set-Alias -Name rvmigvalid -Value Test-ReverieMigration
+Set-Alias -Name sqmigvalid -Value Test-SurqlMigration
 
 #endregion
 
 #region Code Quality & Testing
 
-function Invoke-ReverieLint {
+function Invoke-SurqlLint {
   <#
   .SYNOPSIS
-    Runs ruff linter on the Reverie codebase.
+    Runs ruff linter on the Surql codebase.
   .DESCRIPTION
     Executes ruff check to identify code quality issues, style violations,
     and potential bugs. This is part of the project's critical quality checks.
   .PARAMETER Fix
     Automatically fix issues where possible.
   .EXAMPLE
-    Invoke-ReverieLint
+    Invoke-SurqlLint
     Runs the linter and reports issues.
   .EXAMPLE
-    Invoke-ReverieLint -Fix
+    Invoke-SurqlLint -Fix
     Runs the linter and automatically fixes issues.
   .EXAMPLE
-    rvlint
+    sqlint
     Uses the alias to quickly run the linter.
   #>
   [CmdletBinding()]
@@ -788,7 +788,7 @@ function Invoke-ReverieLint {
     [switch]$Fix
   )
 
-  Write-ReverieMessage -Message 'Running ruff linter...' -Type 'Info'
+  Write-SurqlMessage -Message 'Running ruff linter...' -Type 'Info'
 
   $command = if ($Fix) {
     'uv run ruff check src tests --fix'
@@ -797,34 +797,34 @@ function Invoke-ReverieLint {
     'uv run ruff check src tests'
   }
 
-  Invoke-ReverieCommand -Command $command -PassThru
+  Invoke-SurqlCommand -Command $command -PassThru
 
   if ($LASTEXITCODE -eq 0) {
-    Write-ReverieMessage -Message 'Linting passed' -Type 'Success'
+    Write-SurqlMessage -Message 'Linting passed' -Type 'Success'
   }
   else {
-    Write-ReverieMessage -Message 'Linting found issues' -Type 'Warning'
+    Write-SurqlMessage -Message 'Linting found issues' -Type 'Warning'
   }
 }
-Set-Alias -Name rvlint -Value Invoke-ReverieLint
+Set-Alias -Name sqlint -Value Invoke-SurqlLint
 
-function Invoke-ReverieFormat {
+function Invoke-SurqlFormat {
   <#
   .SYNOPSIS
-    Formats Reverie code using ruff formatter.
+    Formats Surql code using ruff formatter.
   .DESCRIPTION
     Runs ruff format to automatically format the codebase according to
     project style guidelines (black-compatible, 2 spaces, single quotes).
   .PARAMETER Check
     Checks if files are formatted without making changes.
   .EXAMPLE
-    Invoke-ReverieFormat
+    Invoke-SurqlFormat
     Formats all Python files in the project.
   .EXAMPLE
-    Invoke-ReverieFormat -Check
+    Invoke-SurqlFormat -Check
     Checks if files are formatted without modifying them.
   .EXAMPLE
-    rvfmt
+    sqfmt
     Uses the alias to quickly format code.
   #>
   [CmdletBinding(SupportsShouldProcess)]
@@ -833,8 +833,8 @@ function Invoke-ReverieFormat {
     [switch]$Check
   )
 
-  if ($Check -or $PSCmdlet.ShouldProcess('Reverie codebase', 'Format code')) {
-    Write-ReverieMessage -Message 'Running ruff formatter...' -Type 'Info'
+  if ($Check -or $PSCmdlet.ShouldProcess('Surql codebase', 'Format code')) {
+    Write-SurqlMessage -Message 'Running ruff formatter...' -Type 'Info'
 
     $command = if ($Check) {
       'uv run ruff format src tests --check'
@@ -843,57 +843,57 @@ function Invoke-ReverieFormat {
       'uv run ruff format src tests'
     }
 
-    Invoke-ReverieCommand -Command $command -PassThru
+    Invoke-SurqlCommand -Command $command -PassThru
 
     if ($LASTEXITCODE -eq 0) {
       if ($Check) {
-        Write-ReverieMessage -Message 'All files are properly formatted' -Type 'Success'
+        Write-SurqlMessage -Message 'All files are properly formatted' -Type 'Success'
       }
       else {
-        Write-ReverieMessage -Message 'Code formatted successfully' -Type 'Success'
+        Write-SurqlMessage -Message 'Code formatted successfully' -Type 'Success'
       }
     }
     else {
-      Write-ReverieMessage -Message 'Formatting issues found' -Type 'Warning'
+      Write-SurqlMessage -Message 'Formatting issues found' -Type 'Warning'
     }
   }
 }
-Set-Alias -Name rvfmt -Value Invoke-ReverieFormat
+Set-Alias -Name sqfmt -Value Invoke-SurqlFormat
 
-function Invoke-ReverieTypeCheck {
+function Invoke-SurqlTypeCheck {
   <#
   .SYNOPSIS
-    Runs mypy type checker on Reverie codebase.
+    Runs mypy type checker on Surql codebase.
   .DESCRIPTION
     Executes mypy in strict mode to verify type annotations and catch
     type-related errors. All code must pass mypy strict checking.
   .EXAMPLE
-    Invoke-ReverieTypeCheck
+    Invoke-SurqlTypeCheck
     Runs type checking on the entire codebase.
   .EXAMPLE
-    rvtype
+    sqtype
     Uses the alias to quickly run type checking.
   #>
   [CmdletBinding()]
   param()
 
-  Write-ReverieMessage -Message 'Running mypy type checker...' -Type 'Info'
+  Write-SurqlMessage -Message 'Running mypy type checker...' -Type 'Info'
 
-  Invoke-ReverieCommand -Command 'uv run python -m mypy --strict src' -PassThru
+  Invoke-SurqlCommand -Command 'uv run python -m mypy --strict src' -PassThru
 
   if ($LASTEXITCODE -eq 0) {
-    Write-ReverieMessage -Message 'Type checking passed' -Type 'Success'
+    Write-SurqlMessage -Message 'Type checking passed' -Type 'Success'
   }
   else {
-    Write-ReverieMessage -Message 'Type checking found issues' -Type 'Warning'
+    Write-SurqlMessage -Message 'Type checking found issues' -Type 'Warning'
   }
 }
-Set-Alias -Name rvtype -Value Invoke-ReverieTypeCheck
+Set-Alias -Name sqtype -Value Invoke-SurqlTypeCheck
 
-function Test-Reverie {
+function Test-Surql {
   <#
   .SYNOPSIS
-    Runs Reverie test suite.
+    Runs Surql test suite.
   .DESCRIPTION
     Executes pytest to run all tests in the project. Tests must pass
     as part of the project's critical quality checks.
@@ -904,16 +904,16 @@ function Test-Reverie {
   .PARAMETER Pattern
     Runs only tests matching the pattern.
   .EXAMPLE
-    Test-Reverie
+    Test-Surql
     Runs all tests.
   .EXAMPLE
-    Test-Reverie -Verbose
+    Test-Surql -Verbose
     Runs all tests with verbose output.
   .EXAMPLE
-    Test-Reverie -Pattern 'test_storage*'
+    Test-Surql -Pattern 'test_storage*'
     # Runs only storage-related tests.
   .EXAMPLE
-    rvtest
+    sqtest
     Uses the alias to quickly run tests.
   #>
   [CmdletBinding()]
@@ -925,7 +925,7 @@ function Test-Reverie {
     [string]$Pattern
   )
 
-  Write-ReverieMessage -Message 'Running test suite...' -Type 'Info'
+  Write-SurqlMessage -Message 'Running test suite...' -Type 'Info'
 
   $pytestArgs = @('uv', 'run', 'python', '-m', 'pytest')
 
@@ -943,34 +943,34 @@ function Test-Reverie {
   }
 
   $command = $pytestArgs -join ' '
-  Invoke-ReverieCommand -Command $command -PassThru
+  Invoke-SurqlCommand -Command $command -PassThru
 
   if ($LASTEXITCODE -eq 0) {
-    Write-ReverieMessage -Message 'All tests passed' -Type 'Success'
+    Write-SurqlMessage -Message 'All tests passed' -Type 'Success'
   }
   else {
-    Write-ReverieMessage -Message 'Some tests failed' -Type 'Warning'
+    Write-SurqlMessage -Message 'Some tests failed' -Type 'Warning'
   }
 }
-Set-Alias -Name rvtest -Value Test-Reverie
+Set-Alias -Name sqtest -Value Test-Surql
 
-function Test-ReverieCoverage {
+function Test-SurqlCoverage {
   <#
   .SYNOPSIS
-    Runs Reverie tests with coverage analysis.
+    Runs Surql tests with coverage analysis.
   .DESCRIPTION
     Executes pytest with coverage reporting to measure test coverage.
     The project requires ≥80% coverage.
   .PARAMETER Html
     Generate HTML coverage report.
   .EXAMPLE
-    Test-ReverieCoverage
+    Test-SurqlCoverage
     Runs tests and displays coverage report.
   .EXAMPLE
-    Test-ReverieCoverage -Html
+    Test-SurqlCoverage -Html
     Runs tests and generates HTML coverage report.
   .EXAMPLE
-    rvcov
+    sqcov
     Uses the alias to quickly run coverage analysis.
   #>
   [CmdletBinding()]
@@ -979,7 +979,7 @@ function Test-ReverieCoverage {
     [switch]$Html
   )
 
-  Write-ReverieMessage -Message 'Running tests with coverage analysis...' -Type 'Info'
+  Write-SurqlMessage -Message 'Running tests with coverage analysis...' -Type 'Info'
 
   $command = 'uv run python -m pytest --cov=src --cov-report=term-missing'
 
@@ -989,24 +989,24 @@ function Test-ReverieCoverage {
     $command += ' --cov-report=term'
   }
 
-  Invoke-ReverieCommand -Command $command -PassThru
+  Invoke-SurqlCommand -Command $command -PassThru
 
   if ($LASTEXITCODE -eq 0) {
-    Write-ReverieMessage -Message 'Coverage analysis completed' -Type 'Success'
+    Write-SurqlMessage -Message 'Coverage analysis completed' -Type 'Success'
     if ($Html) {
-      Write-ReverieMessage -Message 'HTML report generated in htmlcov/' -Type 'Info'
+      Write-SurqlMessage -Message 'HTML report generated in htmlcov/' -Type 'Info'
     }
   }
   else {
-    Write-ReverieMessage -Message 'Coverage analysis failed' -Type 'Warning'
+    Write-SurqlMessage -Message 'Coverage analysis failed' -Type 'Warning'
   }
 }
-Set-Alias -Name rvcov -Value Test-ReverieCoverage
+Set-Alias -Name sqcov -Value Test-SurqlCoverage
 
-function Invoke-ReverieCheck {
+function Invoke-SurqlCheck {
   <#
   .SYNOPSIS
-    Runs all Reverie quality checks.
+    Runs all Surql quality checks.
   .DESCRIPTION
     Executes the complete suite of critical quality checks required by the project:
       - ruff check (linting)
@@ -1017,10 +1017,10 @@ function Invoke-ReverieCheck {
   .PARAMETER SkipTests
     Skip running tests & bypasses test-related checks.
   .EXAMPLE
-    Invoke-ReverieCheck
+    Invoke-SurqlCheck
     Runs all quality checks.
   .EXAMPLE
-    rvcheck
+    sqcheck
     Uses the alias to quickly run all checks.
   #>
   [CmdletBinding()]
@@ -1029,74 +1029,74 @@ function Invoke-ReverieCheck {
     [switch]$SkipTests
   )
 
-  Write-ReverieMessage -Message 'Running all Reverie quality checks...' -Type 'Info'
+  Write-SurqlMessage -Message 'Running all Surql quality checks...' -Type 'Info'
 
   $failed = $false
   $totalChecks = if ($SkipTests) { 3 } else { 5 }
 
   # Check 1: Ruff lint
-  Write-Progress -Activity 'Running Reverie Quality Checks' -Status 'Running ruff check' -PercentComplete (1 / $totalChecks * 100)
-  Invoke-ReverieLint
+  Write-Progress -Activity 'Running Surql Quality Checks' -Status 'Running ruff check' -PercentComplete (1 / $totalChecks * 100)
+  Invoke-SurqlLint
   if ($LASTEXITCODE -ne 0) { $failed = $true }
 
   # Check 2: Ruff format
-  Write-Progress -Activity 'Running Reverie Quality Checks' -Status 'Running ruff format --check' -PercentComplete (2 / $totalChecks * 100)
-  Invoke-ReverieFormat -Check
+  Write-Progress -Activity 'Running Surql Quality Checks' -Status 'Running ruff format --check' -PercentComplete (2 / $totalChecks * 100)
+  Invoke-SurqlFormat -Check
   if ($LASTEXITCODE -ne 0) { $failed = $true }
 
   # Check 3: Mypy type checking
-  Write-Progress -Activity 'Running Reverie Quality Checks' -Status 'Running mypy --strict' -PercentComplete (3 / $totalChecks * 100)
-  Invoke-ReverieTypeCheck
+  Write-Progress -Activity 'Running Surql Quality Checks' -Status 'Running mypy --strict' -PercentComplete (3 / $totalChecks * 100)
+  Invoke-SurqlTypeCheck
   if ($LASTEXITCODE -ne 0) { $failed = $true }
 
   if (-not $SkipTests) {
     # Check 4: Tests
-    Write-Progress -Activity 'Running Reverie Quality Checks' -Status 'Running pytest' -PercentComplete 80
-    Test-Reverie
+    Write-Progress -Activity 'Running Surql Quality Checks' -Status 'Running pytest' -PercentComplete 80
+    Test-Surql
     if ($LASTEXITCODE -ne 0) { $failed = $true }
 
     # Check 5: Coverage
-    Write-Progress -Activity 'Running Reverie Quality Checks' -Status 'Running pytest --cov' -PercentComplete 100
-    Test-ReverieCoverage
+    Write-Progress -Activity 'Running Surql Quality Checks' -Status 'Running pytest --cov' -PercentComplete 100
+    Test-SurqlCoverage
     if ($LASTEXITCODE -ne 0) { $failed = $true }
   }
 
   # Clear progress bar
-  Write-Progress -Activity 'Running Reverie Quality Checks' -Completed
+  Write-Progress -Activity 'Running Surql Quality Checks' -Completed
 
   # Summary
   if ($failed) {
-    Write-ReverieMessage -Message 'Some checks failed. Please fix issues before committing.' -Type 'Error'
+    Write-SurqlMessage -Message 'Some checks failed. Please fix issues before committing.' -Type 'Error'
     throw "Quality checks failed"
   }
   else {
-    Write-ReverieMessage -Message 'All quality checks passed successfully!' -Type 'Success'
+    Write-SurqlMessage -Message 'All quality checks passed successfully!' -Type 'Success'
   }
 }
-Set-Alias -Name rvcheck -Value Invoke-ReverieCheck
+Set-Alias -Name sqcheck -Value Invoke-SurqlCheck
 
 #endregion
 
 #region Application
 
-function Start-Reverie {
+function Start-Surql {
   <#
   .SYNOPSIS
-      Starts the Reverie CLI application.
+      Starts the Surql CLI application.
   .DESCRIPTION
-      Executes the Reverie CLI using uv run. Pass any additional arguments
+      Executes the Surql CLI using uv run. Pass any additional arguments
       directly to the CLI.
   .PARAMETER Arguments
-      Arguments to pass to the Reverie CLI.
+      Arguments to pass to the Surql CLI.
   .EXAMPLE
-      Start-Reverie
-      Starts the Reverie CLI.
+      Start-Surql
+      Starts the Surql CLI.
   .EXAMPLE
-      Start-Reverie --help
-      Shows Reverie CLI help.
+      Start-Surql --help
+      Shows Surql CLI help.
   .EXAMPLE
-      rvrun <app_command> <args>
-      Uses the alias to quickly start the Reverie CLI with commands.
+      sqrun <app_command> <args>
+      Uses the alias to quickly start the Surql CLI with commands.
   #>
   [CmdletBinding()]
   param(
@@ -1106,27 +1106,27 @@ function Start-Reverie {
 
   $command = "uv run python -m src $($Arguments -join ' ')"
 
-  Write-ReverieMessage -Message 'Starting Reverie CLI...' -Type 'Info'
-  Invoke-ReverieCommand -Command $command
+  Write-SurqlMessage -Message 'Starting Surql CLI...' -Type 'Info'
+  Invoke-SurqlCommand -Command $command
 }
-Set-Alias -Name rvrun -Value Start-Reverie
+Set-Alias -Name sqrun -Value Start-Surql
 
 #endregion
 
 #region Convenience Functions
 
-function Show-ReverieHelp {
+function Show-SurqlHelp {
   <#
   .SYNOPSIS
-      Shows all available Reverie PowerShell commands.
+      Shows all available Surql PowerShell commands.
   .DESCRIPTION
-      Displays a summary of all available Reverie development helper functions
+      Displays a summary of all available Surql development helper functions
       with their aliases and descriptions.
   .EXAMPLE
-      Show-ReverieHelp
+      Show-SurqlHelp
       Displays all available commands.
   .EXAMPLE
-      rvhelp
+      sqhelp
       Uses the alias to quickly show help.
   #>
   [CmdletBinding()]
@@ -1134,7 +1134,7 @@ function Show-ReverieHelp {
 
   Write-Host ''
   Write-Host '+----------------------------------------------------------------------+' -ForegroundColor Cyan
-  Write-Host '|            Reverie PowerShell Development Commands                  |' -ForegroundColor Cyan
+  Write-Host '|            Surql PowerShell Development Commands                  |' -ForegroundColor Cyan
   Write-Host '+----------------------------------------------------------------------+' -ForegroundColor Cyan
   Write-Host ''
 
@@ -1152,66 +1152,66 @@ function Show-ReverieHelp {
 
   Write-Host 'PROJECT MANAGEMENT:' -ForegroundColor Cyan
   @(
-    @{ Name = 'Initialize-ReverieProject'; Alias = 'rvinitproj'; Description = 'Set up a new Reverie project' }
-    @{ Name = 'Remove-ReverieArtifacts'; Alias = 'rvrm'; Description = 'Remove build artifacts and caches' }
-    @{ Name = 'Install-ReverieDependencies'; Alias = 'rvinst'; Description = 'Install project dependencies' }
+    @{ Name = 'Initialize-SurqlProject'; Alias = 'sqinitproj'; Description = 'Set up a new Surql project' }
+    @{ Name = 'Remove-SurqlArtifacts'; Alias = 'sqrm'; Description = 'Remove build artifacts and caches' }
+    @{ Name = 'Install-SurqlDependencies'; Alias = 'sqinst'; Description = 'Install project dependencies' }
   ) | ForEach-Object { & $printCmd $_ }
   Write-Host ''
 
   Write-Host 'DATABASE CONTAINERS:' -ForegroundColor Cyan
   @(
-    @{ Name = 'Initialize-ReverieDatabase'; Alias = 'rvinit'; Description = 'Initialize SurrealDB database' }
-    @{ Name = 'Start-ReverieDatabase'; Alias = 'rvstart'; Description = 'Start database containers' }
-    @{ Name = 'Stop-ReverieDatabase'; Alias = 'rvstop'; Description = 'Stop database containers' }
+    @{ Name = 'Initialize-SurqlDatabase'; Alias = 'sqinit'; Description = 'Initialize SurrealDB database' }
+    @{ Name = 'Start-SurqlDatabase'; Alias = 'sqstart'; Description = 'Start database containers' }
+    @{ Name = 'Stop-SurqlDatabase'; Alias = 'sqstop'; Description = 'Stop database containers' }
   ) | ForEach-Object { & $printCmd $_ }
   Write-Host ''
 
   Write-Host 'CLI - DATABASE:' -ForegroundColor Cyan
   @(
-    @{ Name = 'Test-ReverieConnection'; Alias = 'rvping'; Description = 'Test database connection' }
-    @{ Name = 'Get-ReverieDatabaseInfo'; Alias = 'rvdbinfo'; Description = 'Show database information' }
-    @{ Name = 'Get-ReverieSchema'; Alias = 'rvschema'; Description = 'Show database/table schema' }
+    @{ Name = 'Test-SurqlConnection'; Alias = 'sqping'; Description = 'Test database connection' }
+    @{ Name = 'Get-SurqlDatabaseInfo'; Alias = 'sqdbinfo'; Description = 'Show database information' }
+    @{ Name = 'Get-SurqlSchema'; Alias = 'sqschema'; Description = 'Show database/table schema' }
   ) | ForEach-Object { & $printCmd $_ }
   Write-Host ''
 
   Write-Host 'CLI - MIGRATIONS:' -ForegroundColor Cyan
   @(
-    @{ Name = 'Invoke-ReverieMigration'; Alias = 'rvmig'; Description = 'Run all pending migrations' }
-    @{ Name = 'Get-ReverieMigrationStatus'; Alias = 'rvmigstatus'; Description = 'Show migration status' }
-    @{ Name = 'New-ReverieMigration'; Alias = 'rvmigcreate'; Description = 'Create new migration file' }
-    @{ Name = 'Invoke-ReverieMigrationUp'; Alias = 'rvmigup'; Description = 'Apply pending migrations' }
-    @{ Name = 'Invoke-ReverieMigrationDown'; Alias = 'rvmigdown'; Description = 'Rollback migrations' }
-    @{ Name = 'Get-ReverieMigrationHistory'; Alias = 'rvmighist'; Description = 'Show migration history' }
-    @{ Name = 'Test-ReverieMigration'; Alias = 'rvmigvalid'; Description = 'Validate migration files' }
+    @{ Name = 'Invoke-SurqlMigration'; Alias = 'sqmig'; Description = 'Run all pending migrations' }
+    @{ Name = 'Get-SurqlMigrationStatus'; Alias = 'sqmigstatus'; Description = 'Show migration status' }
+    @{ Name = 'New-SurqlMigration'; Alias = 'sqmigcreate'; Description = 'Create new migration file' }
+    @{ Name = 'Invoke-SurqlMigrationUp'; Alias = 'sqmigup'; Description = 'Apply pending migrations' }
+    @{ Name = 'Invoke-SurqlMigrationDown'; Alias = 'sqmigdown'; Description = 'Rollback migrations' }
+    @{ Name = 'Get-SurqlMigrationHistory'; Alias = 'sqmighist'; Description = 'Show migration history' }
+    @{ Name = 'Test-SurqlMigration'; Alias = 'sqmigvalid'; Description = 'Validate migration files' }
   ) | ForEach-Object { & $printCmd $_ }
   Write-Host ''
 
   Write-Host 'CODE QUALITY & TESTING:' -ForegroundColor Cyan
   @(
-    @{ Name = 'Invoke-ReverieLint'; Alias = 'rvlint'; Description = 'Run ruff linter' }
-    @{ Name = 'Invoke-ReverieFormat'; Alias = 'rvfmt'; Description = 'Format code with ruff' }
-    @{ Name = 'Invoke-ReverieTypeCheck'; Alias = 'rvtype'; Description = 'Run mypy type checker' }
-    @{ Name = 'Test-Reverie'; Alias = 'rvtest'; Description = 'Run test suite' }
-    @{ Name = 'Test-ReverieCoverage'; Alias = 'rvcov'; Description = 'Run tests with coverage' }
-    @{ Name = 'Invoke-ReverieCheck'; Alias = 'rvcheck'; Description = 'Run all quality checks' }
+    @{ Name = 'Invoke-SurqlLint'; Alias = 'sqlint'; Description = 'Run ruff linter' }
+    @{ Name = 'Invoke-SurqlFormat'; Alias = 'sqfmt'; Description = 'Format code with ruff' }
+    @{ Name = 'Invoke-SurqlTypeCheck'; Alias = 'sqtype'; Description = 'Run mypy type checker' }
+    @{ Name = 'Test-Surql'; Alias = 'sqtest'; Description = 'Run test suite' }
+    @{ Name = 'Test-SurqlCoverage'; Alias = 'sqcov'; Description = 'Run tests with coverage' }
+    @{ Name = 'Invoke-SurqlCheck'; Alias = 'sqcheck'; Description = 'Run all quality checks' }
   ) | ForEach-Object { & $printCmd $_ }
   Write-Host ''
 
   Write-Host 'APPLICATION:' -ForegroundColor Cyan
   @(
-    @{ Name = 'Start-Reverie'; Alias = 'rvrun'; Description = 'Start Reverie CLI' }
+    @{ Name = 'Start-Surql'; Alias = 'sqrun'; Description = 'Start Surql CLI' }
   ) | ForEach-Object { & $printCmd $_ }
   Write-Host ''
 
   Write-Host 'HELP:' -ForegroundColor Cyan
   @(
-    @{ Name = 'Show-ReverieHelp'; Alias = 'rvhelp'; Description = 'Show this help message' }
+    @{ Name = 'Show-SurqlHelp'; Alias = 'sqhelp'; Description = 'Show this help message' }
   ) | ForEach-Object { & $printCmd $_ }
 
   Write-Host 'TIP: Use "Get-Help <CommandName> -Detailed" for more information' -ForegroundColor DarkGray
   Write-Host ''
 }
-Set-Alias -Name rvhelp -Value Show-ReverieHelp
+Set-Alias -Name sqhelp -Value Show-SurqlHelp
 
 #endregion
 
@@ -1219,10 +1219,10 @@ Set-Alias -Name rvhelp -Value Show-ReverieHelp
 Write-Host ''
 Write-Host '+----------------------------------------------------------------------+' -ForegroundColor Green
 Write-Host '|                    ' -ForegroundColor Green -NoNewline
-Write-Host 'Reverie Commands Loaded' -ForegroundColor Blue -NoNewline
+Write-Host 'Surql Commands Loaded' -ForegroundColor Blue -NoNewline
 Write-Host '                           |' -ForegroundColor Green
 Write-Host '+----------------------------------------------------------------------+' -ForegroundColor Green
 Write-Host ''
-Write-Host 'Reverie development helper functions loaded successfully!' -ForegroundColor Cyan
-Write-Host "Type 'rvhelp' or 'Show-ReverieHelp' to see all available commands." -ForegroundColor Gray
+Write-Host 'Surql development helper functions loaded successfully!' -ForegroundColor Cyan
+Write-Host "Type 'sqhelp' or 'Show-SurqlHelp' to see all available commands." -ForegroundColor Gray
 Write-Host ''

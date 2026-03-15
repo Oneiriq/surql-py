@@ -6,8 +6,8 @@ SurrealDB query execution for better performance.
 
 import asyncio
 
-from reverie.query import Query
-from reverie.query.hints import (
+from surql.query import Query
+from surql.query.hints import (
     FetchHint,
     IndexHint,
     ParallelHint,

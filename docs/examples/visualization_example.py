@@ -1,6 +1,6 @@
 """Schema Visualization Examples.
 
-This module demonstrates the powerful visualization capabilities of Reverie,
+This module demonstrates the powerful visualization capabilities of surql,
 including multiple output formats, themes, and customization options.
 
 All examples use a simple blog schema with user, post, and comment tables
@@ -84,11 +84,11 @@ if sys.platform == 'win32':
 
     sys.stdout = codecs.getwriter('utf-8')(sys.stdout.buffer, 'strict')
 
-from reverie.schema.edge import edge_schema
-from reverie.schema.fields import datetime_field, record_field, string_field
-from reverie.schema.registry import register_edge, register_table
-from reverie.schema.table import table_schema
-from reverie.schema.themes import (
+from surql.schema.edge import edge_schema
+from surql.schema.fields import datetime_field, record_field, string_field
+from surql.schema.registry import register_edge, register_table
+from surql.schema.table import table_schema
+from surql.schema.themes import (
   DARK_THEME,
   FOREST_THEME,
   MINIMAL_THEME,
@@ -99,7 +99,7 @@ from reverie.schema.themes import (
   MermaidTheme,
   Theme,
 )
-from reverie.schema.visualize import OutputFormat, visualize_schema
+from surql.schema.visualize import OutputFormat, visualize_schema
 
 # Define a simple blog schema
 user_table = table_schema(
@@ -570,7 +570,7 @@ def main():
   """Run all examples."""
   print('\n')
   print('=' * 60)
-  print('REVERIE SCHEMA VISUALIZATION EXAMPLES')
+  print('SURQL SCHEMA VISUALIZATION EXAMPLES')
   print('=' * 60)
   print('\n')
 
