@@ -124,18 +124,18 @@ async with get_client(config) as client:
 
 ## Documentation
 
-- [Installation Guide](docs/installation.md) - Detailed installation and setup
-- [Quick Start Tutorial](docs/quickstart.md) - Step-by-step tutorial
-- [Schema Definition Guide](docs/schema.md) - Complete schema definition reference
-- [Migration System](docs/migrations.md) - Migration creation and management
-- [Query Builder & ORM](docs/queries.md) - Querying and CRUD operations
-- [Query Caching](docs/caching.md) - Memory and Redis-backed caching strategies
-- [Live Queries & Streaming](docs/streaming.md) - Real-time data notifications
-- [CLI Reference](docs/cli.md) - Command-line interface documentation
-- [API Reference](docs/api/README.md) - Module and function reference
-- [Examples](docs/examples/) - Working code examples
-  - [MTREE Vector Search](docs/examples/mtree_vector_search.py) - 1024-dim COSINE indexes
-  - [Advanced Queries](docs/examples/advanced_queries.py) - Complex query patterns
+Full documentation is available at **[oneiriq.github.io/surql-py](https://oneiriq.github.io/surql-py/)**.
+
+- [Installation Guide](https://oneiriq.github.io/surql-py/installation/) - Detailed installation and setup
+- [Quick Start Tutorial](https://oneiriq.github.io/surql-py/quickstart/) - Step-by-step tutorial
+- [Schema Definition Guide](https://oneiriq.github.io/surql-py/schema/) - Complete schema definition reference
+- [Migration System](https://oneiriq.github.io/surql-py/migrations/) - Migration creation and management
+- [Query Builder & ORM](https://oneiriq.github.io/surql-py/queries/) - Querying and CRUD operations
+- [Query Caching](https://oneiriq.github.io/surql-py/caching/) - Memory and Redis-backed caching strategies
+- [Live Queries & Streaming](https://oneiriq.github.io/surql-py/streaming/) - Real-time data notifications
+- [CLI Reference](https://oneiriq.github.io/surql-py/cli/) - Command-line interface documentation
+- [API Reference](https://oneiriq.github.io/surql-py/api/) - Module and function reference
+- [Examples](https://oneiriq.github.io/surql-py/examples/) - Working code examples
 
 ## Architecture
 
@@ -283,7 +283,7 @@ This project is licensed under the Apache License 2.0 - see the [LICENSE](LICENS
 
 ## Support
 
-- Documentation: [docs/](docs/)
+- Documentation: [oneiriq.github.io/surql-py](https://oneiriq.github.io/surql-py/)
 - Issues: [GitHub Issues](https://github.com/Oneiriq/surql-py/issues)
 - Discussions: [GitHub Discussions](https://github.com/Oneiriq/surql-py/discussions)
 
