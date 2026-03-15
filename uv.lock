@@ -994,7 +994,7 @@ wheels = [
 
 [[package]]
 name = "oneiriq-surql"
-version = "1.0.0rc5"
+version = "1.0.0rc6"
 source = { editable = "." }
 dependencies = [
     { name = "cachetools" },
