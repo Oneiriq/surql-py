@@ -77,7 +77,7 @@ from surql.types import (
   or_,
 )
 
-__version__ = '1.0.0rc9'
+__version__ = '1.0.0'
 
 __all__ = [
   # Configuration
