@@ -22,7 +22,7 @@ Before starting, ensure you have:
 
 - Python 3.12+ installed
 - SurrealDB 1.0+ installed and running
-- surql installed (`pip install surql` or `uv add surql`)
+- surql installed (`pip install oneiriq-surql` or `uv add oneiriq-surql`)
 
 If you haven't completed these steps, see the [Installation Guide](installation.md).
 
@@ -45,7 +45,7 @@ source venv/bin/activate  # On Windows: venv\Scripts\activate
 ### 3. Install surql
 
 ```shell
-pip install surql
+pip install oneiriq-surql
 ```
 
 ### 4. Create Project Structure
@@ -805,18 +805,18 @@ Configure named connections via environment variables:
 
 ```env
 # Primary database
-REVERIE_PRIMARY_DB_URL=ws://localhost:8000/rpc
-REVERIE_PRIMARY_DB_NS=app
-REVERIE_PRIMARY_DB=production
-REVERIE_PRIMARY_DB_USER=root
-REVERIE_PRIMARY_DB_PASS=root
+SURQL_PRIMARY_DB_URL=ws://localhost:8000/rpc
+SURQL_PRIMARY_DB_NS=app
+SURQL_PRIMARY_DB=production
+SURQL_PRIMARY_DB_USER=root
+SURQL_PRIMARY_DB_PASS=root
 
 # Read replica
-REVERIE_REPLICA_DB_URL=ws://replica:8000/rpc
-REVERIE_REPLICA_DB_NS=app
-REVERIE_REPLICA_DB=production
-REVERIE_REPLICA_DB_USER=reader
-REVERIE_REPLICA_DB_PASS=reader_pass
+SURQL_REPLICA_DB_URL=ws://replica:8000/rpc
+SURQL_REPLICA_DB_NS=app
+SURQL_REPLICA_DB=production
+SURQL_REPLICA_DB_USER=reader
+SURQL_REPLICA_DB_PASS=reader_pass
 ```
 
 Load from environment:
@@ -829,7 +829,7 @@ async def setup_from_env():
   """Load named connections from environment variables."""
   registry = get_registry()
 
-  # Load configurations using REVERIE_{NAME}_ prefix
+  # Load configurations using SURQL_{NAME}_ prefix
   primary_config = NamedConnectionConfig.from_env('PRIMARY')
   replica_config = NamedConnectionConfig.from_env('REPLICA')
 

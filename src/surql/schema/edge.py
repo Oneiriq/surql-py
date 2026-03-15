@@ -8,7 +8,7 @@ Two approaches are supported:
 1. TYPE RELATION (default): Modern SurrealDB graph edges with automatic in/out fields
    Example: DEFINE TABLE likes TYPE RELATION FROM user TO post
 
-2. SCHEMAFULL with explicit in/out fields: Traditional approach (driftnet-compatible)
+2. SCHEMAFULL with explicit in/out fields: Traditional approach
    Example: DEFINE TABLE likes SCHEMAFULL;
            DEFINE FIELD in ON TABLE likes TYPE record<user>;
            DEFINE FIELD out ON TABLE likes TYPE record<post>;
@@ -46,7 +46,7 @@ class EdgeDefinition(BaseModel):
      - Additional fields can be added for edge properties
 
   2. SCHEMAFULL: Traditional table with explicit in/out field definitions
-     - Compatible with driftnet and traditional SurrealDB schemas
+     - Compatible with traditional SurrealDB schemas
      - Requires explicit in/out fields in the fields list
      - Provides more control over field constraints
 
@@ -61,7 +61,7 @@ class EdgeDefinition(BaseModel):
     ...   ]
     ... )
 
-    SCHEMAFULL edge (driftnet-compatible):
+    SCHEMAFULL edge:
     >>> edge = EdgeDefinition(
     ...   name='entity_relation',
     ...   mode=EdgeMode.SCHEMAFULL,
@@ -121,7 +121,7 @@ def edge_schema(
     TYPE RELATION edge (default):
     >>> edge = edge_schema('likes', from_table='user', to_table='post')
 
-    SCHEMAFULL edge (driftnet-compatible):
+    SCHEMAFULL edge:
     >>> edge = edge_schema(
     ...   'entity_relation',
     ...   mode=EdgeMode.SCHEMAFULL,

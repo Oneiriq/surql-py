@@ -219,7 +219,7 @@ Result wrapper classes and extraction utilities for SurrealDB responses.
 - `AggregateResult` - Generic aggregation result
 - `PaginatedResult[T]` - Paginated result with page metadata
 
-**Result Extraction Utilities (Driftnet-Compatible):**
+**Result Extraction Utilities (SurrealDB Response Format Handling):**
 
 - `extract_result(result)` - Extract data from nested/flat SurrealDB response formats
 - `extract_one(result)` - Extract first record or None
@@ -255,7 +255,7 @@ SurrealDB returns responses in different formats depending on the operation:
 - Nested format: `[{"result": [{"id": "...", ...}]}]` (from `db.query()`)
 - Flat format: `[{"id": "...", ...}]` (from `db.select()`)
 
-The extraction utilities handle both formats seamlessly, eliminating the need for custom workarounds and making code compatible with driftnet patterns.
+The extraction utilities handle both formats seamlessly, eliminating the need for custom workarounds and making code robust across SurrealDB response formats.
 
 #### [`builder.py`](../../src/query/builder.py)
 
@@ -415,7 +415,7 @@ RecordID type for SurrealDB record identifiers with angle bracket support.
 **Supported Formats:**
 
 1. **Standard format**: `table:id` (alphanumeric + underscores)
-2. **Angle bracket format**: `table:⟨complex-id⟩` (driftnet-compatible)
+2. **Angle bracket format**: `table:⟨complex-id⟩` (for complex record IDs)
 
 **Example:**
 
@@ -426,7 +426,7 @@ from surql.types.record_id import RecordID
 user_rid = RecordID(table='user', id='alice')
 print(user_rid)  # user:alice
 
-# Angle bracket format (driftnet-compatible)
+# Angle bracket format
 # Required for IDs with special characters (dots, hyphens, colons, etc.)
 outlet_rid = RecordID.parse('outlet:⟨alaskabeacon.com⟩')
 print(outlet_rid)  # outlet:⟨alaskabeacon.com⟩
@@ -441,9 +441,9 @@ print(doc_rid)  # document:⟨alaskabeacon.com:01HQXYZ...⟩
 # - Compound keys: doc:⟨domain:ulid⟩ (multiple parts)
 ```
 
-**Driftnet Compatibility:**
+**Complex Record ID Support:**
 
-The angle bracket format is valid SurrealDB syntax for escaping complex identifiers. This feature enables full compatibility with driftnet's data model which uses domain names and compound keys as record IDs.
+The angle bracket format is valid SurrealDB syntax for escaping complex identifiers. This feature enables support for record IDs that contain special characters such as domain names, URLs, and compound keys.
 
 #### [`operators.py`](../../src/types/operators.py)
 

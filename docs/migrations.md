@@ -40,8 +40,8 @@ surql's migration system provides:
 The migration path can be configured through multiple sources (in priority order):
 
 1. **CLI flag** (`--directory` / `-d`) - highest priority
-2. **Environment variable** (`REVERIE_MIGRATION_PATH`)
-3. **`.env` file** (`REVERIE_MIGRATION_PATH=...`)
+2. **Environment variable** (`SURQL_MIGRATION_PATH`)
+3. **`.env` file** (`SURQL_MIGRATION_PATH=...`)
 4. **`pyproject.toml`** (`[tool.surql]` section)
 5. **Default value** (`./migrations`) - lowest priority
 
@@ -56,17 +56,17 @@ migration_path = "db/migrations"
 
 ### Environment Variable
 
-Set the `REVERIE_MIGRATION_PATH` environment variable:
+Set the `SURQL_MIGRATION_PATH` environment variable:
 
 ```shell
 # Unix/macOS
-export REVERIE_MIGRATION_PATH=db/migrations
+export SURQL_MIGRATION_PATH=db/migrations
 
 # Windows (PowerShell)
-$env:REVERIE_MIGRATION_PATH = "db/migrations"
+$env:SURQL_MIGRATION_PATH = "db/migrations"
 
 # Windows (CMD)
-set REVERIE_MIGRATION_PATH=db/migrations
+set SURQL_MIGRATION_PATH=db/migrations
 ```
 
 ### .env File
@@ -74,7 +74,7 @@ set REVERIE_MIGRATION_PATH=db/migrations
 Create a `.env` file in your project root:
 
 ```shell
-REVERIE_MIGRATION_PATH=db/migrations
+SURQL_MIGRATION_PATH=db/migrations
 ```
 
 ### CLI Override
@@ -90,8 +90,8 @@ surql migrate status -d ./other/migrations
 
 If you have:
 - `pyproject.toml`: `migration_path = "toml/migrations"`
-- `.env`: `REVERIE_MIGRATION_PATH=env/migrations`
-- Environment: `REVERIE_MIGRATION_PATH=shell/migrations`
+- `.env`: `SURQL_MIGRATION_PATH=env/migrations`
+- Environment: `SURQL_MIGRATION_PATH=shell/migrations`
 - CLI: `--directory cli/migrations`
 
 The resolved path would be `cli/migrations` (CLI has highest priority).

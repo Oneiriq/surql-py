@@ -72,11 +72,11 @@ class Product(BaseModel):
 
 @pytest.fixture
 def clean_env(monkeypatch: pytest.MonkeyPatch):
-  """Clear all REVERIE_ environment variables for test isolation."""
+  """Clear all SURQL_ environment variables for test isolation."""
   import os
 
   for key in list(os.environ.keys()):
-    if key.startswith('REVERIE_'):
+    if key.startswith('SURQL_'):
       monkeypatch.delenv(key, raising=False)
   yield
 

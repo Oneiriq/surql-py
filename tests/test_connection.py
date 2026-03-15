@@ -24,9 +24,9 @@ from surql.connection.transaction import (
 
 @pytest.fixture
 def clean_env(monkeypatch: pytest.MonkeyPatch):
-  """Clear all REVERIE_ environment variables for test isolation."""
+  """Clear all SURQL_ environment variables for test isolation."""
   for key in list(os.environ.keys()):
-    if key.startswith('REVERIE_'):
+    if key.startswith('SURQL_'):
       monkeypatch.delenv(key, raising=False)
   yield
 
@@ -80,17 +80,17 @@ class TestConnectionConfig:
 
   def test_connection_config_from_env(self, clean_env, monkeypatch: pytest.MonkeyPatch) -> None:
     """Test connection config loading from environment variables."""
-    # Set the test environment variables (clean_env already cleared REVERIE_* vars)
+    # Set the test environment variables (clean_env already cleared SURQL_* vars)
     # Also clear Windows USERNAME env var that might interfere via the 'username' alias
     _ = clean_env  # Used for side effect
     monkeypatch.delenv('USERNAME', raising=False)
     monkeypatch.delenv('USER', raising=False)
 
-    monkeypatch.setenv('REVERIE_DB_URL', 'ws://test-db:8000/rpc')
-    monkeypatch.setenv('REVERIE_DB_NS', 'test_ns')
-    monkeypatch.setenv('REVERIE_DB', 'test_db')
-    monkeypatch.setenv('REVERIE_DB_USER', 'test_user')
-    monkeypatch.setenv('REVERIE_DB_PASS', 'test_pass')
+    monkeypatch.setenv('SURQL_DB_URL', 'ws://test-db:8000/rpc')
+    monkeypatch.setenv('SURQL_DB_NS', 'test_ns')
+    monkeypatch.setenv('SURQL_DB', 'test_db')
+    monkeypatch.setenv('SURQL_DB_USER', 'test_user')
+    monkeypatch.setenv('SURQL_DB_PASS', 'test_pass')
 
     config = ConnectionConfig(_env_file=None)
 

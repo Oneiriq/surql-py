@@ -56,7 +56,7 @@ For development or to use the latest features:
 
 ```shell
 # Clone the repository
-git clone https://github.com/Oneiriq/surql-python.git
+git clone https://github.com/Oneiriq/surql-py.git
 cd surql
 
 # Install with uv
@@ -408,5 +408,5 @@ Now that you have surql installed and configured:
 
 - [SurrealDB Documentation](https://surrealdb.com/docs)
 - [SurrealDB Installation](https://surrealdb.com/install)
-- [surql GitHub Repository](https://github.com/Oneiriq/surql-python)
+- [surql GitHub Repository](https://github.com/Oneiriq/surql-py)
 - [Python Virtual Environments](https://docs.python.org/3/tutorial/venv.html)

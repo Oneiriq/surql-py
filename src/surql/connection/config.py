@@ -10,7 +10,7 @@ class ConnectionConfig(BaseSettings):
   """Database connection configuration with environment variable support."""
 
   model_config = SettingsConfigDict(
-    env_prefix='REVERIE_',
+    env_prefix='SURQL_',
     env_file='.env',
     env_file_encoding='utf-8',
     case_sensitive=False,
@@ -213,7 +213,7 @@ class NamedConnectionConfig(BaseSettings):
     Returns:
       Named connection configuration
     """
-    prefix = f'REVERIE_{name.upper()}_'
+    prefix = f'SURQL_{name.upper()}_'
 
     # Create a dynamic subclass with the named prefix
     class NamedConfig(ConnectionConfig):

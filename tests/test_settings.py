@@ -32,11 +32,11 @@ class TestSettings:
   def test_settings_with_custom_values(self) -> None:
     """Test settings loading with custom environment variables."""
     env_vars = {
-      'REVERIE_ENVIRONMENT': 'production',
-      'REVERIE_DEBUG': 'false',
-      'REVERIE_LOG_LEVEL': 'WARNING',
-      'REVERIE_APP_NAME': 'custom-app',
-      'REVERIE_VERSION': '1.0.0',
+      'SURQL_ENVIRONMENT': 'production',
+      'SURQL_DEBUG': 'false',
+      'SURQL_LOG_LEVEL': 'WARNING',
+      'SURQL_APP_NAME': 'custom-app',
+      'SURQL_VERSION': '1.0.0',
     }
 
     with patch.dict(os.environ, env_vars, clear=True):
@@ -63,7 +63,7 @@ class TestSettings:
   )
   def test_debug_parsing(self, debug_value: str, expected: bool) -> None:
     """Test various debug value formats are parsed correctly."""
-    with patch.dict(os.environ, {'REVERIE_DEBUG': debug_value}, clear=True):
+    with patch.dict(os.environ, {'SURQL_DEBUG': debug_value}, clear=True):
       settings = Settings()
       assert settings.debug is expected
 
@@ -72,7 +72,7 @@ class TestSettings:
     # Clear the cache first
     get_settings.cache_clear()
 
-    with patch.dict(os.environ, {'REVERIE_APP_NAME': 'test-app'}, clear=True):
+    with patch.dict(os.environ, {'SURQL_APP_NAME': 'test-app'}, clear=True):
       settings1 = get_settings()
       settings2 = get_settings()
 
@@ -82,16 +82,16 @@ class TestSettings:
 
   def test_invalid_environment_raises_validation_error(self) -> None:
     """Test that invalid environment value raises ValidationError."""
-    # Settings uses REVERIE_ prefix for environment variables
-    with patch.dict(os.environ, {'REVERIE_ENVIRONMENT': 'invalid'}, clear=True):
+    # Settings uses SURQL_ prefix for environment variables
+    with patch.dict(os.environ, {'SURQL_ENVIRONMENT': 'invalid'}, clear=True):
       with pytest.raises(ValidationError) as exc_info:
         Settings(_env_file=None)
       assert 'environment' in str(exc_info.value).lower()
 
   def test_invalid_log_level_raises_validation_error(self) -> None:
     """Test that invalid log level value raises ValidationError."""
-    # Settings uses REVERIE_ prefix for environment variables
-    with patch.dict(os.environ, {'REVERIE_LOG_LEVEL': 'INVALID'}, clear=True):
+    # Settings uses SURQL_ prefix for environment variables
+    with patch.dict(os.environ, {'SURQL_LOG_LEVEL': 'INVALID'}, clear=True):
       with pytest.raises(ValidationError) as exc_info:
         Settings(_env_file=None)
       assert 'log_level' in str(exc_info.value).lower()
@@ -108,20 +108,20 @@ class TestMigrationPath:
 
   def test_migration_path_from_env_var(self) -> None:
     """Test migration_path loaded from environment variable."""
-    with patch.dict(os.environ, {'REVERIE_MIGRATION_PATH': 'db/migrations'}, clear=True):
+    with patch.dict(os.environ, {'SURQL_MIGRATION_PATH': 'db/migrations'}, clear=True):
       settings = Settings(_env_file=None)
       assert settings.migration_path == Path('db/migrations')
 
   def test_migration_path_absolute_from_env_var(self) -> None:
     """Test migration_path with absolute path from environment variable."""
-    with patch.dict(os.environ, {'REVERIE_MIGRATION_PATH': '/custom/path'}, clear=True):
+    with patch.dict(os.environ, {'SURQL_MIGRATION_PATH': '/custom/path'}, clear=True):
       settings = Settings(_env_file=None)
       assert settings.migration_path == Path('/custom/path')
 
   def test_get_migration_path_function(self) -> None:
     """Test get_migration_path helper function."""
     get_settings.cache_clear()
-    with patch.dict(os.environ, {'REVERIE_MIGRATION_PATH': 'custom/migrations'}, clear=True):
+    with patch.dict(os.environ, {'SURQL_MIGRATION_PATH': 'custom/migrations'}, clear=True):
       migration_path = get_migration_path()
       assert migration_path == Path('custom/migrations')
     get_settings.cache_clear()
@@ -205,7 +205,7 @@ class TestPyProjectTomlSettingsSource:
     pyproject = tmp_path / 'pyproject.toml'
     pyproject.write_text('[tool.surql]\nmigration_path = "toml/path"\n')
 
-    with patch.dict(os.environ, {'REVERIE_MIGRATION_PATH': 'env/path'}, clear=True):
+    with patch.dict(os.environ, {'SURQL_MIGRATION_PATH': 'env/path'}, clear=True):
       settings = Settings(_env_file=None)
       assert settings.migration_path == Path('env/path')
 

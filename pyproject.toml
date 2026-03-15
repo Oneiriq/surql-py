@@ -34,7 +34,6 @@ keywords = [
 
 dependencies = [
   "cachetools>=5.0.0",
-  "fastapi>=0.128.0,<1.0.0",
   "httpx>=0.28.1,<1.0.0",
   "pydantic-settings>=2.12.0",
   "pydantic>=2.12.0",
@@ -49,11 +48,16 @@ dependencies = [
 
 [project.optional-dependencies]
 cache = ["redis>=5.0.0"]
+docs = [
+  "mkdocs-material>=9.6.0",
+  "mkdocs-minify-plugin>=0.8.0",
+  "mkdocstrings[python]>=0.29.0",
+]
 
 [project.urls]
 Homepage = "https://github.com/Oneiriq/surql-py"
 Repository = "https://github.com/Oneiriq/surql-py"
-Documentation = "https://github.com/Oneiriq/surql-py#readme"
+Documentation = "https://oneiriq.github.io/surql-py"
 Issues = "https://github.com/Oneiriq/surql-py/issues"
 Changelog = "https://github.com/Oneiriq/surql-py/blob/main/CHANGES"
 

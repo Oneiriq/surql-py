@@ -275,8 +275,8 @@ def _find_migrations_dir() -> Path | None:
   """Find migrations directory using settings or common locations.
 
   Resolution order:
-  1. REVERIE_MIGRATION_PATH environment variable
-  2. .env file (REVERIE_MIGRATION_PATH)
+  1. SURQL_MIGRATION_PATH environment variable
+  2. .env file (SURQL_MIGRATION_PATH)
   3. pyproject.toml [tool.surql] migration_path
   4. Common locations (migrations/, db/migrations/, etc.)
 

@@ -322,7 +322,7 @@ Edges represent relationships between records in SurrealDB's graph model.
 surql supports two edge table modes:
 
 1. **TYPE RELATION (default)**: Modern SurrealDB graph edges with automatic in/out fields
-2. **SCHEMAFULL**: Traditional tables with explicit in/out fields (driftnet-compatible)
+2. **SCHEMAFULL**: Traditional tables with explicit in/out fields
 
 ### TYPE RELATION Edges (Default)
 
@@ -363,15 +363,15 @@ likes_edge = edge_schema(
 )
 ```
 
-### SCHEMAFULL Edges (Driftnet-Compatible)
+### SCHEMAFULL Edges
 
-For compatibility with traditional schemas (like driftnet), use SCHEMAFULL mode with explicit in/out fields:
+For compatibility with traditional schemas, use SCHEMAFULL mode with explicit in/out fields:
 
 ```python
 from surql.schema.edge import EdgeMode, schemafull_edge
 from surql.schema.fields import record_field, string_field, float_field, array_field
 
-# Driftnet-compatible entity_relation edge
+# entity_relation edge with explicit in/out fields
 entity_relation = schemafull_edge(
   'entity_relation',
   fields=[
@@ -451,7 +451,7 @@ tagged_edge = edge_schema(
 **Use SCHEMAFULL when:**
 
 - Migrating from traditional graph databases
-- Compatibility with existing schemas (e.g., driftnet)
+- Compatibility with existing schemas
 - You need full control over edge field definitions
 - Working with legacy SurrealDB schemas
 

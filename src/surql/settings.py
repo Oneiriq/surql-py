@@ -3,7 +3,7 @@
 This module provides configuration management for surql with support for
 multiple configuration sources in priority order:
 
-1. Environment variables (REVERIE_* prefix)
+1. Environment variables (SURQL_* prefix)
 2. .env file
 3. pyproject.toml [tool.surql] section
 4. Default values
@@ -76,13 +76,13 @@ class Settings(BaseSettings):
   4. Default values (lowest priority)
 
   Example:
-    Environment variable: REVERIE_MIGRATION_PATH=/custom/path
-    .env file: REVERIE_MIGRATION_PATH=/custom/path
+    Environment variable: SURQL_MIGRATION_PATH=/custom/path
+    .env file: SURQL_MIGRATION_PATH=/custom/path
     pyproject.toml: [tool.surql] migration_path = "db/migrations"
   """
 
   model_config = SettingsConfigDict(
-    env_prefix='REVERIE_',
+    env_prefix='SURQL_',
     env_file='.env',
     env_file_encoding='utf-8',
     case_sensitive=False,
@@ -177,7 +177,7 @@ def get_migration_path() -> Path:
   """Get the configured migration path.
 
   Returns the migration path from configuration sources in priority order:
-  1. REVERIE_MIGRATION_PATH environment variable
+  1. SURQL_MIGRATION_PATH environment variable
   2. .env file
   3. pyproject.toml [tool.surql] migration_path
   4. Default: ./migrations

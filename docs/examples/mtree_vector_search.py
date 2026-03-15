@@ -1,10 +1,10 @@
-"""MTREE Vector Index Example - Driftnet Compatible Pattern.
+"""MTREE Vector Index Example - Vector Search Pattern.
 
-This example demonstrates MTREE vector index usage matching driftnet's
-semantic search implementation with 1024-dimensional embeddings and
+This example demonstrates MTREE vector index usage for
+semantic search with 1024-dimensional embeddings and
 COSINE similarity.
 
-Driftnet uses MTREE indexes for:
+MTREE indexes are used for:
 - chunk.embedding (1024 dimensions, COSINE)
 - entity.embedding (1024 dimensions, COSINE)
 - claim.embedding (1024 dimensions, COSINE)
@@ -23,7 +23,7 @@ from reverie.schema import (
   with_indexes,
 )
 
-# Define chunk table with 1024-dimensional MTREE index (driftnet pattern)
+# Define chunk table with 1024-dimensional MTREE index (semantic search pattern)
 chunk = table_schema('chunk')
 chunk = with_fields(
   chunk,
@@ -40,8 +40,8 @@ chunk = with_indexes(
   mtree_index(
     'idx_chunk_embedding',
     'embedding',
-    1024,  # Matches driftnet's dimension
-    distance=MTreeDistanceType.COSINE,  # Matches driftnet's metric
+    1024,  # Common embedding dimension
+    distance=MTreeDistanceType.COSINE,  # Common distance metric
     vector_type=MTreeVectorType.F64,
   ),
 )
@@ -149,7 +149,7 @@ user_preferences = with_indexes(
 
 
 """
-Generated SurrealQL (for driftnet-compatible tables):
+Generated SurrealQL (for vector-indexed tables):
 
 DEFINE TABLE chunk SCHEMAFULL;
 DEFINE FIELD document_id ON TABLE chunk TYPE string;
@@ -178,7 +178,7 @@ DEFINE INDEX idx_claim_embedding ON TABLE claim COLUMNS embedding MTREE DIMENSIO
 
 Vector Search Queries (to be used with raw query execution):
 
--- Driftnet-style semantic search on chunks
+-- Semantic search on chunks
 SELECT
     id, document_id, text, chunk_index, char_start, char_end, created_at,
     vector::similarity::cosine(embedding, $embedding) AS similarity

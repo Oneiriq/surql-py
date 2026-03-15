@@ -104,12 +104,12 @@ class TestMTreeIndexToSQL:
     expected = 'DEFINE INDEX openai_idx ON TABLE documents COLUMNS embedding MTREE DIMENSION 1536 DIST COSINE TYPE F32;'
     assert sql == expected
 
-  def test_mtree_index_to_sql_driftnet_1024_dimensions(self) -> None:
-    """Test MTREE index SQL for driftnet's 1024-dimensional embeddings with COSINE."""
+  def test_mtree_index_to_sql_1024_dimensions(self) -> None:
+    """Test MTREE index SQL for 1024-dimensional embeddings with COSINE."""
     idx = mtree_index(
       'idx_chunk_embedding',
       'embedding',
-      1024,  # Driftnet dimension
+      1024,  # Common embedding dimension
       distance=MTreeDistanceType.COSINE,
       vector_type=MTreeVectorType.F64,
     )
@@ -117,7 +117,7 @@ class TestMTreeIndexToSQL:
 
     expected = 'DEFINE INDEX idx_chunk_embedding ON TABLE chunk COLUMNS embedding MTREE DIMENSION 1024 DIST COSINE TYPE F64;'
     assert sql == expected
-    # Verify all driftnet requirements are met
+    # Verify all requirements are met
     assert 'DIMENSION 1024' in sql
     assert 'DIST COSINE' in sql
     assert 'COLUMNS embedding' in sql

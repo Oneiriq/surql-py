@@ -10,7 +10,7 @@ surql is a code-first database toolkit for building modern applications with Sur
 
 - **Code-First Migrations** - Define and manage database schema changes directly in code with automatic migration generation
 - **Type Safety** - Leverage Python's type hints with Pydantic for validation and reduced runtime errors
-- **Driftnet Compatible** - Full compatibility with driftnet patterns: angle bracket RecordIDs, MTREE vector indexes with 9 distance metrics, SCHEMAFULL edge tables, and result extraction utilities
+- **Schema Compatibility** - Support for both TYPE RELATION and SCHEMAFULL edge table modes
 - **Vector Search** - Complete MTREE index support with 9 distance metrics (COSINE, EUCLIDEAN, MANHATTAN, HAMMING, MINKOWSKI, CHEBYSHEV, PEARSON, JACCARD, DOT)
 - **Query Caching** - Memory and Redis-backed caching with `@cache_query` decorator
 - **Live Queries** - Real-time change notifications and streaming support
@@ -133,11 +133,8 @@ async with get_client(config) as client:
 - [Live Queries & Streaming](docs/streaming.md) - Real-time data notifications
 - [CLI Reference](docs/cli.md) - Command-line interface documentation
 - [API Reference](docs/api/README.md) - Module and function reference
-- [Driftnet Migration Guide](docs/driftnet_migration.md) - Migrating from surrealdb-py to surql
-- [Compatibility Analysis](plans/compat.md) - Complete driftnet compatibility verification
 - [Examples](docs/examples/) - Working code examples
-  - [MTREE Vector Search](docs/examples/mtree_vector_search.py) - 1024-dim COSINE indexes (driftnet-compatible)
-  - [Driftnet Edge Tables](docs/examples/driftnet_edge_example.py) - SCHEMAFULL edge patterns
+  - [MTREE Vector Search](docs/examples/mtree_vector_search.py) - 1024-dim COSINE indexes
   - [Advanced Queries](docs/examples/advanced_queries.py) - Complex query patterns
 
 ## Architecture
@@ -149,8 +146,6 @@ surql is built on several core principles:
 - **Immutability** - Immutable data structures and pure transformations
 - **Async-First** - All database operations are asynchronous
 - **Modular Design** - Small, focused modules with single responsibilities
-
-See the [Architecture Document](plans/architecture.md) for detailed design information.
 
 ## Project Structure
 
@@ -237,7 +232,7 @@ surql db query <sql>          # Execute raw SurrealQL
 
 ```shell
 # Clone the repository
-git clone https://github.com/Oneiriq/surql-python.git
+git clone https://github.com/Oneiriq/surql-py.git
 cd surql
 
 # Install dependencies with uv
@@ -289,24 +284,9 @@ This project is licensed under the Apache License 2.0 - see the [LICENSE](LICENS
 ## Support
 
 - Documentation: [docs/](docs/)
-- Issues: [GitHub Issues](https://github.com/Oneiriq/surql-python/issues)
-- Discussions: [GitHub Discussions](https://github.com/Oneiriq/surql-python/discussions)
+- Issues: [GitHub Issues](https://github.com/Oneiriq/surql-py/issues)
+- Discussions: [GitHub Discussions](https://github.com/Oneiriq/surql-py/discussions)
 
 ## Roadmap
 
-- [x] Core schema definition system
-- [x] Migration generation and execution
-- [x] CRUD operations and query builder
-- [x] CLI interface
-- [x] Auto-migration generation from schema changes
-- [x] Schema validation against database
-- [x] Advanced graph query helpers
-- [x] Query result caching
-- [x] Migration squashing
-- [x] Schema visualization
-- [x] Advanced query optimization hints
-- [x] Multi-database migration orchestration
-- [x] Schema versioning and rollback strategies
-- [ ] Performance profiling tools
-
----
+See [CHANGES](CHANGES) for release history.

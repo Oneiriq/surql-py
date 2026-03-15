@@ -1379,10 +1379,10 @@ class TestSimilaritySearchQuery:
     assert 'text' in sql
     assert 'AS score' in sql
 
-  def test_similarity_search_driftnet_pattern(self) -> None:
-    """Test the exact pattern driftnet uses for vector search.
+  def test_similarity_search_pattern(self) -> None:
+    """Test a common pattern for vector search with similarity scoring.
 
-    Validates that surql can now produce the equivalent of driftnet's
+    Validates that surql can produce the equivalent of a typical
     manually constructed SurrealQL:
       SELECT id, text, vector::similarity::cosine(embedding, $embedding) AS similarity
       FROM chunk

@@ -199,8 +199,8 @@ def get_migrations_directory(directory: Path | None = None) -> Path:
 
   Resolution order (first wins):
   1. Explicit directory parameter (CLI --directory flag)
-  2. REVERIE_MIGRATION_PATH environment variable
-  3. .env file (REVERIE_MIGRATION_PATH)
+  2. SURQL_MIGRATION_PATH environment variable
+  3. .env file (SURQL_MIGRATION_PATH)
   4. pyproject.toml [tool.surql] migration_path
   5. Default: ./migrations
 
