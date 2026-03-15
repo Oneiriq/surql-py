@@ -65,7 +65,7 @@ jobs:
     if: >-
       (github.event_name == 'workflow_dispatch' && github.event.inputs.target == 'testpypi') ||
       (github.event_name == 'release' && github.event.release.prerelease)
-    environment: testpypi
+    environment: test
     permissions:
       id-token: write
     steps:
