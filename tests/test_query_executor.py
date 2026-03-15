@@ -5,9 +5,9 @@ from unittest.mock import AsyncMock, patch
 import pytest
 from pydantic import BaseModel, ValidationError
 
-from reverie.connection.client import QueryError
-from reverie.query.builder import Query
-from reverie.query.executor import (
+from surql.connection.client import QueryError
+from surql.query.builder import Query
+from surql.query.executor import (
   _extract_result_data,
   execute_query,
   execute_raw,
@@ -18,7 +18,7 @@ from reverie.query.executor import (
   fetch_record,
   fetch_records,
 )
-from reverie.query.results import ListResult, RecordResult
+from surql.query.results import ListResult, RecordResult
 
 
 # Test models
@@ -58,7 +58,7 @@ class TestExecuteQuery:
 
     query = Query[User]().select().from_table('user')
 
-    with patch('reverie.query.executor.get_db', return_value=mock_db_client):
+    with patch('surql.query.executor.get_db', return_value=mock_db_client):
       result = await execute_query(query)
 
     assert result == [{'result': []}]
@@ -438,7 +438,7 @@ class TestExecuteRaw:
     """Test execute_raw using context client."""
     mock_db_client.execute = AsyncMock(return_value=[{'result': []}])
 
-    with patch('reverie.query.executor.get_db', return_value=mock_db_client):
+    with patch('surql.query.executor.get_db', return_value=mock_db_client):
       result = await execute_raw('SELECT * FROM user')
 
     assert result == [{'result': []}]

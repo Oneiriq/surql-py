@@ -4,7 +4,7 @@ from datetime import datetime, timezone
 
 import pytest
 
-from reverie.types.coerce import coerce_datetime, coerce_record_datetimes
+from surql.types.coerce import coerce_datetime, coerce_record_datetimes
 
 
 class TestCoerceDatetime:

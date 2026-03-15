@@ -3,7 +3,7 @@
 import pytest
 from pydantic import BaseModel
 
-from reverie.query.builder import (
+from surql.query.builder import (
   Query,
   VectorDistanceType,
   delete,
@@ -13,9 +13,9 @@ from reverie.query.builder import (
   update,
   vector_search_query,
 )
-from reverie.query.executor import _extract_result_data
-from reverie.query.helpers import similarity_search_query
-from reverie.query.results import (
+from surql.query.executor import _extract_result_data
+from surql.query.helpers import similarity_search_query
+from surql.query.results import (
   ListResult,
   PageInfo,
   QueryResult,
@@ -31,8 +31,8 @@ from reverie.query.results import (
   records,
   success,
 )
-from reverie.types.operators import Gt, eq
-from reverie.types.record_id import RecordID
+from surql.types.operators import Gt, eq
+from surql.types.record_id import RecordID
 
 
 # Test models
@@ -1382,7 +1382,7 @@ class TestSimilaritySearchQuery:
   def test_similarity_search_driftnet_pattern(self) -> None:
     """Test the exact pattern driftnet uses for vector search.
 
-    Validates that reverie can now produce the equivalent of driftnet's
+    Validates that surql can now produce the equivalent of driftnet's
     manually constructed SurrealQL:
       SELECT id, text, vector::similarity::cosine(embedding, $embedding) AS similarity
       FROM chunk

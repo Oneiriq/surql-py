@@ -3,7 +3,7 @@
 import pytest
 from pydantic import ValidationError
 
-from reverie.types.operators import (
+from surql.types.operators import (
   And,
   Contains,
   ContainsAll,
@@ -41,7 +41,7 @@ from reverie.types.operators import (
   not_inside,
   or_,
 )
-from reverie.types.record_id import RecordID
+from surql.types.record_id import RecordID
 
 
 class TestRecordID:

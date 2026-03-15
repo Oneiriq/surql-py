@@ -10,8 +10,8 @@ from pathlib import Path
 import pytest
 from typer.testing import CliRunner
 
-from reverie.migration.models import Migration
-from reverie.migration.squash import (
+from surql.migration.models import Migration
+from surql.migration.squash import (
   SquashError,
   SquashResult,
   SquashWarning,
@@ -664,11 +664,11 @@ class TestGenerateSquashedMigration:
     assert 'Generated:' in content
 
   def test_includes_author(self) -> None:
-    """Test includes 'reverie' as author."""
+    """Test includes 'surql' as author."""
     statements = ['DEFINE TABLE user SCHEMAFULL;']
     content = generate_squashed_migration(statements)
 
-    assert "'author': 'reverie'" in content
+    assert "'author': 'surql'" in content
 
 
 # ============================================================================
@@ -1173,7 +1173,7 @@ class TestSquashCLICommand:
 
   def test_help_shows_command(self, cli_runner: CliRunner) -> None:
     """Test --help shows squash command."""
-    from reverie.cli.migrate import app as migrate_app
+    from surql.cli.migrate import app as migrate_app
 
     result = cli_runner.invoke(migrate_app, ['squash', '--help'])
 
@@ -1188,7 +1188,7 @@ class TestSquashCLICommand:
 
   def test_nonexistent_directory_shows_warning(self, cli_runner: CliRunner, tmp_path: Path) -> None:
     """Test nonexistent directory shows warning and returns gracefully."""
-    from reverie.cli.migrate import app as migrate_app
+    from surql.cli.migrate import app as migrate_app
 
     nonexistent = tmp_path / 'nonexistent'
 
@@ -1202,7 +1202,7 @@ class TestSquashCLICommand:
     self, cli_runner: CliRunner, temp_migration_dir: Path
   ) -> None:
     """Test --dry-run previews without changes."""
-    from reverie.cli.migrate import app as migrate_app
+    from surql.cli.migrate import app as migrate_app
 
     create_migration_file(
       temp_migration_dir,
@@ -1238,7 +1238,7 @@ class TestSquashCLICommand:
     self, cli_runner: CliRunner, temp_migration_dir: Path
   ) -> None:
     """Test --from and --to filter migrations."""
-    from reverie.cli.migrate import app as migrate_app
+    from surql.cli.migrate import app as migrate_app
 
     create_migration_file(
       temp_migration_dir,
@@ -1279,7 +1279,7 @@ class TestSquashCLICommand:
     self, cli_runner: CliRunner, temp_migration_dir: Path
   ) -> None:
     """Test --no-optimize disables optimization."""
-    from reverie.cli.migrate import app as migrate_app
+    from surql.cli.migrate import app as migrate_app
 
     create_migration_file(
       temp_migration_dir,
@@ -1312,7 +1312,7 @@ class TestSquashCLICommand:
     self, cli_runner: CliRunner, temp_migration_dir: Path
   ) -> None:
     """Test --keep-originals preserves original files."""
-    from reverie.cli.migrate import app as migrate_app
+    from surql.cli.migrate import app as migrate_app
 
     create_migration_file(
       temp_migration_dir,
@@ -1352,7 +1352,7 @@ class TestSquashCLICommand:
     when high severity warnings are present. Since force is not passed through
     to the squash_migrations() function, exit code 1 is expected.
     """
-    from reverie.cli.migrate import app as migrate_app
+    from surql.cli.migrate import app as migrate_app
 
     create_migration_file(
       temp_migration_dir,
@@ -1385,7 +1385,7 @@ class TestSquashCLICommand:
 
   def test_exit_code_success(self, cli_runner: CliRunner, temp_migration_dir: Path) -> None:
     """Test exit code 0 for success."""
-    from reverie.cli.migrate import app as migrate_app
+    from surql.cli.migrate import app as migrate_app
 
     create_migration_file(
       temp_migration_dir,
@@ -1416,7 +1416,7 @@ class TestSquashCLICommand:
     self, cli_runner: CliRunner, temp_migration_dir: Path
   ) -> None:
     """Test empty directory returns gracefully with warning."""
-    from reverie.cli.migrate import app as migrate_app
+    from surql.cli.migrate import app as migrate_app
 
     # Empty directory returns with warning, not error
     result = cli_runner.invoke(
@@ -1441,7 +1441,7 @@ class TestSquashCLICommand:
     proceeds to call squash_migrations(), which also validates and raises
     SquashError (exit 1), the actual behavior depends on the code path.
     """
-    from reverie.cli.migrate import app as migrate_app
+    from surql.cli.migrate import app as migrate_app
 
     create_migration_file(
       temp_migration_dir,
@@ -1474,7 +1474,7 @@ class TestSquashCLICommand:
 
   def test_single_migration_error(self, cli_runner: CliRunner, temp_migration_dir: Path) -> None:
     """Test error when only one migration exists."""
-    from reverie.cli.migrate import app as migrate_app
+    from surql.cli.migrate import app as migrate_app
 
     create_migration_file(
       temp_migration_dir,
@@ -1499,7 +1499,7 @@ class TestSquashCLICommand:
 
   def test_displays_migrations_table(self, cli_runner: CliRunner, temp_migration_dir: Path) -> None:
     """Test displays table of migrations to squash."""
-    from reverie.cli.migrate import app as migrate_app
+    from surql.cli.migrate import app as migrate_app
 
     create_migration_file(
       temp_migration_dir,
@@ -1532,7 +1532,7 @@ class TestSquashCLICommand:
     self, cli_runner: CliRunner, temp_migration_dir: Path
   ) -> None:
     """Test displays statistics panel on completion."""
-    from reverie.cli.migrate import app as migrate_app
+    from surql.cli.migrate import app as migrate_app
 
     create_migration_file(
       temp_migration_dir,

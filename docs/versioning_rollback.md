@@ -1,6 +1,6 @@
 # Schema Versioning and Rollback
 
-Complete guide to schema versioning, snapshotting, and safe rollback strategies in reverie.
+Complete guide to schema versioning, snapshotting, and safe rollback strategies in surql.
 
 ## Table of Contents
 
@@ -51,7 +51,7 @@ version = '20260109_120000'  # Timestamp-based identifier
 A snapshot captures complete database schema at a specific version:
 
 ```python
-from reverie.migration.versioning import SchemaSnapshot
+from surql.migration.versioning import SchemaSnapshot
 
 snapshot = SchemaSnapshot(
   version='20260109_120000',
@@ -69,7 +69,7 @@ snapshot = SchemaSnapshot(
 A graph representing the migration history and relationships:
 
 ```python
-from reverie.migration.versioning import VersionGraph
+from surql.migration.versioning import VersionGraph
 
 graph = VersionGraph()
 graph.add_version(migration1)
@@ -81,7 +81,7 @@ graph.add_version(migration2, parent='20260108_120000')
 A plan for safely rolling back to a previous version:
 
 ```python
-from reverie.migration.rollback import create_rollback_plan
+from surql.migration.rollback import create_rollback_plan
 
 plan = await create_rollback_plan(
   client,
@@ -97,8 +97,8 @@ plan = await create_rollback_plan(
 Capture current schema state:
 
 ```python
-from reverie.migration.versioning import create_snapshot
-from reverie.connection.client import get_client
+from surql.migration.versioning import create_snapshot
+from surql.connection.client import get_client
 
 async def capture_schema():
   async with get_client(config) as client:
@@ -120,7 +120,7 @@ async def capture_schema():
 Save snapshots to the database:
 
 ```python
-from reverie.migration.versioning import store_snapshot
+from surql.migration.versioning import store_snapshot
 
 async def save_snapshot(snapshot):
   async with get_client(config) as client:
@@ -133,7 +133,7 @@ async def save_snapshot(snapshot):
 Retrieve previously saved snapshots:
 
 ```python
-from reverie.migration.versioning import load_snapshot
+from surql.migration.versioning import load_snapshot
 
 async def retrieve_snapshot(version):
   async with get_client(config) as client:
@@ -154,7 +154,7 @@ async def retrieve_snapshot(version):
 Get all stored snapshots:
 
 ```python
-from reverie.migration.versioning import list_snapshots
+from surql.migration.versioning import list_snapshots
 
 async def show_all_snapshots():
   async with get_client(config) as client:
@@ -171,7 +171,7 @@ async def show_all_snapshots():
 Identify differences between two schema versions:
 
 ```python
-from reverie.migration.versioning import compare_snapshots
+from surql.migration.versioning import compare_snapshots
 
 async def compare_versions(version1, version2):
   async with get_client(config) as client:
@@ -213,8 +213,8 @@ async def compare_versions(version1, version2):
 Track migration history as a graph:
 
 ```python
-from reverie.migration.versioning import VersionGraph
-from reverie.migration.discovery import discover_migrations
+from surql.migration.versioning import VersionGraph
+from surql.migration.discovery import discover_migrations
 from pathlib import Path
 
 def build_version_graph():
@@ -291,8 +291,8 @@ def plan_using_graph(graph, current_version, target_version):
 Plan rollback with safety analysis:
 
 ```python
-from reverie.migration.rollback import create_rollback_plan
-from reverie.migration.discovery import discover_migrations
+from surql.migration.rollback import create_rollback_plan
+from surql.migration.discovery import discover_migrations
 
 async def plan_rollback():
   migrations = discover_migrations(Path('migrations'))
@@ -329,7 +329,7 @@ async def plan_rollback():
 Get safety analysis without creating full plan:
 
 ```python
-from reverie.migration.rollback import analyze_rollback_safety
+from surql.migration.rollback import analyze_rollback_safety
 
 async def check_safety(target_version):
   migrations = discover_migrations(Path('migrations'))
@@ -440,7 +440,7 @@ def down():
 Execute a safe rollback:
 
 ```python
-from reverie.migration.rollback import execute_rollback
+from surql.migration.rollback import execute_rollback
 
 async def rollback_safely():
   migrations = discover_migrations(Path('migrations'))
@@ -554,7 +554,7 @@ async def preview_rollback():
 Automatically create snapshots after migrations:
 
 ```python
-from reverie.migration.history import enable_auto_snapshots, disable_auto_snapshots
+from surql.migration.history import enable_auto_snapshots, disable_auto_snapshots
 
 # Enable automatic snapshots
 enable_auto_snapshots()
@@ -580,8 +580,8 @@ When enabled:
 **Example Flow:**
 
 ```python
-from reverie.migration.history import enable_auto_snapshots
-from reverie.migration.executor import apply_migrations
+from surql.migration.history import enable_auto_snapshots
+from surql.migration.executor import apply_migrations
 
 async def migrate_with_snapshots():
   # Enable auto-snapshots
@@ -610,7 +610,7 @@ async def migrate_with_snapshots():
 Create a snapshot manually:
 
 ```shell
-reverie migrate snapshot [OPTIONS]
+surql migrate snapshot [OPTIONS]
 ```
 
 **Options:**
@@ -622,13 +622,13 @@ reverie migrate snapshot [OPTIONS]
 
 ```shell
 # Create snapshot of current state
-reverie migrate snapshot
+surql migrate snapshot
 
 # Create snapshot for specific version
-reverie migrate snapshot --version 20260109_120000
+surql migrate snapshot --version 20260109_120000
 
 # Export snapshot to file
-reverie migrate snapshot --output snapshot.json
+surql migrate snapshot --output snapshot.json
 ```
 
 ### migrate list-snapshots
@@ -636,7 +636,7 @@ reverie migrate snapshot --output snapshot.json
 List all stored snapshots:
 
 ```shell
-reverie migrate list-snapshots [OPTIONS]
+surql migrate list-snapshots [OPTIONS]
 ```
 
 **Options:**
@@ -646,7 +646,7 @@ reverie migrate list-snapshots [OPTIONS]
 **Example:**
 
 ```shell
-reverie migrate list-snapshots
+surql migrate list-snapshots
 ```
 
 **Output:**
@@ -666,7 +666,7 @@ Schema Snapshots
 Plan rollback to a target version:
 
 ```shell
-reverie migrate plan-rollback VERSION [OPTIONS]
+surql migrate plan-rollback VERSION [OPTIONS]
 ```
 
 **Arguments:**
@@ -682,10 +682,10 @@ reverie migrate plan-rollback VERSION [OPTIONS]
 
 ```shell
 # Plan rollback
-reverie migrate plan-rollback 20260108_120000
+surql migrate plan-rollback 20260108_120000
 
 # Show SQL that will run
-reverie migrate plan-rollback 20260108_120000 --show-sql
+surql migrate plan-rollback 20260108_120000 --show-sql
 ```
 
 **Output:**
@@ -711,7 +711,7 @@ Safety Issues:
 Execute a rollback:
 
 ```shell
-reverie migrate rollback VERSION [OPTIONS]
+surql migrate rollback VERSION [OPTIONS]
 ```
 
 **Arguments:**
@@ -728,16 +728,16 @@ reverie migrate rollback VERSION [OPTIONS]
 
 ```shell
 # Rollback to version (with confirmation)
-reverie migrate rollback 20260108_120000
+surql migrate rollback 20260108_120000
 
 # Force unsafe rollback
-reverie migrate rollback 20260107_120000 --force
+surql migrate rollback 20260107_120000 --force
 
 # Dry run to preview
-reverie migrate rollback 20260108_120000 --dry-run
+surql migrate rollback 20260108_120000 --dry-run
 
 # Skip confirmation
-reverie migrate rollback 20260108_120000 --yes
+surql migrate rollback 20260108_120000 --yes
 ```
 
 ### migrate compare
@@ -745,7 +745,7 @@ reverie migrate rollback 20260108_120000 --yes
 Compare two snapshots:
 
 ```shell
-reverie migrate compare VERSION1 VERSION2
+surql migrate compare VERSION1 VERSION2
 ```
 
 **Arguments:**
@@ -756,7 +756,7 @@ reverie migrate compare VERSION1 VERSION2
 **Example:**
 
 ```shell
-reverie migrate compare 20260108_120000 20260109_120000
+surql migrate compare 20260108_120000 20260109_120000
 ```
 
 **Output:**
@@ -801,12 +801,12 @@ Never execute without reviewing:
 
 ```shell
 # Step 1: Create plan
-reverie migrate plan-rollback 20260108_120000 --show-sql
+surql migrate plan-rollback 20260108_120000 --show-sql
 
 # Step 2: Review output carefully
 
 # Step 3: Execute if safe
-reverie migrate rollback 20260108_120000
+surql migrate rollback 20260108_120000
 ```
 
 ### 3. Backup Data Before Unsafe Rollbacks
@@ -846,10 +846,10 @@ Always test rollback process:
 
 ```shell
 # In development
-reverie migrate up                    # Apply migration
-reverie migrate snapshot              # Create snapshot
-reverie migrate rollback <version>    # Test rollback
-reverie migrate up                    # Re-apply
+surql migrate up                    # Apply migration
+surql migrate snapshot              # Create snapshot
+surql migrate rollback <version>    # Test rollback
+surql migrate up                    # Re-apply
 ```
 
 ### 5. Use Auto-Snapshots in Production
@@ -956,7 +956,7 @@ async def cleanup_old_snapshots(keep_count=10):
 
 1. Check database connection:
    ```shell
-   reverie db ping
+   surql db ping
    ```
 
 2. Verify permissions:
@@ -983,7 +983,7 @@ async def cleanup_old_snapshots(keep_count=10):
 
 ```python
 async def debug_rollback_plan():
-  from reverie.migration.history import get_applied_migrations
+  from surql.migration.history import get_applied_migrations
   
   async with get_client(config) as client:
     applied = await get_applied_migrations(client)
@@ -1057,9 +1057,9 @@ async def verify_schema_integrity():
 
 ```python
 from pathlib import Path
-from reverie.migration.discovery import discover_migrations
-from reverie.migration.rollback import create_rollback_plan, execute_rollback
-from reverie.migration.versioning import create_snapshot, store_snapshot
+from surql.migration.discovery import discover_migrations
+from surql.migration.rollback import create_rollback_plan, execute_rollback
+from surql.migration.versioning import create_snapshot, store_snapshot
 
 async def complete_rollback_workflow():
   """Complete workflow: snapshot, plan, review, execute."""

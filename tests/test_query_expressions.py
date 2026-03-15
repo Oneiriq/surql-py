@@ -3,7 +3,7 @@
 import pytest
 from pydantic import ValidationError
 
-from reverie.query.expressions import (
+from surql.query.expressions import (
   Expression,
   FieldExpression,
   FunctionExpression,

@@ -5,10 +5,10 @@ from unittest.mock import AsyncMock
 import pytest
 from pydantic import BaseModel
 
-from reverie.connection.client import DatabaseClient
-from reverie.query.builder import Query, upsert
-from reverie.query.crud import upsert_record
-from reverie.types.record_id import RecordID
+from surql.connection.client import DatabaseClient
+from surql.query.builder import Query, upsert
+from surql.query.crud import upsert_record
+from surql.types.record_id import RecordID
 
 
 class User(BaseModel):

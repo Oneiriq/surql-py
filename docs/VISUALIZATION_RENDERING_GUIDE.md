@@ -1,10 +1,10 @@
 # Visualization Rendering Guide
 
-This guide explains how to **render** Reverie's schema visualizations to see the beautiful styled output with colors, gradients, and themeing.
+This guide explains how to **render** surql's schema visualizations to see the beautiful styled output with colors, gradients, and themeing.
 
 ## Important: Source Code vs Rendered Output
 
-When you generate visualizations with Reverie, you get **source code** that needs to be **rendered** to display visually:
+When you generate visualizations with surql, you get **source code** that needs to be **rendered** to display visually:
 
 - **GraphViz**: You see DOT code with HTML-like tags for colors → needs GraphViz to render
 - **Mermaid**: You see markdown with theme directives → needs Mermaid.js to render
@@ -202,7 +202,7 @@ Most documentation generators support Mermaid:
 
 ```python
 # Generate and save Mermaid diagram
-from reverie.schema.visualize import visualize_schema, OutputFormat
+from surql.schema.visualize import visualize_schema, OutputFormat
 
 diagram = visualize_schema(
     tables=tables,
@@ -327,8 +327,8 @@ python docs/examples/visualization_example.py | aha > schema.html
 If your terminal doesn't support colors or Unicode:
 
 ```python
-from reverie.schema.visualize import visualize_schema, OutputFormat
-from reverie.schema.themes import ASCIITheme
+from surql.schema.visualize import visualize_schema, OutputFormat
+from surql.schema.themes import ASCIITheme
 
 diagram = visualize_schema(
     tables=tables,
@@ -502,7 +502,7 @@ Here's a complete workflow from generation to rendering:
 
 ```python
 # 1. Generate all formats
-from reverie.schema.visualize import visualize_schema, OutputFormat
+from surql.schema.visualize import visualize_schema, OutputFormat
 
 # GraphViz
 graphviz_code = visualize_schema(

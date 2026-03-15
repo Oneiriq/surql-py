@@ -5,12 +5,12 @@ from unittest.mock import AsyncMock, patch
 
 import pytest
 
-from reverie.connection.config import ConnectionConfig
-from reverie.migration.models import Migration
-from reverie.orchestration.config import EnvironmentConfig, EnvironmentRegistry
-from reverie.orchestration.coordinator import MigrationCoordinator, OrchestrationError
-from reverie.orchestration.health import HealthCheck, HealthStatus
-from reverie.orchestration.strategy import DeploymentStatus
+from surql.connection.config import ConnectionConfig
+from surql.migration.models import Migration
+from surql.orchestration.config import EnvironmentConfig, EnvironmentRegistry
+from surql.orchestration.coordinator import MigrationCoordinator, OrchestrationError
+from surql.orchestration.health import HealthCheck, HealthStatus
+from surql.orchestration.strategy import DeploymentStatus
 
 
 @pytest.fixture
@@ -65,7 +65,7 @@ class TestHealthCheck:
     health = HealthCheck()
 
     # Mock the client
-    with patch('reverie.orchestration.health.get_client') as mock_get_client:
+    with patch('surql.orchestration.health.get_client') as mock_get_client:
       mock_client = AsyncMock()
       mock_get_client.return_value.__aenter__.return_value = mock_client
       mock_client.execute = AsyncMock(return_value=1)
@@ -76,7 +76,7 @@ class TestHealthCheck:
   @pytest.mark.anyio
   async def test_check_connectivity_failure(self) -> None:
     """Test failed connectivity check."""
-    from reverie.connection.client import ConnectionError as ClientConnectionError
+    from surql.connection.client import ConnectionError as ClientConnectionError
 
     connection = ConnectionConfig(db_url='ws://localhost:8000/rpc', db_ns='test', db='main')
     env = EnvironmentConfig(name='test', connection=connection)
@@ -84,7 +84,7 @@ class TestHealthCheck:
     health = HealthCheck()
 
     # Mock the client to raise error
-    with patch('reverie.orchestration.health.get_client') as mock_get_client:
+    with patch('surql.orchestration.health.get_client') as mock_get_client:
       mock_client = AsyncMock()
       mock_get_client.return_value.__aenter__.return_value = mock_client
       mock_client.execute = AsyncMock(side_effect=ClientConnectionError('Connection failed'))
@@ -100,7 +100,7 @@ class TestHealthCheck:
 
     health = HealthCheck()
 
-    with patch('reverie.orchestration.health.get_client') as mock_get_client:
+    with patch('surql.orchestration.health.get_client') as mock_get_client:
       mock_client = AsyncMock()
       mock_get_client.return_value.__aenter__.return_value = mock_client
       mock_client.execute = AsyncMock(return_value=[])
@@ -111,14 +111,14 @@ class TestHealthCheck:
   @pytest.mark.anyio
   async def test_check_migration_table_not_exists(self) -> None:
     """Test migration table not existing."""
-    from reverie.connection.client import QueryError
+    from surql.connection.client import QueryError
 
     connection = ConnectionConfig(db_url='ws://localhost:8000/rpc', db_ns='test', db='main')
     env = EnvironmentConfig(name='test', connection=connection)
 
     health = HealthCheck()
 
-    with patch('reverie.orchestration.health.get_client') as mock_get_client:
+    with patch('surql.orchestration.health.get_client') as mock_get_client:
       mock_client = AsyncMock()
       mock_get_client.return_value.__aenter__.return_value = mock_client
       mock_client.execute = AsyncMock(side_effect=QueryError('Table not found'))
@@ -134,7 +134,7 @@ class TestHealthCheck:
 
     health = HealthCheck()
 
-    with patch('reverie.orchestration.health.get_client') as mock_get_client:
+    with patch('surql.orchestration.health.get_client') as mock_get_client:
       mock_client = AsyncMock()
       mock_get_client.return_value.__aenter__.return_value = mock_client
       mock_client.execute = AsyncMock(return_value=[])
@@ -148,14 +148,14 @@ class TestHealthCheck:
   @pytest.mark.anyio
   async def test_check_environment_unhealthy(self) -> None:
     """Test checking unhealthy environment."""
-    from reverie.connection.client import ConnectionError as ClientConnectionError
+    from surql.connection.client import ConnectionError as ClientConnectionError
 
     connection = ConnectionConfig(db_url='ws://localhost:8000/rpc', db_ns='test', db='main')
     env = EnvironmentConfig(name='test', connection=connection)
 
     health = HealthCheck()
 
-    with patch('reverie.orchestration.health.get_client') as mock_get_client:
+    with patch('surql.orchestration.health.get_client') as mock_get_client:
       mock_client = AsyncMock()
       mock_get_client.return_value.__aenter__.return_value = mock_client
       mock_client.execute = AsyncMock(side_effect=ClientConnectionError('Failed'))
@@ -179,7 +179,7 @@ class TestHealthCheck:
 
     health = HealthCheck()
 
-    with patch('reverie.orchestration.health.get_client') as mock_get_client:
+    with patch('surql.orchestration.health.get_client') as mock_get_client:
       mock_client = AsyncMock()
       mock_get_client.return_value.__aenter__.return_value = mock_client
       mock_client.execute = AsyncMock(return_value=[])

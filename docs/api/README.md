@@ -1,6 +1,6 @@
 # API Reference
 
-This document provides an overview of reverie's API modules. For detailed implementation, refer to the source code.
+This document provides an overview of surql's API modules. For detailed implementation, refer to the source code.
 
 ## Table of Contents
 
@@ -44,7 +44,7 @@ Field type definitions and builder functions.
 **Example:**
 
 ```python
-from reverie.schema.fields import string_field, int_field
+from surql.schema.fields import string_field, int_field
 
 name_field = string_field('name', assertion='string::len($value) > 0')
 age_field = int_field('age', assertion='$value >= 0')
@@ -77,7 +77,7 @@ Table schema composition and builders.
 **Example:**
 
 ```python
-from reverie.schema.table import table_schema, unique_index, TableMode
+from surql.schema.table import table_schema, unique_index, TableMode
 
 schema = table_schema(
   'user',
@@ -102,7 +102,7 @@ Edge (relationship) schema definitions.
 **Example:**
 
 ```python
-from reverie.schema.edge import edge_schema
+from surql.schema.edge import edge_schema
 
 follows = edge_schema('follows', from_table='user', to_table='user')
 ```
@@ -200,7 +200,7 @@ High-level CRUD operations.
 **Example:**
 
 ```python
-from reverie.query.crud import create_record, query_records
+from surql.query.crud import create_record, query_records
 
 user = await create_record('user', user_data, client=client)
 users = await query_records('user', User, conditions=['age >= 18'], client=client)
@@ -229,7 +229,7 @@ Result wrapper classes and extraction utilities for SurrealDB responses.
 **Example:**
 
 ```python
-from reverie.query.results import extract_result, extract_one, extract_scalar, has_results
+from surql.query.results import extract_result, extract_one, extract_scalar, has_results
 
 # Handle nested format from db.query()
 result = await client.execute('SELECT * FROM user WHERE age > 18')
@@ -279,7 +279,7 @@ Composable query builder.
 **Example:**
 
 ```python
-from reverie.query.builder import Query
+from surql.query.builder import Query
 
 query = (
   Query()
@@ -345,7 +345,7 @@ Async database client.
 **Example:**
 
 ```python
-from reverie.connection.client import get_client
+from surql.connection.client import get_client
 
 async with get_client(config) as client:
   result = await client.execute('SELECT * FROM user')
@@ -384,7 +384,7 @@ Transaction support.
 **Example:**
 
 ```python
-from reverie.connection.transaction import transaction
+from surql.connection.transaction import transaction
 
 async with transaction(client):
   await client.execute('UPDATE user:alice SET credits -= 10')
@@ -420,7 +420,7 @@ RecordID type for SurrealDB record identifiers with angle bracket support.
 **Example:**
 
 ```python
-from reverie.types.record_id import RecordID
+from surql.types.record_id import RecordID
 
 # Standard format
 user_rid = RecordID(table='user', id='alice')
@@ -529,7 +529,7 @@ Application settings management.
 **Example:**
 
 ```python
-from reverie.settings import get_db_config
+from surql.settings import get_db_config
 
 config = get_db_config()  # Loads from environment variables
 ```
@@ -539,9 +539,9 @@ config = get_db_config()  # Loads from environment variables
 ### Basic CRUD
 
 ```python
-from reverie.connection.client import get_client
-from reverie.connection.config import ConnectionConfig
-from reverie.query.crud import create_record, query_records
+from surql.connection.client import get_client
+from surql.connection.config import ConnectionConfig
+from surql.query.crud import create_record, query_records
 
 config = ConnectionConfig(url='ws://localhost:8000/rpc', ...)
 
@@ -562,8 +562,8 @@ async with get_client(config) as client:
 ### Schema Definition
 
 ```python
-from reverie.schema.fields import string_field, int_field
-from reverie.schema.table import table_schema, unique_index, TableMode
+from surql.schema.fields import string_field, int_field
+from surql.schema.table import table_schema, unique_index, TableMode
 
 schema = table_schema(
   'user',
@@ -581,8 +581,8 @@ schema = table_schema(
 ### Migrations
 
 ```python
-from reverie.migration.discovery import discover_migrations
-from reverie.migration.executor import create_migration_plan, execute_migration_plan
+from surql.migration.discovery import discover_migrations
+from surql.migration.executor import create_migration_plan, execute_migration_plan
 
 migrations = discover_migrations(Path('migrations'))
 plan = await create_migration_plan(client, migrations, MigrationDirection.UP)

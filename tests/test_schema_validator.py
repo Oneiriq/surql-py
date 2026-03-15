@@ -13,10 +13,10 @@ from unittest.mock import AsyncMock, Mock, patch
 import pytest
 from typer.testing import CliRunner
 
-from reverie.cli.schema import app as schema_app
-from reverie.schema.edge import EdgeDefinition, EdgeMode
-from reverie.schema.fields import FieldDefinition, FieldType
-from reverie.schema.table import (
+from surql.cli.schema import app as schema_app
+from surql.schema.edge import EdgeDefinition, EdgeMode
+from surql.schema.fields import FieldDefinition, FieldType
+from surql.schema.table import (
   IndexDefinition,
   IndexType,
   MTreeDistanceType,
@@ -24,7 +24,7 @@ from reverie.schema.table import (
   TableDefinition,
   TableMode,
 )
-from reverie.schema.validator import (
+from surql.schema.validator import (
   ValidationResult,
   ValidationSeverity,
   filter_by_severity,
@@ -319,7 +319,7 @@ class TestValidateSchemaNoIssues:
       )
 
       # Mock parse_table_info to return matching definition
-      with patch('reverie.schema.validator.parse_table_info') as mock_parse:
+      with patch('surql.schema.validator.parse_table_info') as mock_parse:
         mock_parse.return_value = TableDefinition(
           name='user',
           mode=TableMode.SCHEMAFULL,
@@ -356,7 +356,7 @@ class TestValidateSchemaFieldMismatches:
         ]
       )
 
-      with patch('reverie.schema.validator.parse_table_info') as mock_parse:
+      with patch('surql.schema.validator.parse_table_info') as mock_parse:
         mock_parse.return_value = TableDefinition(
           name='user',
           mode=TableMode.SCHEMAFULL,
@@ -394,7 +394,7 @@ class TestValidateSchemaFieldMismatches:
         ]
       )
 
-      with patch('reverie.schema.validator.parse_table_info') as mock_parse:
+      with patch('surql.schema.validator.parse_table_info') as mock_parse:
         mock_parse.return_value = TableDefinition(
           name='user',
           mode=TableMode.SCHEMAFULL,
@@ -439,7 +439,7 @@ class TestValidateSchemaFieldMismatches:
         ]
       )
 
-      with patch('reverie.schema.validator.parse_table_info') as mock_parse:
+      with patch('surql.schema.validator.parse_table_info') as mock_parse:
         mock_parse.return_value = TableDefinition(
           name='user',
           mode=TableMode.SCHEMAFULL,
@@ -482,7 +482,7 @@ class TestValidateSchemaFieldMismatches:
         ]
       )
 
-      with patch('reverie.schema.validator.parse_table_info') as mock_parse:
+      with patch('surql.schema.validator.parse_table_info') as mock_parse:
         mock_parse.return_value = TableDefinition(
           name='user',
           mode=TableMode.SCHEMAFULL,
@@ -521,7 +521,7 @@ class TestValidateSchemaIndexMismatches:
         ]
       )
 
-      with patch('reverie.schema.validator.parse_table_info') as mock_parse:
+      with patch('surql.schema.validator.parse_table_info') as mock_parse:
         mock_parse.return_value = TableDefinition(
           name='user',
           mode=TableMode.SCHEMAFULL,
@@ -557,7 +557,7 @@ class TestValidateSchemaIndexMismatches:
         ]
       )
 
-      with patch('reverie.schema.validator.parse_table_info') as mock_parse:
+      with patch('surql.schema.validator.parse_table_info') as mock_parse:
         mock_parse.return_value = TableDefinition(
           name='user',
           mode=TableMode.SCHEMAFULL,
@@ -592,7 +592,7 @@ class TestValidateSchemaIndexMismatches:
         ]
       )
 
-      with patch('reverie.schema.validator.parse_table_info') as mock_parse:
+      with patch('surql.schema.validator.parse_table_info') as mock_parse:
         mock_parse.return_value = TableDefinition(
           name='user',
           mode=TableMode.SCHEMAFULL,
@@ -631,7 +631,7 @@ class TestValidateSchemaIndexMismatches:
         ]
       )
 
-      with patch('reverie.schema.validator.parse_table_info') as mock_parse:
+      with patch('surql.schema.validator.parse_table_info') as mock_parse:
         mock_parse.return_value = TableDefinition(
           name='user',
           mode=TableMode.SCHEMAFULL,
@@ -677,7 +677,7 @@ class TestValidateSchemaIndexMismatches:
         ]
       )
 
-      with patch('reverie.schema.validator.parse_table_info') as mock_parse:
+      with patch('surql.schema.validator.parse_table_info') as mock_parse:
         mock_parse.return_value = TableDefinition(
           name='document',
           mode=TableMode.SCHEMAFULL,
@@ -719,7 +719,7 @@ class TestValidateSchemaTableModeMismatch:
         ]
       )
 
-      with patch('reverie.schema.validator.parse_table_info') as mock_parse:
+      with patch('surql.schema.validator.parse_table_info') as mock_parse:
         mock_parse.return_value = TableDefinition(name='user', mode=TableMode.SCHEMALESS)
 
         return await validate_schema(code_tables, mock_client)
@@ -786,7 +786,7 @@ class TestValidateSchemaEdgeValidation:
         ]
       )
 
-      with patch('reverie.schema.validator.parse_table_info') as mock_parse:
+      with patch('surql.schema.validator.parse_table_info') as mock_parse:
         mock_parse.return_value = TableDefinition(
           name='likes',
           mode=TableMode.SCHEMAFULL,
@@ -1075,19 +1075,19 @@ class TestValidateCLICommand:
     """Test that --strict flag returns non-zero exit code on errors."""
     schema_file = tmp_path / 'schema.py'
     schema_file.write_text("""
-from reverie.schema.table import table_schema
-from reverie.schema.fields import string_field
-from reverie.schema.table import with_fields
+from surql.schema.table import table_schema
+from surql.schema.fields import string_field
+from surql.schema.table import with_fields
 
 user_table = table_schema('user')
 user_table = with_fields(user_table, string_field('name'))
 """)
 
     with (
-      patch('reverie.cli.schema_validate.get_db_config'),
-      patch('reverie.cli.schema_validate.get_client') as mock_get_client,
-      patch('reverie.cli.schema_validate._load_schemas_from_file') as mock_load,
-      patch('reverie.schema.validator.validate_schema') as mock_validate,
+      patch('surql.cli.schema_validate.get_db_config'),
+      patch('surql.cli.schema_validate.get_client') as mock_get_client,
+      patch('surql.cli.schema_validate._load_schemas_from_file') as mock_load,
+      patch('surql.schema.validator.validate_schema') as mock_validate,
     ):
       mock_load.return_value = {'user': TableDefinition(name='user', mode=TableMode.SCHEMAFULL)}
 
@@ -1114,10 +1114,10 @@ user_table = with_fields(user_table, string_field('name'))
     schema_file.write_text('# empty schema')
 
     with (
-      patch('reverie.cli.schema_validate.get_db_config'),
-      patch('reverie.cli.schema_validate.get_client') as mock_get_client,
-      patch('reverie.cli.schema_validate._load_schemas_from_file') as mock_load,
-      patch('reverie.schema.validator.validate_schema') as mock_validate,
+      patch('surql.cli.schema_validate.get_db_config'),
+      patch('surql.cli.schema_validate.get_client') as mock_get_client,
+      patch('surql.cli.schema_validate._load_schemas_from_file') as mock_load,
+      patch('surql.schema.validator.validate_schema') as mock_validate,
     ):
       mock_load.return_value = {'user': TableDefinition(name='user', mode=TableMode.SCHEMAFULL)}
 
@@ -1144,10 +1144,10 @@ user_table = with_fields(user_table, string_field('name'))
     schema_file.write_text('# empty schema')
 
     with (
-      patch('reverie.cli.schema_validate.get_db_config'),
-      patch('reverie.cli.schema_validate.get_client') as mock_get_client,
-      patch('reverie.cli.schema_validate._load_schemas_from_file') as mock_load,
-      patch('reverie.schema.validator.validate_schema') as mock_validate,
+      patch('surql.cli.schema_validate.get_db_config'),
+      patch('surql.cli.schema_validate.get_client') as mock_get_client,
+      patch('surql.cli.schema_validate._load_schemas_from_file') as mock_load,
+      patch('surql.schema.validator.validate_schema') as mock_validate,
     ):
       mock_load.return_value = {'user': TableDefinition(name='user', mode=TableMode.SCHEMAFULL)}
 
@@ -1173,10 +1173,10 @@ user_table = with_fields(user_table, string_field('name'))
     schema_file.write_text('# empty schema')
 
     with (
-      patch('reverie.cli.schema_validate.get_db_config'),
-      patch('reverie.cli.schema_validate.get_client') as mock_get_client,
-      patch('reverie.cli.schema_validate._load_schemas_from_file') as mock_load,
-      patch('reverie.schema.validator.validate_schema') as mock_validate,
+      patch('surql.cli.schema_validate.get_db_config'),
+      patch('surql.cli.schema_validate.get_client') as mock_get_client,
+      patch('surql.cli.schema_validate._load_schemas_from_file') as mock_load,
+      patch('surql.schema.validator.validate_schema') as mock_validate,
     ):
       mock_load.return_value = {'user': TableDefinition(name='user', mode=TableMode.SCHEMAFULL)}
 
@@ -1204,10 +1204,10 @@ user_table = with_fields(user_table, string_field('name'))
     schema_file.write_text('# empty schema')
 
     with (
-      patch('reverie.cli.schema_validate.get_db_config'),
-      patch('reverie.cli.schema_validate.get_client') as mock_get_client,
-      patch('reverie.cli.schema_validate._load_schemas_from_file') as mock_load,
-      patch('reverie.schema.validator.validate_schema') as mock_validate,
+      patch('surql.cli.schema_validate.get_db_config'),
+      patch('surql.cli.schema_validate.get_client') as mock_get_client,
+      patch('surql.cli.schema_validate._load_schemas_from_file') as mock_load,
+      patch('surql.schema.validator.validate_schema') as mock_validate,
     ):
       mock_load.return_value = {'user': TableDefinition(name='user', mode=TableMode.SCHEMAFULL)}
 
@@ -1232,10 +1232,10 @@ user_table = with_fields(user_table, string_field('name'))
     output_file = tmp_path / 'report.txt'
 
     with (
-      patch('reverie.cli.schema_validate.get_db_config'),
-      patch('reverie.cli.schema_validate.get_client') as mock_get_client,
-      patch('reverie.cli.schema_validate._load_schemas_from_file') as mock_load,
-      patch('reverie.schema.validator.validate_schema') as mock_validate,
+      patch('surql.cli.schema_validate.get_db_config'),
+      patch('surql.cli.schema_validate.get_client') as mock_get_client,
+      patch('surql.cli.schema_validate._load_schemas_from_file') as mock_load,
+      patch('surql.schema.validator.validate_schema') as mock_validate,
     ):
       mock_load.return_value = {'user': TableDefinition(name='user', mode=TableMode.SCHEMAFULL)}
 
@@ -1263,10 +1263,10 @@ user_table = with_fields(user_table, string_field('name'))
     output_file = tmp_path / 'report.json'
 
     with (
-      patch('reverie.cli.schema_validate.get_db_config'),
-      patch('reverie.cli.schema_validate.get_client') as mock_get_client,
-      patch('reverie.cli.schema_validate._load_schemas_from_file') as mock_load,
-      patch('reverie.schema.validator.validate_schema') as mock_validate,
+      patch('surql.cli.schema_validate.get_db_config'),
+      patch('surql.cli.schema_validate.get_client') as mock_get_client,
+      patch('surql.cli.schema_validate._load_schemas_from_file') as mock_load,
+      patch('surql.schema.validator.validate_schema') as mock_validate,
     ):
       mock_load.return_value = {'user': TableDefinition(name='user', mode=TableMode.SCHEMAFULL)}
 
@@ -1299,9 +1299,9 @@ user_table = with_fields(user_table, string_field('name'))
     schema_file.write_text('# empty schema')
 
     with (
-      patch('reverie.cli.schema_validate.get_db_config'),
-      patch('reverie.cli.schema_validate.get_client') as mock_get_client,
-      patch('reverie.cli.schema_validate._load_schemas_from_file') as mock_load,
+      patch('surql.cli.schema_validate.get_db_config'),
+      patch('surql.cli.schema_validate.get_client') as mock_get_client,
+      patch('surql.cli.schema_validate._load_schemas_from_file') as mock_load,
     ):
       mock_load.return_value = {'user': TableDefinition(name='user', mode=TableMode.SCHEMAFULL)}
 
@@ -1318,10 +1318,10 @@ user_table = with_fields(user_table, string_field('name'))
     schema_file.write_text('# empty schema')
 
     with (
-      patch('reverie.cli.schema_validate.get_db_config'),
-      patch('reverie.cli.schema_validate.get_client') as mock_get_client,
-      patch('reverie.cli.schema_validate._load_schemas_from_file') as mock_load,
-      patch('reverie.schema.validator.validate_schema') as mock_validate,
+      patch('surql.cli.schema_validate.get_db_config'),
+      patch('surql.cli.schema_validate.get_client') as mock_get_client,
+      patch('surql.cli.schema_validate._load_schemas_from_file') as mock_load,
+      patch('surql.schema.validator.validate_schema') as mock_validate,
     ):
       mock_load.return_value = {'user': TableDefinition(name='user', mode=TableMode.SCHEMAFULL)}
 
@@ -1355,10 +1355,10 @@ class TestValidateCLIExitCodes:
     schema_file.write_text('# empty schema')
 
     with (
-      patch('reverie.cli.schema_validate.get_db_config'),
-      patch('reverie.cli.schema_validate.get_client') as mock_get_client,
-      patch('reverie.cli.schema_validate._load_schemas_from_file') as mock_load,
-      patch('reverie.schema.validator.validate_schema') as mock_validate,
+      patch('surql.cli.schema_validate.get_db_config'),
+      patch('surql.cli.schema_validate.get_client') as mock_get_client,
+      patch('surql.cli.schema_validate._load_schemas_from_file') as mock_load,
+      patch('surql.schema.validator.validate_schema') as mock_validate,
     ):
       mock_load.return_value = {'user': TableDefinition(name='user', mode=TableMode.SCHEMAFULL)}
       mock_client = AsyncMock()
@@ -1375,10 +1375,10 @@ class TestValidateCLIExitCodes:
     schema_file.write_text('# empty schema')
 
     with (
-      patch('reverie.cli.schema_validate.get_db_config'),
-      patch('reverie.cli.schema_validate.get_client') as mock_get_client,
-      patch('reverie.cli.schema_validate._load_schemas_from_file') as mock_load,
-      patch('reverie.schema.validator.validate_schema') as mock_validate,
+      patch('surql.cli.schema_validate.get_db_config'),
+      patch('surql.cli.schema_validate.get_client') as mock_get_client,
+      patch('surql.cli.schema_validate._load_schemas_from_file') as mock_load,
+      patch('surql.schema.validator.validate_schema') as mock_validate,
     ):
       mock_load.return_value = {'user': TableDefinition(name='user', mode=TableMode.SCHEMAFULL)}
       mock_client = AsyncMock()
@@ -1399,10 +1399,10 @@ class TestValidateCLIExitCodes:
     schema_file.write_text('# empty schema')
 
     with (
-      patch('reverie.cli.schema_validate.get_db_config'),
-      patch('reverie.cli.schema_validate.get_client') as mock_get_client,
-      patch('reverie.cli.schema_validate._load_schemas_from_file') as mock_load,
-      patch('reverie.schema.validator.validate_schema') as mock_validate,
+      patch('surql.cli.schema_validate.get_db_config'),
+      patch('surql.cli.schema_validate.get_client') as mock_get_client,
+      patch('surql.cli.schema_validate._load_schemas_from_file') as mock_load,
+      patch('surql.schema.validator.validate_schema') as mock_validate,
     ):
       mock_load.return_value = {'user': TableDefinition(name='user', mode=TableMode.SCHEMAFULL)}
       mock_client = AsyncMock()

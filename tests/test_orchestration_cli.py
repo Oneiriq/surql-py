@@ -7,8 +7,8 @@ from unittest.mock import AsyncMock, patch
 import pytest
 from typer.testing import CliRunner
 
-from reverie.cli.orchestrate import app
-from reverie.orchestration.strategy import DeploymentResult, DeploymentStatus
+from surql.cli.orchestrate import app
+from surql.orchestration.strategy import DeploymentResult, DeploymentStatus
 
 
 @pytest.fixture
@@ -194,7 +194,7 @@ class TestCLIOutputFormatting:
     """Test deployment results display."""
     from datetime import UTC, datetime
 
-    from reverie.cli.orchestrate import _display_deployment_results
+    from surql.cli.orchestrate import _display_deployment_results
 
     results = {
       'env1': DeploymentResult(
@@ -252,7 +252,7 @@ class TestCLIEdgeCases:
     test_migrations_dir: Path,
   ) -> None:
     """Test deployment with empty environments list."""
-    with patch('reverie.cli.orchestrate.MigrationCoordinator') as mock_coordinator:
+    with patch('surql.cli.orchestrate.MigrationCoordinator') as mock_coordinator:
       mock_instance = mock_coordinator.return_value
       mock_instance.deploy_to_environments = AsyncMock(return_value={})
 

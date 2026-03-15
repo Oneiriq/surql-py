@@ -4,8 +4,8 @@ from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
 
-from reverie.connection.config import ConnectionConfig
-from reverie.connection.registry import ConnectionRegistry, RegistryError, get_registry
+from surql.connection.config import ConnectionConfig
+from surql.connection.registry import ConnectionRegistry, RegistryError, get_registry
 
 
 @pytest.fixture
@@ -68,7 +68,7 @@ class TestConnectionRegistry:
   @pytest.mark.anyio
   async def test_register_connection(self, clean_registry, mock_config):
     """Test connection registration."""
-    with patch('reverie.connection.registry.DatabaseClient') as MockClient:
+    with patch('surql.connection.registry.DatabaseClient') as MockClient:
       mock_client = MagicMock()
       mock_client.connect = AsyncMock()
       mock_client.is_connected = True
@@ -84,7 +84,7 @@ class TestConnectionRegistry:
   @pytest.mark.anyio
   async def test_register_without_connect(self, clean_registry, mock_config):
     """Test registration without immediate connection."""
-    with patch('reverie.connection.registry.DatabaseClient') as MockClient:
+    with patch('surql.connection.registry.DatabaseClient') as MockClient:
       mock_client = MagicMock()
       mock_client.connect = AsyncMock()
       mock_client.is_connected = False
@@ -98,7 +98,7 @@ class TestConnectionRegistry:
   @pytest.mark.anyio
   async def test_register_duplicate_name(self, clean_registry, mock_config):
     """Test registration with duplicate name raises error."""
-    with patch('reverie.connection.registry.DatabaseClient') as MockClient:
+    with patch('surql.connection.registry.DatabaseClient') as MockClient:
       mock_client = MagicMock()
       mock_client.connect = AsyncMock()
       mock_client.is_connected = True
@@ -112,7 +112,7 @@ class TestConnectionRegistry:
   @pytest.mark.anyio
   async def test_register_multiple_connections(self, clean_registry):
     """Test registering multiple connections."""
-    with patch('reverie.connection.registry.DatabaseClient') as MockClient:
+    with patch('surql.connection.registry.DatabaseClient') as MockClient:
       mock_client = MagicMock()
       mock_client.connect = AsyncMock()
       mock_client.is_connected = True
@@ -135,7 +135,7 @@ class TestConnectionRegistry:
   @pytest.mark.anyio
   async def test_unregister_connection(self, clean_registry, mock_config):
     """Test connection unregistration."""
-    with patch('reverie.connection.registry.DatabaseClient') as MockClient:
+    with patch('surql.connection.registry.DatabaseClient') as MockClient:
       mock_client = MagicMock()
       mock_client.connect = AsyncMock()
       mock_client.disconnect = AsyncMock()
@@ -157,7 +157,7 @@ class TestConnectionRegistry:
   @pytest.mark.anyio
   async def test_unregister_without_disconnect(self, clean_registry, mock_config):
     """Test unregistration without disconnecting."""
-    with patch('reverie.connection.registry.DatabaseClient') as MockClient:
+    with patch('surql.connection.registry.DatabaseClient') as MockClient:
       mock_client = MagicMock()
       mock_client.connect = AsyncMock()
       mock_client.disconnect = AsyncMock()
@@ -172,7 +172,7 @@ class TestConnectionRegistry:
   @pytest.mark.anyio
   async def test_get_connection(self, clean_registry):
     """Test getting a registered connection."""
-    with patch('reverie.connection.registry.DatabaseClient') as MockClient:
+    with patch('surql.connection.registry.DatabaseClient') as MockClient:
       mock_client = MagicMock()
       mock_client.connect = AsyncMock()
       mock_client.is_connected = True
@@ -188,7 +188,7 @@ class TestConnectionRegistry:
   @pytest.mark.anyio
   async def test_get_default_connection(self, clean_registry):
     """Test getting default connection."""
-    with patch('reverie.connection.registry.DatabaseClient') as MockClient:
+    with patch('surql.connection.registry.DatabaseClient') as MockClient:
       mock_client = MagicMock()
       mock_client.connect = AsyncMock()
       mock_client.is_connected = True
@@ -216,7 +216,7 @@ class TestConnectionRegistry:
   @pytest.mark.anyio
   async def test_get_config(self, clean_registry):
     """Test getting connection configuration."""
-    with patch('reverie.connection.registry.DatabaseClient') as MockClient:
+    with patch('surql.connection.registry.DatabaseClient') as MockClient:
       mock_client = MagicMock()
       mock_client.connect = AsyncMock()
       mock_client.is_connected = True
@@ -232,7 +232,7 @@ class TestConnectionRegistry:
   @pytest.mark.anyio
   async def test_set_default(self, clean_registry):
     """Test setting default connection."""
-    with patch('reverie.connection.registry.DatabaseClient') as MockClient:
+    with patch('surql.connection.registry.DatabaseClient') as MockClient:
       mock_client = MagicMock()
       mock_client.connect = AsyncMock()
       mock_client.is_connected = True
@@ -260,7 +260,7 @@ class TestConnectionRegistry:
   @pytest.mark.anyio
   async def test_list_connections(self, clean_registry):
     """Test listing all connections."""
-    with patch('reverie.connection.registry.DatabaseClient') as MockClient:
+    with patch('surql.connection.registry.DatabaseClient') as MockClient:
       mock_client = MagicMock()
       mock_client.connect = AsyncMock()
       mock_client.is_connected = True
@@ -284,7 +284,7 @@ class TestConnectionRegistry:
   @pytest.mark.anyio
   async def test_disconnect_all(self, clean_registry):
     """Test disconnecting all connections."""
-    with patch('reverie.connection.registry.DatabaseClient') as MockClient:
+    with patch('surql.connection.registry.DatabaseClient') as MockClient:
       mock_client1 = MagicMock()
       mock_client1.connect = AsyncMock()
       mock_client1.disconnect = AsyncMock()
@@ -314,7 +314,7 @@ class TestConnectionRegistry:
   @pytest.mark.anyio
   async def test_clear(self, clean_registry):
     """Test clearing all connections."""
-    with patch('reverie.connection.registry.DatabaseClient') as MockClient:
+    with patch('surql.connection.registry.DatabaseClient') as MockClient:
       mock_client = MagicMock()
       mock_client.connect = AsyncMock()
       mock_client.disconnect = AsyncMock()
@@ -334,7 +334,7 @@ class TestConnectionRegistry:
   @pytest.mark.anyio
   async def test_register_set_default_flag(self, clean_registry):
     """Test registering with set_default flag."""
-    with patch('reverie.connection.registry.DatabaseClient') as MockClient:
+    with patch('surql.connection.registry.DatabaseClient') as MockClient:
       mock_client = MagicMock()
       mock_client.connect = AsyncMock()
       mock_client.is_connected = True
@@ -355,7 +355,7 @@ class TestConnectionRegistry:
   @pytest.mark.anyio
   async def test_unregister_updates_default(self, clean_registry):
     """Test unregistering default connection updates to next available."""
-    with patch('reverie.connection.registry.DatabaseClient') as MockClient:
+    with patch('surql.connection.registry.DatabaseClient') as MockClient:
       mock_client1 = MagicMock()
       mock_client1.connect = AsyncMock()
       mock_client1.disconnect = AsyncMock()

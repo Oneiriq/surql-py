@@ -1,11 +1,11 @@
 # Installation Guide
 
-This guide covers installing reverie and setting up SurrealDB for development.
+This guide covers installing surql and setting up SurrealDB for development.
 
 ## Table of Contents
 
 - [Requirements](#requirements)
-- [Installing reverie](#installing-reverie)
+- [Installing surql](#installing-surql)
 - [Installing SurrealDB](#installing-surrealdb)
 - [Configuration](#configuration)
 - [Verification](#verification)
@@ -30,12 +30,12 @@ python3 --version
 
 - SurrealDB 1.0 or higher
 
-## Installing reverie
+## Installing surql
 
 ### Using pip
 
 ```shell
-pip install reverie
+pip install oneiriq-surql
 ```
 
 ### Using uv (Recommended)
@@ -46,8 +46,8 @@ pip install reverie
 # Install uv if you haven't already
 pip install uv
 
-# Add reverie to your project
-uv add reverie
+# Add surql to your project
+uv add oneiriq-surql
 ```
 
 ### From Source
@@ -56,8 +56,8 @@ For development or to use the latest features:
 
 ```shell
 # Clone the repository
-git clone https://github.com/yourusername/reverie.git
-cd reverie
+git clone https://github.com/Oneiriq/surql-python.git
+cd surql
 
 # Install with uv
 uv sync
@@ -210,7 +210,7 @@ LOG_LEVEL=INFO
 Create a configuration file in your project:
 
 ```python
-from reverie.connection.config import ConnectionConfig
+from surql.connection.config import ConnectionConfig
 
 config = ConnectionConfig(
   url='ws://localhost:8000/rpc',
@@ -224,10 +224,10 @@ config = ConnectionConfig(
 
 ### Loading from Environment
 
-reverie automatically loads configuration from environment variables:
+surql automatically loads configuration from environment variables:
 
 ```python
-from reverie.settings import get_db_config
+from surql.settings import get_db_config
 
 # Loads from environment variables
 config = get_db_config()
@@ -235,18 +235,18 @@ config = get_db_config()
 
 ## Verification
 
-### Verify reverie Installation
+### Verify surql Installation
 
 ```shell
-reverie --help
+surql --help
 ```
 
 You should see the CLI help output:
 
 ```shell
-Usage: reverie [OPTIONS] COMMAND [ARGS]...
+Usage: surql [OPTIONS] COMMAND [ARGS]...
 
-  reverie - Code-first database toolkit for SurrealDB.
+  surql - Code-first database toolkit for SurrealDB.
 
 Options:
   --verbose, -v  Enable verbose logging
@@ -256,7 +256,7 @@ Commands:
   db       Database management commands
   migrate  Database migration commands
   schema   Schema inspection commands
-  version  Show reverie version information
+  version  Show surql version information
 ```
 
 ### Test Database Connection
@@ -265,8 +265,8 @@ Create a test script `test_connection.py`:
 
 ```python
 import asyncio
-from reverie.connection.client import get_client
-from reverie.connection.config import ConnectionConfig
+from surql.connection.client import get_client
+from surql.connection.config import ConnectionConfig
 
 async def test_connection():
   config = ConnectionConfig(
@@ -296,10 +296,10 @@ python test_connection.py
 
 ```shell
 # Check database connection
-reverie db ping
+surql db ping
 
 # Show database info
-reverie db info
+surql db info
 ```
 
 ## Project Setup
@@ -315,7 +315,7 @@ mkdir migrations
 ### Create First Migration
 
 ```shell
-reverie migrate create "Initial setup"
+surql migrate create "Initial setup"
 ```
 
 This creates a migration file in `migrations/` with the current timestamp.
@@ -359,8 +359,8 @@ If you get a connection refused error:
 If you get import errors:
 
 ```shell
-# Reinstall reverie
-pip install --force-reinstall reverie
+# Reinstall surql
+pip install --force-reinstall surql
 
 # Or with uv
 uv sync --reinstall
@@ -372,12 +372,12 @@ If you get permission errors on Linux/macOS:
 
 ```shell
 # Run with sudo (not recommended for pip)
-sudo pip install reverie
+sudo pip install oneiriq-surql
 
 # Or use virtual environment (recommended)
 python -m venv venv
 source venv/bin/activate  # On Windows: venv\Scripts\activate
-pip install reverie
+pip install oneiriq-surql
 ```
 
 ### SurrealDB Not Found
@@ -397,7 +397,7 @@ If `surreal` command is not found after installation:
 
 ## Next Steps
 
-Now that you have reverie installed and configured:
+Now that you have surql installed and configured:
 
 1. Follow the [Quick Start Tutorial](quickstart.md) to create your first schema and migration
 2. Read the [Schema Definition Guide](schema.md) to learn about schema features
@@ -408,5 +408,5 @@ Now that you have reverie installed and configured:
 
 - [SurrealDB Documentation](https://surrealdb.com/docs)
 - [SurrealDB Installation](https://surrealdb.com/install)
-- [reverie GitHub Repository](https://github.com/yourusername/reverie)
+- [surql GitHub Repository](https://github.com/Oneiriq/surql-python)
 - [Python Virtual Environments](https://docs.python.org/3/tutorial/venv.html)

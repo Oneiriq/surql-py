@@ -1,4 +1,4 @@
-"""Shared pytest fixtures for reverie ORM tests.
+"""Shared pytest fixtures for surql ORM tests.
 
 This module provides common fixtures used across all test modules including
 mock database clients, sample schemas, and test utilities.
@@ -13,7 +13,7 @@ import structlog
 from pydantic import BaseModel
 from typer.testing import CliRunner
 
-# Configure structlog BEFORE importing reverie modules to avoid warnings
+# Configure structlog BEFORE importing surql modules to avoid warnings
 # This must run before any structlog loggers are created
 structlog.configure(
   processors=[
@@ -28,17 +28,17 @@ structlog.configure(
   cache_logger_on_first_use=False,
 )
 
-# Import reverie modules AFTER structlog is configured
-from reverie.connection.client import DatabaseClient  # noqa: E402
-from reverie.connection.config import ConnectionConfig  # noqa: E402
-from reverie.schema.fields import FieldDefinition, FieldType  # noqa: E402
-from reverie.schema.table import (  # noqa: E402
+# Import surql modules AFTER structlog is configured
+from surql.connection.client import DatabaseClient  # noqa: E402
+from surql.connection.config import ConnectionConfig  # noqa: E402
+from surql.schema.fields import FieldDefinition, FieldType  # noqa: E402
+from surql.schema.table import (  # noqa: E402
   IndexDefinition,
   IndexType,
   TableDefinition,
   TableMode,
 )
-from reverie.types.record_id import RecordID  # noqa: E402
+from surql.types.record_id import RecordID  # noqa: E402
 
 # Test data models
 

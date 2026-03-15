@@ -1,6 +1,6 @@
 # CLI Reference
 
-Complete reference for the reverie command-line interface.
+Complete reference for the surql command-line interface.
 
 ## Table of Contents
 
@@ -16,35 +16,35 @@ Complete reference for the reverie command-line interface.
 
 ## Overview
 
-The reverie CLI provides commands for managing database schemas, migrations, and inspecting your database.
+The surql CLI provides commands for managing database schemas, migrations, and inspecting your database.
 
 ```shell
-reverie [OPTIONS] COMMAND [ARGS]
+surql [OPTIONS] COMMAND [ARGS]
 ```
 
 ### Getting Help
 
 ```shell
 # Show all commands
-reverie --help
+surql --help
 
 # Show help for specific command
-reverie migrate --help
+surql migrate --help
 
 # Show help for subcommand
-reverie migrate up --help
+surql migrate up --help
 ```
 
 ### Version Information
 
 ```shell
-reverie version
+surql version
 ```
 
 Output:
 
 ```shell
-reverie version 0.6.0
+surql version 0.6.0
 Environment: development
 ```
 
@@ -57,8 +57,8 @@ These options work with any command:
 Enable verbose logging for detailed output.
 
 ```shell
-reverie --verbose migrate up
-reverie -v schema show
+surql --verbose migrate up
+surql -v schema show
 ```
 
 ### `--help`
@@ -66,8 +66,8 @@ reverie -v schema show
 Show help message and exit.
 
 ```shell
-reverie --help
-reverie migrate --help
+surql --help
+surql migrate --help
 ```
 
 ## Migration Commands
@@ -75,7 +75,7 @@ reverie migrate --help
 All migration commands are under the `migrate` subcommand:
 
 ```shell
-reverie migrate [COMMAND] [OPTIONS]
+surql migrate [COMMAND] [OPTIONS]
 ```
 
 ### `migrate up`
@@ -83,7 +83,7 @@ reverie migrate [COMMAND] [OPTIONS]
 Apply pending migrations to the database.
 
 ```shell
-reverie migrate up [OPTIONS]
+surql migrate up [OPTIONS]
 ```
 
 **Options:**
@@ -97,22 +97,22 @@ reverie migrate up [OPTIONS]
 
 ```shell
 # Apply all pending migrations
-reverie migrate up
+surql migrate up
 
 # Apply only the next migration
-reverie migrate up --steps 1
+surql migrate up --steps 1
 
 # Apply next 3 migrations
-reverie migrate up --steps 3
+surql migrate up --steps 3
 
 # Preview what will be applied
-reverie migrate up --dry-run
+surql migrate up --dry-run
 
 # Use custom migration directory
-reverie migrate up --directory ./db/migrations
+surql migrate up --directory ./db/migrations
 
 # Verbose output
-reverie migrate up --verbose
+surql migrate up --verbose
 ```
 
 **Output:**
@@ -130,7 +130,7 @@ Successfully applied 2 migration(s)
 Rollback the last applied migration(s).
 
 ```shell
-reverie migrate down [OPTIONS]
+surql migrate down [OPTIONS]
 ```
 
 **Options:**
@@ -144,16 +144,16 @@ reverie migrate down [OPTIONS]
 
 ```shell
 # Rollback last migration
-reverie migrate down
+surql migrate down
 
 # Rollback last 3 migrations
-reverie migrate down --steps 3
+surql migrate down --steps 3
 
 # Preview rollback
-reverie migrate down --dry-run
+surql migrate down --dry-run
 
 # Verbose output
-reverie migrate down --verbose
+surql migrate down --verbose
 ```
 
 **Output:**
@@ -170,7 +170,7 @@ Successfully rolled back 1 migration(s)
 Show migration status (applied vs pending).
 
 ```shell
-reverie migrate status [OPTIONS]
+surql migrate status [OPTIONS]
 ```
 
 **Options:**
@@ -183,13 +183,13 @@ reverie migrate status [OPTIONS]
 
 ```shell
 # Show status as table
-reverie migrate status
+surql migrate status
 
 # Show status as JSON
-reverie migrate status --format json
+surql migrate status --format json
 
 # Use custom directory
-reverie migrate status --directory ./db/migrations
+surql migrate status --directory ./db/migrations
 ```
 
 **Output (table):**
@@ -236,7 +236,7 @@ Total: 3 | Applied: 2 | Pending: 1
 Show applied migrations from database history.
 
 ```shell
-reverie migrate history [OPTIONS]
+surql migrate history [OPTIONS]
 ```
 
 **Options:**
@@ -248,10 +248,10 @@ reverie migrate history [OPTIONS]
 
 ```shell
 # Show history as table
-reverie migrate history
+surql migrate history
 
 # Show history as JSON
-reverie migrate history --format json
+surql migrate history --format json
 ```
 
 **Output:**
@@ -271,7 +271,7 @@ Migration History
 Create a new blank migration file.
 
 ```shell
-reverie migrate create DESCRIPTION [OPTIONS]
+surql migrate create DESCRIPTION [OPTIONS]
 ```
 
 **Arguments:**
@@ -287,10 +287,10 @@ reverie migrate create DESCRIPTION [OPTIONS]
 
 ```shell
 # Create migration
-reverie migrate create "Add user indexes"
+surql migrate create "Add user indexes"
 
 # Create in custom directory
-reverie migrate create "Add posts" --directory ./db/migrations
+surql migrate create "Add posts" --directory ./db/migrations
 ```
 
 **Output:**
@@ -306,7 +306,7 @@ Path: migrations/20260102_143000_add_user_indexes.py
 Validate migration files for errors.
 
 ```shell
-reverie migrate validate [OPTIONS]
+surql migrate validate [OPTIONS]
 ```
 
 **Options:**
@@ -318,10 +318,10 @@ reverie migrate validate [OPTIONS]
 
 ```shell
 # Validate migrations
-reverie migrate validate
+surql migrate validate
 
 # Validate with verbose output
-reverie migrate validate --verbose
+surql migrate validate --verbose
 ```
 
 **Output:**
@@ -339,7 +339,7 @@ All 3 migration(s) are valid
 Generate migration from schema changes (auto-generation).
 
 ```shell
-reverie migrate generate DESCRIPTION [OPTIONS]
+surql migrate generate DESCRIPTION [OPTIONS]
 ```
 
 **Note:** Full auto-generation is not yet implemented. Currently creates a blank migration.
@@ -356,7 +356,7 @@ reverie migrate generate DESCRIPTION [OPTIONS]
 **Examples:**
 
 ```shell
-reverie migrate generate "Update user schema"
+surql migrate generate "Update user schema"
 ```
 
 ## Schema Commands
@@ -364,7 +364,7 @@ reverie migrate generate "Update user schema"
 Commands for inspecting database schema:
 
 ```shell
-reverie schema [COMMAND] [OPTIONS]
+surql schema [COMMAND] [OPTIONS]
 ```
 
 ### `schema show`
@@ -372,7 +372,7 @@ reverie schema [COMMAND] [OPTIONS]
 Display database or table schema.
 
 ```shell
-reverie schema show [TABLE] [OPTIONS]
+surql schema show [TABLE] [OPTIONS]
 ```
 
 **Arguments:**
@@ -383,13 +383,13 @@ reverie schema show [TABLE] [OPTIONS]
 
 ```shell
 # Show entire database schema
-reverie schema show
+surql schema show
 
 # Show specific table schema
-reverie schema show user
+surql schema show user
 
 # Show post table schema
-reverie schema show post
+surql schema show post
 ```
 
 **Output (database):**
@@ -429,7 +429,7 @@ Indexes:
 Commands for database management:
 
 ```shell
-reverie db [COMMAND] [OPTIONS]
+surql db [COMMAND] [OPTIONS]
 ```
 
 ### `db ping`
@@ -437,13 +437,13 @@ reverie db [COMMAND] [OPTIONS]
 Check database connection.
 
 ```shell
-reverie db ping
+surql db ping
 ```
 
 **Examples:**
 
 ```shell
-reverie db ping
+surql db ping
 ```
 
 **Output:**
@@ -460,13 +460,13 @@ Database: blog
 Show database information.
 
 ```shell
-reverie db info
+surql db info
 ```
 
 **Examples:**
 
 ```shell
-reverie db info
+surql db info
 ```
 
 **Output:**
@@ -493,13 +493,13 @@ Migrations Applied: 3
 mkdir migrations
 
 # Create first migration
-reverie migrate create "Initial schema"
+surql migrate create "Initial schema"
 
 # Edit migration file
 # ... add your SQL statements ...
 
 # Apply migration
-reverie migrate up
+surql migrate up
 ```
 
 ### Development Workflow
@@ -507,75 +507,75 @@ reverie migrate up
 ```shell
 # 1. Make schema changes in code
 # 2. Create migration
-reverie migrate create "Add email verification"
+surql migrate create "Add email verification"
 
 # 3. Edit migration file with SQL
 # 4. Preview changes
-reverie migrate up --dry-run
+surql migrate up --dry-run
 
 # 5. Apply migration
-reverie migrate up
+surql migrate up
 
 # 6. Verify schema
-reverie schema show
+surql schema show
 ```
 
 ### Rollback Workflow
 
 ```shell
 # Check current status
-reverie migrate status
+surql migrate status
 
 # Preview rollback
-reverie migrate down --dry-run
+surql migrate down --dry-run
 
 # Rollback if needed
-reverie migrate down
+surql migrate down
 
 # Verify
-reverie migrate status
+surql migrate status
 ```
 
 ### Debugging Migrations
 
 ```shell
 # Validate migration files
-reverie migrate validate
+surql migrate validate
 
 # Check what's pending
-reverie migrate status
+surql migrate status
 
 # Try dry run first
-reverie migrate up --dry-run
+surql migrate up --dry-run
 
 # Apply with verbose logging
-reverie migrate up --verbose
+surql migrate up --verbose
 ```
 
 ### Production Deployment
 
 ```shell
 # 1. Check status on production
-reverie migrate status --format json > status.json
+surql migrate status --format json > status.json
 
 # 2. Preview changes
-reverie migrate up --dry-run
+surql migrate up --dry-run
 
 # 3. Apply migrations
-reverie migrate up
+surql migrate up
 
 # 4. Verify
-reverie migrate history
+surql migrate history
 
 # 5. Check database
-reverie db info
+surql db info
 ```
 
 ## Configuration
 
 ### Configuration Files
 
-reverie loads configuration from:
+surql loads configuration from:
 
 1. Environment variables
 2. `.env` file in current directory
@@ -625,14 +625,14 @@ Load specific environment:
 
 ```shell
 # Linux/macOS
-export $(cat .env.production | xargs) && reverie migrate up
+export $(cat .env.production | xargs) && surql migrate up
 
 # Windows PowerShell
 Get-Content .env.production | ForEach-Object {
   $name, $value = $_.split('=')
   Set-Content env:\$name $value
 }
-reverie migrate up
+surql migrate up
 ```
 
 ## Environment Variables
@@ -698,41 +698,41 @@ Check exit code:
 
 ```shell
 # Linux/macOS
-reverie migrate up
+surql migrate up
 echo $?
 
 # Windows Command Prompt
-reverie migrate up
+surql migrate up
 echo %ERRORLEVEL%
 
 # Windows PowerShell
-reverie migrate up
+surql migrate up
 echo $LASTEXITCODE
 ```
 
 ## Shell Completion
 
-reverie supports shell completion for shell, zsh, and fish.
+surql supports shell completion for shell, zsh, and fish.
 
 ### shell
 
 ```shell
 # Add to ~/.shellrc
-eval "$(_reverie_COMPLETE=shell_source reverie)"
+eval "$(_surql_COMPLETE=shell_source surql)"
 ```
 
 ### Zsh
 
 ```shell
 # Add to ~/.zshrc
-eval "$(_reverie_COMPLETE=zsh_source reverie)"
+eval "$(_surql_COMPLETE=zsh_source surql)"
 ```
 
 ### Fish
 
 ```shell
 # Add to ~/.config/fish/config.fish
-eval (env _reverie_COMPLETE=fish_source reverie)
+eval (env _surql_COMPLETE=fish_source surql)
 ```
 
 ## Troubleshooting
@@ -741,23 +741,23 @@ eval (env _reverie_COMPLETE=fish_source reverie)
 
 ```shell
 # Check database is running
-reverie db ping
+surql db ping
 
 # Test connection with verbose output
-reverie --verbose db info
+surql --verbose db info
 ```
 
 ### Migration Errors
 
 ```shell
 # Validate migration files
-reverie migrate validate
+surql migrate validate
 
 # Check migration status
-reverie migrate status
+surql migrate status
 
 # View migration history
-reverie migrate history
+surql migrate history
 ```
 
 ### Permission Errors
@@ -774,10 +774,10 @@ mkdir -p migrations
 
 ```shell
 # Use JSON for script parsing
-reverie migrate status --format json | jq '.[] | select(.status == "PENDING")'
+surql migrate status --format json | jq '.[] | select(.status == "PENDING")'
 
 # Use table for human-readable output
-reverie migrate status --format table
+surql migrate status --format table
 ```
 
 ## Scripting Examples
@@ -790,13 +790,13 @@ set -e
 
 # Apply migrations in CI/CD
 echo "Checking migration status..."
-reverie migrate status
+surql migrate status
 
 echo "Applying migrations..."
-reverie migrate up
+surql migrate up
 
 echo "Verifying migrations..."
-reverie migrate history
+surql migrate history
 
 echo "Done!"
 ```
@@ -812,7 +812,7 @@ def run_migrations():
   try:
     # Check status
     result = subprocess.run(
-      ['reverie', 'migrate', 'status', '--format', 'json'],
+      ['surql', 'migrate', 'status', '--format', 'json'],
       capture_output=True,
       text=True,
       check=True,
@@ -822,7 +822,7 @@ def run_migrations():
     
     # Apply migrations
     subprocess.run(
-      ['reverie', 'migrate', 'up'],
+      ['surql', 'migrate', 'up'],
       check=True,
     )
     

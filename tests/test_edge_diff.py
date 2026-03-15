@@ -2,15 +2,15 @@
 
 import pytest
 
-from reverie.migration.diff import (
+from surql.migration.diff import (
   _validate_event_expression,
   diff_edges,
   diff_permissions,
 )
-from reverie.migration.models import DiffOperation
-from reverie.schema.edge import EdgeDefinition, EdgeMode
-from reverie.schema.fields import FieldDefinition, FieldType
-from reverie.schema.table import (
+from surql.migration.models import DiffOperation
+from surql.schema.edge import EdgeDefinition, EdgeMode
+from surql.schema.fields import FieldDefinition, FieldType
+from surql.schema.table import (
   EventDefinition,
   IndexDefinition,
   IndexType,

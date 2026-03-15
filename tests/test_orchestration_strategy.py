@@ -2,10 +2,10 @@
 
 import pytest
 
-from reverie.connection.config import ConnectionConfig
-from reverie.migration.models import Migration
-from reverie.orchestration.config import EnvironmentConfig
-from reverie.orchestration.strategy import (
+from surql.connection.config import ConnectionConfig
+from surql.migration.models import Migration
+from surql.orchestration.config import EnvironmentConfig
+from surql.orchestration.strategy import (
   CanaryStrategy,
   DeploymentResult,
   DeploymentStatus,

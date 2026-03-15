@@ -2,7 +2,7 @@
 
 from pydantic import BaseModel
 
-from reverie.query.builder import Query, ReturnFormat
+from surql.query.builder import Query, ReturnFormat
 
 
 class User(BaseModel):

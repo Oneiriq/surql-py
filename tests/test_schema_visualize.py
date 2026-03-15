@@ -11,16 +11,16 @@ from unittest.mock import patch
 import pytest
 from typer.testing import CliRunner
 
-from reverie.cli.schema import app as schema_app
-from reverie.schema.edge import EdgeDefinition, EdgeMode
-from reverie.schema.fields import FieldDefinition, FieldType
-from reverie.schema.table import (
+from surql.cli.schema import app as schema_app
+from surql.schema.edge import EdgeDefinition, EdgeMode
+from surql.schema.fields import FieldDefinition, FieldType
+from surql.schema.table import (
   IndexDefinition,
   IndexType,
   TableDefinition,
   TableMode,
 )
-from reverie.schema.visualize import (
+from surql.schema.visualize import (
   ASCIIGenerator,
   GraphVizGenerator,
   MermaidGenerator,
@@ -608,12 +608,12 @@ class TestVisualizeFromRegistryFunction:
 
   def test_with_mocked_registry(self, simple_table: TableDefinition) -> None:
     """Test visualize_from_registry with mocked registry."""
-    from reverie.schema.registry import SchemaRegistry
+    from surql.schema.registry import SchemaRegistry
 
     mock_registry = SchemaRegistry()
     mock_registry.register_table(simple_table)
 
-    with patch('reverie.schema.visualize.get_registry', return_value=mock_registry):
+    with patch('surql.schema.visualize.get_registry', return_value=mock_registry):
       result = visualize_from_registry()
 
     assert 'erDiagram' in result
@@ -621,36 +621,36 @@ class TestVisualizeFromRegistryFunction:
 
   def test_format_option_mermaid(self, simple_table: TableDefinition) -> None:
     """Test with MERMAID format option."""
-    from reverie.schema.registry import SchemaRegistry
+    from surql.schema.registry import SchemaRegistry
 
     mock_registry = SchemaRegistry()
     mock_registry.register_table(simple_table)
 
-    with patch('reverie.schema.visualize.get_registry', return_value=mock_registry):
+    with patch('surql.schema.visualize.get_registry', return_value=mock_registry):
       result = visualize_from_registry(output_format=OutputFormat.MERMAID)
 
     assert 'erDiagram' in result
 
   def test_format_option_graphviz(self, simple_table: TableDefinition) -> None:
     """Test with GRAPHVIZ format option."""
-    from reverie.schema.registry import SchemaRegistry
+    from surql.schema.registry import SchemaRegistry
 
     mock_registry = SchemaRegistry()
     mock_registry.register_table(simple_table)
 
-    with patch('reverie.schema.visualize.get_registry', return_value=mock_registry):
+    with patch('surql.schema.visualize.get_registry', return_value=mock_registry):
       result = visualize_from_registry(output_format=OutputFormat.GRAPHVIZ)
 
     assert 'digraph schema {' in result
 
   def test_format_option_ascii(self, simple_table: TableDefinition) -> None:
     """Test with ASCII format option."""
-    from reverie.schema.registry import SchemaRegistry
+    from surql.schema.registry import SchemaRegistry
 
     mock_registry = SchemaRegistry()
     mock_registry.register_table(simple_table)
 
-    with patch('reverie.schema.visualize.get_registry', return_value=mock_registry):
+    with patch('surql.schema.visualize.get_registry', return_value=mock_registry):
       result = visualize_from_registry(output_format=OutputFormat.ASCII)
 
     assert '+' in result
@@ -658,12 +658,12 @@ class TestVisualizeFromRegistryFunction:
 
   def test_include_fields_option(self, simple_table: TableDefinition) -> None:
     """Test include_fields option from registry."""
-    from reverie.schema.registry import SchemaRegistry
+    from surql.schema.registry import SchemaRegistry
 
     mock_registry = SchemaRegistry()
     mock_registry.register_table(simple_table)
 
-    with patch('reverie.schema.visualize.get_registry', return_value=mock_registry):
+    with patch('surql.schema.visualize.get_registry', return_value=mock_registry):
       result = visualize_from_registry(include_fields=False)
 
     assert 'user {' in result
@@ -675,24 +675,24 @@ class TestVisualizeFromRegistryFunction:
     edge_definition: EdgeDefinition,
   ) -> None:
     """Test include_edges option from registry."""
-    from reverie.schema.registry import SchemaRegistry
+    from surql.schema.registry import SchemaRegistry
 
     mock_registry = SchemaRegistry()
     mock_registry.register_table(simple_table)
     mock_registry.register_edge(edge_definition)
 
-    with patch('reverie.schema.visualize.get_registry', return_value=mock_registry):
+    with patch('surql.schema.visualize.get_registry', return_value=mock_registry):
       result = visualize_from_registry(include_edges=False)
 
     assert '}o--o{' not in result
 
   def test_empty_registry(self) -> None:
     """Test with empty registry."""
-    from reverie.schema.registry import SchemaRegistry
+    from surql.schema.registry import SchemaRegistry
 
     mock_registry = SchemaRegistry()
 
-    with patch('reverie.schema.visualize.get_registry', return_value=mock_registry):
+    with patch('surql.schema.visualize.get_registry', return_value=mock_registry):
       result = visualize_from_registry()
 
     # Should produce valid output even with empty registry
@@ -703,7 +703,7 @@ class TestVisualizeFromRegistryFunction:
 
 
 class TestVisualizeCLICommand:
-  """Test suite for 'reverie schema visualize' CLI command."""
+  """Test suite for 'surql schema visualize' CLI command."""
 
   def setup_method(self) -> None:
     """Set up test resources with wide terminal for consistent help output."""
@@ -748,17 +748,17 @@ class TestVisualizeCLICommand:
     """Test with valid schema file."""
     schema_file = tmp_path / 'schema.py'
     schema_file.write_text("""
-from reverie.schema.table import table_schema
-from reverie.schema.fields import string_field
-from reverie.schema.table import with_fields
-from reverie.schema.registry import register_table
+from surql.schema.table import table_schema
+from surql.schema.fields import string_field
+from surql.schema.table import with_fields
+from surql.schema.registry import register_table
 
 user_table = table_schema('user')
 user_table = with_fields(user_table, string_field('name'))
 register_table(user_table)
 """)
 
-    with patch('reverie.cli.schema_visualize._load_schemas_from_file') as mock_load:
+    with patch('surql.cli.schema_visualize._load_schemas_from_file') as mock_load:
       mock_load.return_value = {
         'user': TableDefinition(
           name='user',
@@ -777,8 +777,8 @@ register_table(user_table)
     schema_file.write_text('# schema')
 
     with (
-      patch('reverie.cli.schema_visualize._load_schemas_from_file') as mock_load,
-      patch('reverie.schema.registry.get_registered_edges', return_value={}),
+      patch('surql.cli.schema_visualize._load_schemas_from_file') as mock_load,
+      patch('surql.schema.registry.get_registered_edges', return_value={}),
     ):
       mock_load.return_value = {'user': TableDefinition(name='user', mode=TableMode.SCHEMAFULL)}
 
@@ -795,8 +795,8 @@ register_table(user_table)
     schema_file.write_text('# schema')
 
     with (
-      patch('reverie.cli.schema_visualize._load_schemas_from_file') as mock_load,
-      patch('reverie.schema.registry.get_registered_edges', return_value={}),
+      patch('surql.cli.schema_visualize._load_schemas_from_file') as mock_load,
+      patch('surql.schema.registry.get_registered_edges', return_value={}),
     ):
       mock_load.return_value = {'user': TableDefinition(name='user', mode=TableMode.SCHEMAFULL)}
 
@@ -813,8 +813,8 @@ register_table(user_table)
     schema_file.write_text('# schema')
 
     with (
-      patch('reverie.cli.schema_visualize._load_schemas_from_file') as mock_load,
-      patch('reverie.schema.registry.get_registered_edges', return_value={}),
+      patch('surql.cli.schema_visualize._load_schemas_from_file') as mock_load,
+      patch('surql.schema.registry.get_registered_edges', return_value={}),
     ):
       mock_load.return_value = {'user': TableDefinition(name='user', mode=TableMode.SCHEMAFULL)}
 
@@ -833,8 +833,8 @@ register_table(user_table)
     output_file = tmp_path / 'diagram.md'
 
     with (
-      patch('reverie.cli.schema_visualize._load_schemas_from_file') as mock_load,
-      patch('reverie.schema.registry.get_registered_edges', return_value={}),
+      patch('surql.cli.schema_visualize._load_schemas_from_file') as mock_load,
+      patch('surql.schema.registry.get_registered_edges', return_value={}),
     ):
       mock_load.return_value = {'user': TableDefinition(name='user', mode=TableMode.SCHEMAFULL)}
 
@@ -854,8 +854,8 @@ register_table(user_table)
     schema_file.write_text('# schema')
 
     with (
-      patch('reverie.cli.schema_visualize._load_schemas_from_file') as mock_load,
-      patch('reverie.schema.registry.get_registered_edges', return_value={}),
+      patch('surql.cli.schema_visualize._load_schemas_from_file') as mock_load,
+      patch('surql.schema.registry.get_registered_edges', return_value={}),
     ):
       mock_load.return_value = {
         'user': TableDefinition(name='user', mode=TableMode.SCHEMAFULL),
@@ -879,8 +879,8 @@ register_table(user_table)
     schema_file.write_text('# schema')
 
     with (
-      patch('reverie.cli.schema_visualize._load_schemas_from_file') as mock_load,
-      patch('reverie.schema.registry.get_registered_edges', return_value={}),
+      patch('surql.cli.schema_visualize._load_schemas_from_file') as mock_load,
+      patch('surql.schema.registry.get_registered_edges', return_value={}),
     ):
       mock_load.return_value = {
         'user': TableDefinition(
@@ -907,8 +907,8 @@ register_table(user_table)
     schema_file.write_text('# schema')
 
     with (
-      patch('reverie.cli.schema_visualize._load_schemas_from_file') as mock_load,
-      patch('reverie.schema.registry.get_registered_edges') as mock_edges,
+      patch('surql.cli.schema_visualize._load_schemas_from_file') as mock_load,
+      patch('surql.schema.registry.get_registered_edges') as mock_edges,
     ):
       mock_load.return_value = {
         'user': TableDefinition(name='user', mode=TableMode.SCHEMAFULL),
@@ -939,7 +939,7 @@ register_table(user_table)
     schema_file = tmp_path / 'schema.py'
     schema_file.write_text('# schema')
 
-    with patch('reverie.cli.schema_visualize._load_schemas_from_file') as mock_load:
+    with patch('surql.cli.schema_visualize._load_schemas_from_file') as mock_load:
       mock_load.return_value = {'user': TableDefinition(name='user', mode=TableMode.SCHEMAFULL)}
 
       result = self.runner.invoke(
@@ -956,7 +956,7 @@ register_table(user_table)
     schema_file = tmp_path / 'empty_schema.py'
     schema_file.write_text('# empty schema file')
 
-    with patch('reverie.cli.schema_visualize._load_schemas_from_file') as mock_load:
+    with patch('surql.cli.schema_visualize._load_schemas_from_file') as mock_load:
       mock_load.return_value = {}
 
       result = self.runner.invoke(schema_app, ['visualize', '--schema', str(schema_file)])
@@ -1091,7 +1091,7 @@ class TestGraphVizWithThemes:
 
   def test_graphviz_with_modern_theme(self, simple_table: TableDefinition) -> None:
     """Test GraphViz generation with modern theme and gradients."""
-    from reverie.schema.themes import MODERN_THEME
+    from surql.schema.themes import MODERN_THEME
 
     generator = GraphVizGenerator(theme=MODERN_THEME.graphviz)
     result = generator.generate({'user': simple_table}, {})
@@ -1114,7 +1114,7 @@ class TestGraphVizWithThemes:
 
   def test_graphviz_with_gradients_disabled(self, simple_table: TableDefinition) -> None:
     """Test GraphViz with gradients disabled for backward compatibility."""
-    from reverie.schema.themes import GraphVizTheme
+    from surql.schema.themes import GraphVizTheme
 
     theme = GraphVizTheme(
       node_color='#6366f1',
@@ -1137,7 +1137,7 @@ class TestGraphVizWithThemes:
 
   def test_semantic_field_coloring(self) -> None:
     """Test fields are colored by type in themed GraphViz."""
-    from reverie.schema.themes import MODERN_THEME
+    from surql.schema.themes import MODERN_THEME
 
     table = TableDefinition(
       name='mixed',
@@ -1162,7 +1162,7 @@ class TestGraphVizWithThemes:
 
   def test_constraint_semantic_coloring(self, table_with_indexes: TableDefinition) -> None:
     """Test constraints get semantic colors."""
-    from reverie.schema.themes import MODERN_THEME
+    from surql.schema.themes import MODERN_THEME
 
     generator = GraphVizGenerator(theme=MODERN_THEME.graphviz)
     result = generator.generate({'user': table_with_indexes}, {})
@@ -1188,7 +1188,7 @@ class TestGraphVizWithThemes:
     self, simple_table: TableDefinition, edge_definition: EdgeDefinition
   ) -> None:
     """Test self-referential edges with theme colors."""
-    from reverie.schema.themes import MODERN_THEME
+    from surql.schema.themes import MODERN_THEME
 
     generator = GraphVizGenerator(theme=MODERN_THEME.graphviz)
     result = generator.generate({'user': simple_table}, {'follows': edge_definition})
@@ -1206,7 +1206,7 @@ class TestMermaidWithThemes:
 
   def test_mermaid_with_modern_theme(self, simple_table: TableDefinition) -> None:
     """Test Mermaid generation includes theme directive."""
-    from reverie.schema.themes import MODERN_THEME
+    from surql.schema.themes import MODERN_THEME
 
     generator = MermaidGenerator(theme=MODERN_THEME.mermaid)
     result = generator.generate({'user': simple_table}, {})
@@ -1217,7 +1217,7 @@ class TestMermaidWithThemes:
 
   def test_mermaid_with_forest_theme(self, simple_table: TableDefinition) -> None:
     """Test Mermaid with forest theme."""
-    from reverie.schema.themes import FOREST_THEME
+    from surql.schema.themes import FOREST_THEME
 
     generator = MermaidGenerator(theme=FOREST_THEME.mermaid)
     result = generator.generate({'user': simple_table}, {})
@@ -1226,7 +1226,7 @@ class TestMermaidWithThemes:
 
   def test_mermaid_with_dark_theme(self, simple_table: TableDefinition) -> None:
     """Test Mermaid with dark theme."""
-    from reverie.schema.themes import DARK_THEME
+    from surql.schema.themes import DARK_THEME
 
     generator = MermaidGenerator(theme=DARK_THEME.mermaid)
     result = generator.generate({'user': simple_table}, {})
@@ -1261,7 +1261,7 @@ class TestASCIIWithThemes:
 
   def test_ascii_with_modern_theme_unicode(self, simple_table: TableDefinition) -> None:
     """Test ASCII generation with unicode box characters."""
-    from reverie.schema.themes import MODERN_THEME
+    from surql.schema.themes import MODERN_THEME
 
     generator = ASCIIGenerator(theme=MODERN_THEME.ascii)
     result = generator.generate({'user': simple_table}, {})
@@ -1273,7 +1273,7 @@ class TestASCIIWithThemes:
 
   def test_ascii_with_single_box_style(self, simple_table: TableDefinition) -> None:
     """Test ASCII with single line box style."""
-    from reverie.schema.themes import ASCIITheme
+    from surql.schema.themes import ASCIITheme
 
     theme = ASCIITheme(box_style='single', use_unicode=True, use_colors=False, use_icons=False)
     generator = ASCIIGenerator(theme=theme)
@@ -1284,7 +1284,7 @@ class TestASCIIWithThemes:
 
   def test_ascii_with_double_box_style(self, simple_table: TableDefinition) -> None:
     """Test ASCII with double line box style."""
-    from reverie.schema.themes import ASCIITheme
+    from surql.schema.themes import ASCIITheme
 
     theme = ASCIITheme(box_style='double', use_unicode=True, use_colors=False, use_icons=False)
     generator = ASCIIGenerator(theme=theme)
@@ -1295,7 +1295,7 @@ class TestASCIIWithThemes:
 
   def test_ascii_with_heavy_box_style(self, simple_table: TableDefinition) -> None:
     """Test ASCII with heavy line box style."""
-    from reverie.schema.themes import ASCIITheme
+    from surql.schema.themes import ASCIITheme
 
     theme = ASCIITheme(box_style='heavy', use_unicode=True, use_colors=False, use_icons=False)
     generator = ASCIIGenerator(theme=theme)
@@ -1306,7 +1306,7 @@ class TestASCIIWithThemes:
 
   def test_ascii_with_ansi_colors(self, table_with_record_field: TableDefinition) -> None:
     """Test ASCII with ANSI color codes."""
-    from reverie.schema.themes import ASCIITheme
+    from surql.schema.themes import ASCIITheme
 
     theme = ASCIITheme(box_style='single', use_unicode=False, use_colors=True, use_icons=False)
     generator = ASCIIGenerator(theme=theme)
@@ -1319,7 +1319,7 @@ class TestASCIIWithThemes:
 
   def test_ascii_with_icons(self, table_with_indexes: TableDefinition) -> None:
     """Test ASCII with constraint icons."""
-    from reverie.schema.themes import ASCIITheme
+    from surql.schema.themes import ASCIITheme
 
     theme = ASCIITheme(box_style='single', use_unicode=False, use_colors=False, use_icons=True)
     generator = ASCIIGenerator(theme=theme)
@@ -1331,7 +1331,7 @@ class TestASCIIWithThemes:
 
   def test_ascii_with_all_features(self, table_with_record_field: TableDefinition) -> None:
     """Test ASCII with unicode, colors, and icons all enabled."""
-    from reverie.schema.themes import MODERN_THEME
+    from surql.schema.themes import MODERN_THEME
 
     generator = ASCIIGenerator(theme=MODERN_THEME.ascii)
     result = generator.generate({'post': table_with_record_field}, {})
@@ -1362,7 +1362,7 @@ class TestASCIIWithThemes:
 
   def test_ascii_minimal_theme(self, simple_table: TableDefinition) -> None:
     """Test ASCII with minimal theme (no colors, no icons)."""
-    from reverie.schema.themes import MINIMAL_THEME
+    from surql.schema.themes import MINIMAL_THEME
 
     generator = ASCIIGenerator(theme=MINIMAL_THEME.ascii)
     result = generator.generate({'user': simple_table}, {})
@@ -1387,7 +1387,7 @@ class TestASCIIWithThemes:
 
   def test_ascii_unicode_disabled_fallback(self, simple_table: TableDefinition) -> None:
     """Test ASCII falls back to basic characters when unicode disabled."""
-    from reverie.schema.themes import ASCIITheme
+    from surql.schema.themes import ASCIITheme
 
     theme = ASCIITheme(box_style='rounded', use_unicode=False, use_colors=False, use_icons=False)
     generator = ASCIIGenerator(theme=theme)
@@ -1404,7 +1404,7 @@ class TestASCIIWithThemes:
     self, table_with_indexes: TableDefinition, table_with_record_field: TableDefinition
   ) -> None:
     """Test ASCII with multiple constraint types and theme."""
-    from reverie.schema.themes import MODERN_THEME
+    from surql.schema.themes import MODERN_THEME
 
     generator = ASCIIGenerator(theme=MODERN_THEME.ascii)
     result = generator.generate({'user': table_with_indexes, 'post': table_with_record_field}, {})
@@ -1427,7 +1427,7 @@ class TestASCIIWithThemes:
     Python's len() counts them as 1. The _get_display_width function should
     account for this to keep box borders vertically aligned.
     """
-    from reverie.schema.themes import FOREST_THEME, MODERN_THEME
+    from surql.schema.themes import FOREST_THEME, MODERN_THEME
 
     # Test with multiple themes that have icons enabled
     for theme_name, theme in [('modern', MODERN_THEME), ('forest', FOREST_THEME)]:

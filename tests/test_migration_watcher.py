@@ -1,9 +1,9 @@
 """Tests for the auto-migration watcher, hooks, and CLI commands.
 
 This module provides comprehensive tests for:
-- Schema file watcher (src/reverie/migration/watcher.py)
-- Git hook utilities (src/reverie/migration/hooks.py)
-- CLI commands: schema check, hook-config, watch (src/reverie/cli/schema.py)
+- Schema file watcher (src/surql/migration/watcher.py)
+- Git hook utilities (src/surql/migration/hooks.py)
+- CLI commands: schema check, hook-config, watch (src/surql/cli/schema.py)
 """
 
 import asyncio
@@ -18,22 +18,22 @@ import pytest
 from typer.testing import CliRunner
 from watchdog.events import FileCreatedEvent, FileDeletedEvent, FileModifiedEvent
 
-from reverie.cli.schema import (
+from surql.cli.schema import (
   CHECK_EXIT_DRIFT_DETECTED,
   CHECK_EXIT_ERROR,
   CHECK_EXIT_NO_DRIFT,
 )
-from reverie.cli.schema import (
+from surql.cli.schema import (
   app as schema_app,
 )
-from reverie.migration.hooks import (
+from surql.migration.hooks import (
   HookCheckResult,
   SchemaDriftInfo,
   check_schema_drift,
   generate_precommit_config,
   get_staged_schema_files,
 )
-from reverie.migration.watcher import (
+from surql.migration.watcher import (
   PendingChange,
   SchemaChange,
   SchemaWatcher,
@@ -538,7 +538,7 @@ class TestHookCheckResult:
       passed=False,
       message='Schema drift detected in 2 file(s)',
       unmigrated_files=[Path('schemas/user.py'), Path('schemas/post.py')],
-      suggested_action='Generate a migration with: reverie schema generate',
+      suggested_action='Generate a migration with: surql schema generate',
     )
 
     assert result.passed is False
@@ -622,11 +622,11 @@ class TestCheckSchemaDrift:
     # Create a newer schema file (after migration)
     schema_file = schema_dir / 'user_schema.py'
     schema_file.write_text("""
-from reverie.schema.table import table_schema
+from surql.schema.table import table_schema
 user = table_schema('user')
 """)
 
-    with patch('reverie.migration.hooks._load_schemas_from_file') as mock_load:
+    with patch('surql.migration.hooks._load_schemas_from_file') as mock_load:
       # Mock returns empty tables - the important thing is file timestamp
       mock_load.return_value = {}
 
@@ -797,7 +797,7 @@ class TestGeneratePrecommitConfig:
 
     assert 'repos:' in config
     assert 'hooks:' in config
-    assert 'reverie-schema-check' in config
+    assert 'surql-schema-check' in config
 
   def test_uses_provided_schema_path(self) -> None:
     """Test uses provided schema path in configuration."""
@@ -871,7 +871,7 @@ class TestSchemaCheckCommand:
     schema_dir = tmp_path / 'schemas'
     schema_dir.mkdir()
 
-    with patch('reverie.migration.hooks.check_schema_drift') as mock_check:
+    with patch('surql.migration.hooks.check_schema_drift') as mock_check:
       mock_check.return_value = HookCheckResult(
         passed=True,
         message='No schema drift detected',
@@ -890,7 +890,7 @@ class TestSchemaCheckCommand:
     schema_dir = tmp_path / 'schemas'
     schema_dir.mkdir()
 
-    with patch('reverie.migration.hooks.check_schema_drift') as mock_check:
+    with patch('surql.migration.hooks.check_schema_drift') as mock_check:
       mock_check.return_value = HookCheckResult(
         passed=False,
         message='Schema drift detected',
@@ -910,7 +910,7 @@ class TestSchemaCheckCommand:
     schema_dir = tmp_path / 'schemas'
     schema_dir.mkdir()
 
-    with patch('reverie.migration.hooks.check_schema_drift') as mock_check:
+    with patch('surql.migration.hooks.check_schema_drift') as mock_check:
       mock_check.return_value = HookCheckResult(
         passed=True,
         message='Schema drift detected (non-blocking)',
@@ -929,7 +929,7 @@ class TestSchemaCheckCommand:
     schema_dir = tmp_path / 'schemas'
     schema_dir.mkdir()
 
-    with patch('reverie.migration.hooks.check_schema_drift') as mock_check:
+    with patch('surql.migration.hooks.check_schema_drift') as mock_check:
       mock_check.return_value = HookCheckResult(
         passed=True,
         message='No drift',
@@ -962,7 +962,7 @@ class TestSchemaCheckCommand:
     migrations_dir = tmp_path / 'custom_migrations'
     migrations_dir.mkdir()
 
-    with patch('reverie.migration.hooks.check_schema_drift') as mock_check:
+    with patch('surql.migration.hooks.check_schema_drift') as mock_check:
       mock_check.return_value = HookCheckResult(
         passed=True,
         message='No drift',
@@ -1020,7 +1020,7 @@ class TestSchemaHookConfigCommand:
     assert result.exit_code == 0
     assert 'repos:' in result.stdout
     assert 'hooks:' in result.stdout
-    assert 'reverie-schema-check' in result.stdout
+    assert 'surql-schema-check' in result.stdout
 
   def test_hook_config_uses_custom_schema_path(self) -> None:
     """Test hook-config uses custom schema path."""
@@ -1110,7 +1110,7 @@ class TestSchemaWatchCommand:
 
     # We can't easily test the full watch loop, but we can test initialization
     with (
-      patch('reverie.migration.watcher.SchemaWatcher') as mock_watcher_class,
+      patch('surql.migration.watcher.SchemaWatcher') as mock_watcher_class,
       patch('asyncio.sleep', side_effect=KeyboardInterrupt),
     ):
       mock_watcher = AsyncMock()
@@ -1136,7 +1136,7 @@ class TestSchemaWatchCommand:
     assert not migrations_dir.exists()
 
     with (
-      patch('reverie.migration.watcher.SchemaWatcher') as mock_watcher_class,
+      patch('surql.migration.watcher.SchemaWatcher') as mock_watcher_class,
       patch('asyncio.sleep', side_effect=KeyboardInterrupt),
     ):
       mock_watcher = AsyncMock()

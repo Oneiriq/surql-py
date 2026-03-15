@@ -4,7 +4,7 @@ from unittest.mock import AsyncMock, MagicMock
 
 import pytest
 
-from reverie.connection.auth import (
+from surql.connection.auth import (
   AuthManager,
   AuthType,
   DatabaseCredentials,

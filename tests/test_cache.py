@@ -10,7 +10,7 @@ from unittest.mock import AsyncMock, patch
 
 import pytest
 
-from reverie.cache import (
+from surql.cache import (
   CacheBackend,
   CacheConfig,
   CacheManager,
@@ -43,7 +43,7 @@ class TestCacheConfig:
     assert config.default_ttl == 300
     assert config.max_size == 1000
     assert config.redis_url == 'redis://localhost:6379'
-    assert config.key_prefix == 'reverie:'
+    assert config.key_prefix == 'surql:'
 
   def test_cache_config_custom_values(self) -> None:
     """Test CacheConfig with custom values."""
@@ -767,7 +767,7 @@ class TestCacheManagerGetOrSet:
 
     keys = asyncio.run(run_test())
     assert len(keys) == 1
-    assert 'reverie:users' in keys
+    assert 'surql:users' in keys
 
 
 class TestCacheManagerInvalidate:
@@ -853,19 +853,19 @@ class TestCacheManagerBuildKey:
 
   def test_build_key_multiple_parts(self) -> None:
     """Test build_key with multiple parts."""
-    config = CacheConfig(key_prefix='reverie:')
+    config = CacheConfig(key_prefix='surql:')
     manager = CacheManager(config)
 
     key = manager.build_key('user', '123', 'profile')
-    assert key == 'reverie:user:123:profile'
+    assert key == 'surql:user:123:profile'
 
   def test_build_key_no_double_prefix(self) -> None:
     """Test build_key doesn't double-prefix."""
-    config = CacheConfig(key_prefix='reverie:')
+    config = CacheConfig(key_prefix='surql:')
     manager = CacheManager(config)
 
-    key = manager.build_key('reverie:already_prefixed')
-    assert key == 'reverie:already_prefixed'
+    key = manager.build_key('surql:already_prefixed')
+    assert key == 'surql:already_prefixed'
 
 
 class TestCacheManagerTableTracking:
@@ -879,7 +879,7 @@ class TestCacheManagerTableTracking:
     manager.track_table('user', 'user:123')
 
     keys = manager.get_table_keys('user')
-    assert 'reverie:user:123' in keys
+    assert 'surql:user:123' in keys
 
   def test_get_table_keys_returns_copy(self) -> None:
     """Test get_table_keys returns a copy of the set."""
@@ -1067,7 +1067,7 @@ class TestCacheQueryDecorator:
 
     async def run_test() -> str:
       # Reset global cache manager
-      import reverie.cache as cache_module
+      import surql.cache as cache_module
 
       cache_module._cache_manager = None
 
@@ -1159,7 +1159,7 @@ class TestConfigureCache:
     """Test configure_cache creates and returns CacheManager."""
 
     async def run_test() -> bool:
-      import reverie.cache as cache_module
+      import surql.cache as cache_module
 
       cache_module._cache_manager = None
 
@@ -1178,7 +1178,7 @@ class TestConfigureCache:
     """Test configure_cache replaces existing manager."""
 
     async def run_test() -> tuple[int, int]:
-      import reverie.cache as cache_module
+      import surql.cache as cache_module
 
       cache_module._cache_manager = None
 
@@ -1205,7 +1205,7 @@ class TestGetCacheManager:
     """Test get_cache_manager returns configured manager."""
 
     async def run_test() -> bool:
-      import reverie.cache as cache_module
+      import surql.cache as cache_module
 
       cache_module._cache_manager = None
 
@@ -1222,7 +1222,7 @@ class TestGetCacheManager:
 
   def test_get_cache_manager_returns_none_when_not_configured(self) -> None:
     """Test get_cache_manager returns None when not configured."""
-    import reverie.cache as cache_module
+    import surql.cache as cache_module
 
     cache_module._cache_manager = None
 
@@ -1237,7 +1237,7 @@ class TestInvalidateGlobal:
     """Test global invalidate by key."""
 
     async def run_test() -> int:
-      import reverie.cache as cache_module
+      import surql.cache as cache_module
 
       cache_module._cache_manager = None
 
@@ -1257,7 +1257,7 @@ class TestInvalidateGlobal:
     """Test global invalidate returns 0 when cache not configured."""
 
     async def run_test() -> int:
-      import reverie.cache as cache_module
+      import surql.cache as cache_module
 
       cache_module._cache_manager = None
 
@@ -1274,7 +1274,7 @@ class TestClearCacheGlobal:
     """Test global clear_cache removes all entries."""
 
     async def run_test() -> int:
-      import reverie.cache as cache_module
+      import surql.cache as cache_module
 
       cache_module._cache_manager = None
 
@@ -1296,7 +1296,7 @@ class TestClearCacheGlobal:
     """Test global clear_cache returns 0 when not configured."""
 
     async def run_test() -> int:
-      import reverie.cache as cache_module
+      import surql.cache as cache_module
 
       cache_module._cache_manager = None
 
@@ -1313,7 +1313,7 @@ class TestCloseCacheGlobal:
     """Test close_cache cleans up resources."""
 
     async def run_test() -> bool:
-      import reverie.cache as cache_module
+      import surql.cache as cache_module
 
       cache_module._cache_manager = None
 
@@ -1331,7 +1331,7 @@ class TestCloseCacheGlobal:
     """Test close_cache handles case when not configured."""
 
     async def run_test() -> None:
-      import reverie.cache as cache_module
+      import surql.cache as cache_module
 
       cache_module._cache_manager = None
 

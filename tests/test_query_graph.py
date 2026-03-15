@@ -5,7 +5,7 @@ from unittest.mock import AsyncMock, patch
 import pytest
 from pydantic import BaseModel
 
-from reverie.query.graph import (
+from surql.query.graph import (
   GraphQuery,
   compute_degree,
   count_related,
@@ -21,7 +21,7 @@ from reverie.query.graph import (
   traverse_with_depth,
   unrelate,
 )
-from reverie.types.record_id import RecordID
+from surql.types.record_id import RecordID
 
 
 # Test models
@@ -136,7 +136,7 @@ class TestTraverse:
       return_value=[{'result': [{'title': 'Post 1', 'content': 'Content 1'}]}]
     )
 
-    with patch('reverie.query.executor.get_db', return_value=mock_db_client):
+    with patch('surql.query.executor.get_db', return_value=mock_db_client):
       posts = await traverse('user:alice', '->likes->post', Post)
 
     assert len(posts) == 1
@@ -342,7 +342,7 @@ class TestRelate:
     """Test relate using context client."""
     mock_db_client.execute = AsyncMock(return_value=[{'result': {'id': 'likes:123'}}])
 
-    with patch('reverie.query.graph.get_db', return_value=mock_db_client):
+    with patch('surql.query.graph.get_db', return_value=mock_db_client):
       edge = await relate('likes', 'user:alice', 'post:456')
 
     assert 'id' in edge
@@ -391,7 +391,7 @@ class TestUnrelate:
     """Test unrelate using context client."""
     mock_db_client.execute = AsyncMock(return_value=None)
 
-    with patch('reverie.query.graph.get_db', return_value=mock_db_client):
+    with patch('surql.query.graph.get_db', return_value=mock_db_client):
       await unrelate('likes', 'user:alice', 'post:456')
 
     mock_db_client.execute.assert_called_once()
@@ -667,7 +667,7 @@ class TestCountRelated:
     """Test count_related using context client."""
     mock_db_client.execute = AsyncMock(return_value=[{'result': [{'count': 5}]}])
 
-    with patch('reverie.query.graph.get_db', return_value=mock_db_client):
+    with patch('surql.query.graph.get_db', return_value=mock_db_client):
       count = await count_related('user:alice', 'likes', direction='out')
 
     assert count == 5
@@ -741,7 +741,7 @@ class TestShortestPath:
       return_value=[{'name': 'Alice', 'email': 'alice@example.com'}]
     )
 
-    with patch('reverie.query.graph.get_db', return_value=mock_db_client):
+    with patch('surql.query.graph.get_db', return_value=mock_db_client):
       path = await shortest_path('user:alice', 'user:bob', 'follows')
 
     assert len(path) >= 1
@@ -1061,7 +1061,7 @@ class TestGraphQueryFetch:
       return_value=[{'result': [{'name': 'Bob', 'email': 'bob@example.com'}]}]
     )
 
-    with patch('reverie.query.graph_query.get_db', return_value=mock_db_client):
+    with patch('surql.query.graph_query.get_db', return_value=mock_db_client):
       users = await GraphQuery('user:alice').out('follows').fetch(User)
 
     assert len(users) == 1
@@ -1243,7 +1243,7 @@ class TestFindMutualConnections:
     """Test find_mutual_connections uses context client when not provided."""
     mock_db_client.execute = AsyncMock(return_value=[{'result': []}])
 
-    with patch('reverie.query.graph.get_db', return_value=mock_db_client):
+    with patch('surql.query.graph.get_db', return_value=mock_db_client):
       await find_mutual_connections('user:alice', 'follows')
 
     mock_db_client.execute.assert_called_once()
@@ -1575,7 +1575,7 @@ class TestComputeDegree:
       ]
     )
 
-    with patch('reverie.query.graph.get_db', return_value=mock_db_client):
+    with patch('surql.query.graph.get_db', return_value=mock_db_client):
       degree = await compute_degree('user:alice', 'follows')
 
     assert degree['total'] == 2

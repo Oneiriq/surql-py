@@ -5,7 +5,7 @@ from pathlib import Path
 
 import pytest
 
-from reverie.migration.discovery import (
+from surql.migration.discovery import (
   MigrationDiscoveryError,
   MigrationLoadError,
   _calculate_checksum,
@@ -15,7 +15,7 @@ from reverie.migration.discovery import (
   load_migration,
   validate_migration_name,
 )
-from reverie.migration.models import (
+from surql.migration.models import (
   DiffOperation,
   Migration,
   MigrationDirection,
@@ -243,7 +243,7 @@ class TestMigrationMetadata:
       description='Test',
     )
 
-    assert metadata.author == 'reverie'
+    assert metadata.author == 'surql'
     assert metadata.depends_on == []
 
 

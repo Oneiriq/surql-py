@@ -1,6 +1,6 @@
-# Reverie Visualization Examples
+# surql Visualization Examples
 
-This directory contains examples demonstrating Reverie's schema visualization capabilities.
+This directory contains examples demonstrating surql's schema visualization capabilities.
 
 ## Important: Viewing Rendered Output
 
@@ -177,7 +177,7 @@ python -c "print('╭─╮')"
 
 ## Other Examples in This Directory
 
-- [`basic_usage.py`](basic_usage.py) - Basic Reverie operations
+- [`basic_usage.py`](basic_usage.py) - Basic surql operations
 - [`advanced_queries.py`](advanced_queries.py) - Advanced query examples
 - [`graph_queries.py`](graph_queries.py) - Graph traversal examples
 - [`migration_example.py`](migration_example.py) - Database migration workflow
@@ -192,8 +192,8 @@ python -c "print('╭─╮')"
 
 - 📖 **Full Rendering Guide**: [`docs/VISUALIZATION_RENDERING_GUIDE.md`](../VISUALIZATION_RENDERING_GUIDE.md)
 - 📋 **Troubleshooting**: See the Troubleshooting section in the rendering guide
-- 🎨 **Theme Documentation**: Check [`src/reverie/schema/themes.py`](../../src/reverie/schema/themes.py)
-- 🔧 **Visualization API**: See [`src/reverie/schema/visualize.py`](../../src/reverie/schema/visualize.py)
+- 🎨 **Theme Documentation**: Check [`src/surql/schema/themes.py`](../../src/surql/schema/themes.py)
+- 🔧 **Visualization API**: See [`src/surql/schema/visualize.py`](../../src/surql/schema/visualize.py)
 
 ---
 

@@ -1,6 +1,6 @@
 # Quick Start Tutorial
 
-This tutorial will walk you through creating your first reverie project, defining schemas, creating migrations, and performing CRUD operations.
+This tutorial will walk you through creating your first surql project, defining schemas, creating migrations, and performing CRUD operations.
 
 ## Table of Contents
 
@@ -22,7 +22,7 @@ Before starting, ensure you have:
 
 - Python 3.12+ installed
 - SurrealDB 1.0+ installed and running
-- reverie installed (`pip install reverie` or `uv add reverie`)
+- surql installed (`pip install surql` or `uv add surql`)
 
 If you haven't completed these steps, see the [Installation Guide](installation.md).
 
@@ -42,10 +42,10 @@ python -m venv venv
 source venv/bin/activate  # On Windows: venv\Scripts\activate
 ```
 
-### 3. Install reverie
+### 3. Install surql
 
 ```shell
-pip install reverie
+pip install surql
 ```
 
 ### 4. Create Project Structure
@@ -94,8 +94,8 @@ Let's create a blog with users and posts.
 Create `schemas/user.py`:
 
 ```python
-from reverie.schema.fields import string_field, datetime_field
-from reverie.schema.table import table_schema, unique_index, TableMode
+from surql.schema.fields import string_field, datetime_field
+from surql.schema.table import table_schema, unique_index, TableMode
 
 user_schema = table_schema(
   'user',
@@ -119,8 +119,8 @@ user_schema = table_schema(
 Create `schemas/post.py`:
 
 ```python
-from reverie.schema.fields import string_field, record_field, datetime_field, bool_field
-from reverie.schema.table import table_schema, search_index, TableMode
+from surql.schema.fields import string_field, record_field, datetime_field, bool_field
+from surql.schema.table import table_schema, search_index, TableMode
 
 post_schema = table_schema(
   'post',
@@ -146,7 +146,7 @@ post_schema = table_schema(
 ### 1. Create Migration File
 
 ```shell
-reverie migrate create "Create user and post tables"
+surql migrate create "Create user and post tables"
 ```
 
 This creates a file like `migrations/20260102_120000_create_user_and_post_tables.py`.
@@ -198,7 +198,7 @@ def down() -> list[str]:
 metadata = {
   'version': '20260102_120000',
   'description': 'Create user and post tables',
-  'author': 'reverie',
+  'author': 'surql',
   'depends_on': [],
 }
 ```
@@ -211,9 +211,9 @@ Create `main.py`:
 
 ```python
 import asyncio
-from reverie.connection.client import get_client
-from reverie.connection.config import ConnectionConfig
-from reverie.settings import get_db_config
+from surql.connection.client import get_client
+from surql.connection.config import ConnectionConfig
+from surql.settings import get_db_config
 
 async def get_db_client():
   """Get database client from configuration."""
@@ -226,7 +226,7 @@ async def get_db_client():
 ### 1. Check Migration Status
 
 ```shell
-reverie migrate status
+surql migrate status
 ```
 
 Output:
@@ -244,7 +244,7 @@ Total: 1 | Applied: 0 | Pending: 1
 ### 2. Apply Migrations
 
 ```shell
-reverie migrate up
+surql migrate up
 ```
 
 Output:
@@ -259,7 +259,7 @@ Successfully applied 1 migration(s)
 ### 3. Verify
 
 ```shell
-reverie schema show
+surql schema show
 ```
 
 ## Perform CRUD Operations
@@ -295,7 +295,7 @@ class Post(BaseModel):
 Add to `main.py`:
 
 ```python
-from reverie.query.crud import create_record, query_records, get_record
+from surql.query.crud import create_record, query_records, get_record
 
 async def create_user_example():
   """Create a new user."""
@@ -320,7 +320,7 @@ async def create_post_example(author_id: str):
       'post',
       Post(
         title='My First Blog Post',
-        content='This is my first post using reverie!',
+        content='This is my first post using surql!',
         slug='my-first-post',
         author=author_id,
         published=True,
@@ -366,7 +366,7 @@ async def query_published_posts():
 ### Update Records
 
 ```python
-from reverie.query.crud import update_record, merge_record
+from surql.query.crud import update_record, merge_record
 
 async def update_user_example(user_id: str):
   """Update a user."""
@@ -400,7 +400,7 @@ async def merge_post_example(post_id: str):
 ### Delete Records
 
 ```python
-from reverie.query.crud import delete_record
+from surql.query.crud import delete_record
 
 async def delete_post_example(post_id: str):
   """Delete a post."""
@@ -416,8 +416,8 @@ async def delete_post_example(post_id: str):
 Create `schemas/likes.py`:
 
 ```python
-from reverie.schema.edge import edge_schema
-from reverie.schema.fields import datetime_field
+from surql.schema.edge import edge_schema
+from surql.schema.fields import datetime_field
 
 likes_edge = edge_schema(
   'likes',
@@ -432,7 +432,7 @@ likes_edge = edge_schema(
 ### Create Edge Migration
 
 ```shell
-reverie migrate create "Create likes edge"
+surql migrate create "Create likes edge"
 ```
 
 Edit the migration file:
@@ -455,7 +455,7 @@ def down() -> list[str]:
 Apply the migration:
 
 ```shell
-reverie migrate up
+surql migrate up
 ```
 
 ### Create Relationships
@@ -488,9 +488,9 @@ from pydantic import BaseModel, EmailStr, Field
 from typing import Optional
 from datetime import datetime
 
-from reverie.connection.client import get_client
-from reverie.settings import get_db_config
-from reverie.query.crud import (
+from surql.connection.client import get_client
+from surql.settings import get_db_config
+from surql.query.crud import (
   create_record,
   query_records,
   get_record,
@@ -532,8 +532,8 @@ async def main():
     post = await create_record(
       'post',
       Post(
-        title='Getting Started with reverie',
-        content='reverie makes working with SurrealDB easy!',
+        title='Getting Started with surql',
+        content='surql makes working with SurrealDB easy!',
         slug='getting-started',
         author=user['id'],
       ),
@@ -597,7 +597,7 @@ Created post: post:abc123
 Publishing post...
 
 Querying published posts...
-  - Getting Started with reverie (by user:alice)
+  - Getting Started with surql (by user:alice)
 
 Creating like relationship...
 
@@ -665,7 +665,7 @@ Create a test configuration:
 ```python
 # conftest.py
 import pytest
-from reverie.connection.config import ConnectionConfig
+from surql.connection.config import ConnectionConfig
 
 @pytest.fixture
 async def test_db():
@@ -688,7 +688,7 @@ async def test_db():
 Use context managers for automatic cleanup:
 
 ```python
-from reverie.connection.context import db_context
+from surql.connection.context import db_context
 
 async def with_context_example():
   async with db_context(get_db_config()) as client:
@@ -700,7 +700,7 @@ async def with_context_example():
 ## Multiple Connections
 
 For applications requiring connections to multiple databases (read replicas, analytics,
-different environments), reverie provides a connection registry.
+different environments), surql provides a connection registry.
 
 ### When to Use Multiple Connections
 
@@ -713,8 +713,8 @@ different environments), reverie provides a connection registry.
 
 ```python
 import asyncio
-from reverie.connection.registry import ConnectionRegistry, get_registry
-from reverie.connection.config import ConnectionConfig
+from surql.connection.registry import ConnectionRegistry, get_registry
+from surql.connection.config import ConnectionConfig
 
 async def setup_connections():
   """Register multiple database connections."""
@@ -764,8 +764,8 @@ async def setup_connections():
 ### Use Named Connections
 
 ```python
-from reverie.connection.registry import get_registry
-from reverie.query.crud import create_record, query_records
+from surql.connection.registry import get_registry
+from surql.query.crud import create_record, query_records
 
 async def use_connections():
   """Use different connections for different operations."""
@@ -822,8 +822,8 @@ REVERIE_REPLICA_DB_PASS=reader_pass
 Load from environment:
 
 ```python
-from reverie.connection.config import NamedConnectionConfig
-from reverie.connection.registry import get_registry
+from surql.connection.config import NamedConnectionConfig
+from surql.connection.registry import get_registry
 
 async def setup_from_env():
   """Load named connections from environment variables."""
@@ -857,7 +857,7 @@ If connection fails:
 
 ```shell
 # Test database connectivity
-reverie db ping
+surql db ping
 
 # Check SurrealDB is running
 surreal version

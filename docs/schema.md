@@ -1,6 +1,6 @@
 # Schema Definition Guide
 
-This guide covers defining type-safe database schemas using reverie's functional composition API.
+This guide covers defining type-safe database schemas using surql's functional composition API.
 
 ## Table of Contents
 
@@ -16,7 +16,7 @@ This guide covers defining type-safe database schemas using reverie's functional
 
 ## Overview
 
-reverie provides a code-first approach to schema definition using:
+surql provides a code-first approach to schema definition using:
 
 - **Pure functions** - All schema builders return immutable data structures
 - **Pydantic models** - Type-safe schema definitions with validation
@@ -26,8 +26,8 @@ reverie provides a code-first approach to schema definition using:
 ### Key Concepts
 
 ```python
-from reverie.schema.fields import string_field, int_field
-from reverie.schema.table import table_schema, unique_index, TableMode
+from surql.schema.fields import string_field, int_field
+from surql.schema.table import table_schema, unique_index, TableMode
 
 # Define a schema using pure functions
 schema = table_schema(
@@ -47,10 +47,10 @@ schema = table_schema(
 
 ### Basic Field Types
 
-reverie supports all SurrealDB field types:
+surql supports all SurrealDB field types:
 
 ```python
-from reverie.schema.fields import (
+from surql.schema.fields import (
   FieldType,
   string_field,
   int_field,
@@ -203,7 +203,7 @@ computed_field(
 Use dot notation for nested structure:
 
 ```python
-from reverie.schema.fields import field, FieldType
+from surql.schema.fields import field, FieldType
 
 fields = [
   field('name.first', FieldType.STRING),
@@ -219,7 +219,7 @@ fields = [
 ### Basic Table Definition
 
 ```python
-from reverie.schema.table import table_schema, TableMode
+from surql.schema.table import table_schema, TableMode
 
 # Schemafull (strict)
 user_table = table_schema(
@@ -245,7 +245,7 @@ old_table = table_schema(
 ### Complete Table Example
 
 ```python
-from reverie.schema.fields import (
+from surql.schema.fields import (
   string_field,
   int_field,
   datetime_field,
@@ -253,7 +253,7 @@ from reverie.schema.fields import (
   array_field,
   bool_field,
 )
-from reverie.schema.table import (
+from surql.schema.table import (
   table_schema,
   unique_index,
   search_index,
@@ -319,7 +319,7 @@ user_table = table_schema(
 
 Edges represent relationships between records in SurrealDB's graph model.
 
-reverie supports two edge table modes:
+surql supports two edge table modes:
 
 1. **TYPE RELATION (default)**: Modern SurrealDB graph edges with automatic in/out fields
 2. **SCHEMAFULL**: Traditional tables with explicit in/out fields (driftnet-compatible)
@@ -329,8 +329,8 @@ reverie supports two edge table modes:
 The modern approach uses `TYPE RELATION` syntax where SurrealDB automatically manages in/out fields.
 
 ```python
-from reverie.schema.edge import edge_schema
-from reverie.schema.fields import datetime_field
+from surql.schema.edge import edge_schema
+from surql.schema.fields import datetime_field
 
 follows_edge = edge_schema(
   'follows',
@@ -368,8 +368,8 @@ likes_edge = edge_schema(
 For compatibility with traditional schemas (like driftnet), use SCHEMAFULL mode with explicit in/out fields:
 
 ```python
-from reverie.schema.edge import EdgeMode, schemafull_edge
-from reverie.schema.fields import record_field, string_field, float_field, array_field
+from surql.schema.edge import EdgeMode, schemafull_edge
+from surql.schema.fields import record_field, string_field, float_field, array_field
 
 # Driftnet-compatible entity_relation edge
 entity_relation = schemafull_edge(
@@ -413,7 +413,7 @@ entity_relation = edge_schema(
 ### Weighted Edges
 
 ```python
-from reverie.schema.fields import float_field
+from surql.schema.fields import float_field
 
 similarity_edge = edge_schema(
   'similar_to',
@@ -460,7 +460,7 @@ tagged_edge = edge_schema(
 ### Index Types
 
 ```python
-from reverie.schema.table import index, unique_index, search_index, IndexType
+from surql.schema.table import index, unique_index, search_index, IndexType
 
 # Standard index
 index('name_idx', ['name'], IndexType.STANDARD)
@@ -485,7 +485,7 @@ index('date_user_idx', ['created_at', 'user_id'])
 ### Index Examples
 
 ```python
-from reverie.schema.table import table_schema, unique_index, search_index, index
+from surql.schema.table import table_schema, unique_index, search_index, index
 
 product_table = table_schema(
   'product',
@@ -518,7 +518,7 @@ Events are database triggers that execute when conditions are met.
 ### Basic Event
 
 ```python
-from reverie.schema.table import event
+from surql.schema.table import event
 
 email_change_event = event(
   'email_changed',
@@ -628,7 +628,7 @@ post_permissions = {
 ### Field-Level Permissions
 
 ```python
-from reverie.schema.fields import string_field
+from surql.schema.fields import string_field
 
 # Field with custom permissions
 email_field = string_field(
@@ -642,19 +642,19 @@ email_field = string_field(
 
 ## Functional Composition
 
-reverie emphasizes functional composition for building schemas.
+surql emphasizes functional composition for building schemas.
 
 ### Composing Tables
 
 ```python
-from reverie.schema.table import (
+from surql.schema.table import (
   table_schema,
   with_fields,
   with_indexes,
   with_events,
   with_permissions,
 )
-from reverie.schema.fields import string_field, datetime_field
+from surql.schema.fields import string_field, datetime_field
 
 # Start with base table
 base_table = table_schema('user', mode=TableMode.SCHEMAFULL)
@@ -880,8 +880,8 @@ table_schema(
 ### E-commerce Product Schema
 
 ```python
-from reverie.schema.fields import *
-from reverie.schema.table import *
+from surql.schema.fields import *
+from surql.schema.table import *
 
 product_schema = table_schema(
   'product',

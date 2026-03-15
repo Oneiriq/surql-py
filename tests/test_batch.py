@@ -9,8 +9,8 @@ from unittest.mock import AsyncMock, patch
 import pytest
 from pydantic import BaseModel
 
-from reverie.connection.client import DatabaseClient
-from reverie.query.batch import (
+from surql.connection.client import DatabaseClient
+from surql.query.batch import (
   build_relate_query,
   build_upsert_query,
   delete_many,
@@ -132,7 +132,7 @@ class TestUpsertMany:
       return_value=[{'result': [{'id': 'user:1', 'name': 'Test'}]}]
     )
 
-    with patch('reverie.query.batch.get_db', return_value=mock_db_client):
+    with patch('surql.query.batch.get_db', return_value=mock_db_client):
       results = await upsert_many(None, 'users', [{'name': 'Test'}])
 
     assert len(results) == 1
@@ -272,7 +272,7 @@ class TestRelateMany:
     )
 
     relations = [('person:alice', 'person:bob', None)]
-    with patch('reverie.query.batch.get_db', return_value=mock_db_client):
+    with patch('surql.query.batch.get_db', return_value=mock_db_client):
       results = await relate_many(None, 'person', 'knows', 'person', relations)
 
     assert len(results) == 1
@@ -392,7 +392,7 @@ class TestInsertMany:
       return_value=[{'result': [{'id': 'user:1', 'name': 'Test'}]}]
     )
 
-    with patch('reverie.query.batch.get_db', return_value=mock_db_client):
+    with patch('surql.query.batch.get_db', return_value=mock_db_client):
       results = await insert_many(None, 'users', [{'name': 'Test'}])
 
     assert len(results) == 1
@@ -476,7 +476,7 @@ class TestDeleteMany:
       return_value=[{'result': [{'id': 'user:1', 'name': 'Test'}]}]
     )
 
-    with patch('reverie.query.batch.get_db', return_value=mock_db_client):
+    with patch('surql.query.batch.get_db', return_value=mock_db_client):
       results = await delete_many(None, 'user', ['1'])
 
     assert len(results) == 1

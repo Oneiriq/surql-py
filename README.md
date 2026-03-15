@@ -1,10 +1,10 @@
-# Reverie
+# surql
 
 [![License](https://img.shields.io/badge/License-Apache%202.0-blue.svg)](LICENSE)
 [![Python Version](https://img.shields.io/badge/python-3.12%2B-blue)](https://www.python.org/downloads/)
 [![SurrealDB](https://img.shields.io/badge/SurrealDB-1.0%2B-ff00a0)](https://surrealdb.com/)
 
-Reverie is a code-first database toolkit for building modern applications with SurrealDB. It provides a seamless developer experience by integrating database operations directly into the codebase, allowing developers to define, query, and manipulate data using familiar programming constructs and **code-first migrations**.
+surql is a code-first database toolkit for building modern applications with SurrealDB. It provides a seamless developer experience by integrating database operations directly into the codebase, allowing developers to define, query, and manipulate data using familiar programming constructs and **code-first migrations**.
 
 ## Features
 
@@ -39,17 +39,17 @@ Reverie is a code-first database toolkit for building modern applications with S
 
 ```shell
 # Using pip
-pip install reverie
+pip install oneiriq-surql
 
 # Using uv (recommended)
-uv add reverie
+uv add oneiriq-surql
 ```
 
 ### Define a Schema
 
 ```python
-from reverie.schema.fields import string_field, int_field, datetime_field
-from reverie.schema.table import table_schema, unique_index, TableMode
+from surql.schema.fields import string_field, int_field, datetime_field
+from surql.schema.table import table_schema, unique_index, TableMode
 
 user_schema = table_schema(
   'user',
@@ -70,22 +70,22 @@ user_schema = table_schema(
 
 ```shell
 # Create a new migration file
-reverie migrate create "Add user table"
+surql migrate create "Add user table"
 
 # Apply migrations
-reverie migrate up
+surql migrate up
 
 # Check migration status
-reverie migrate status
+surql migrate status
 ```
 
 ### Perform CRUD Operations
 
 ```python
 from pydantic import BaseModel
-from reverie.connection.client import DatabaseClient, get_client
-from reverie.connection.config import ConnectionConfig
-from reverie.query.crud import create_record, query_records
+from surql.connection.client import DatabaseClient, get_client
+from surql.connection.config import ConnectionConfig
+from surql.query.crud import create_record, query_records
 
 class User(BaseModel):
   name: str
@@ -133,7 +133,7 @@ async with get_client(config) as client:
 - [Live Queries & Streaming](docs/streaming.md) - Real-time data notifications
 - [CLI Reference](docs/cli.md) - Command-line interface documentation
 - [API Reference](docs/api/README.md) - Module and function reference
-- [Driftnet Migration Guide](docs/driftnet_migration.md) - Migrating from surrealdb-py to reverie
+- [Driftnet Migration Guide](docs/driftnet_migration.md) - Migrating from surrealdb-py to surql
 - [Compatibility Analysis](plans/compat.md) - Complete driftnet compatibility verification
 - [Examples](docs/examples/) - Working code examples
   - [MTREE Vector Search](docs/examples/mtree_vector_search.py) - 1024-dim COSINE indexes (driftnet-compatible)
@@ -142,7 +142,7 @@ async with get_client(config) as client:
 
 ## Architecture
 
-reverie is built on several core principles:
+surql is built on several core principles:
 
 - **Functional Composition** - Favor pure functions and composition over inheritance
 - **Type Safety** - Strict typing with mypy and runtime validation with Pydantic
@@ -155,7 +155,7 @@ See the [Architecture Document](plans/architecture.md) for detailed design infor
 ## Project Structure
 
 ```shell
-reverie/
+surql/
 ├── src/
 │   ├── schema/          # Schema definition layer
 │   │   ├── fields.py    # Field type definitions
@@ -208,24 +208,24 @@ reverie/
 
 ```shell
 # Migration commands
-reverie migrate up              # Apply pending migrations
-reverie migrate down            # Rollback last migration
-reverie migrate status          # Show migration status
-reverie migrate history         # Show applied migrations
-reverie migrate create <name>   # Create new migration
-reverie migrate squash          # Squash migrations
+surql migrate up              # Apply pending migrations
+surql migrate down            # Rollback last migration
+surql migrate status          # Show migration status
+surql migrate history         # Show applied migrations
+surql migrate create <name>   # Create new migration
+surql migrate squash          # Squash migrations
 
 # Schema commands
-reverie schema show             # Show database schema
-reverie schema show <table>     # Show table schema
-reverie schema validate         # Validate against database
-reverie schema visualize        # Generate schema diagram
-reverie schema watch            # Watch for schema changes
+surql schema show             # Show database schema
+surql schema show <table>     # Show table schema
+surql schema validate         # Validate against database
+surql schema visualize        # Generate schema diagram
+surql schema watch            # Watch for schema changes
 
 # Database commands
-reverie db info                 # Show database information
-reverie db ping                 # Check database connection
-reverie db query <sql>          # Execute raw SurrealQL
+surql db info                 # Show database information
+surql db ping                 # Check database connection
+surql db query <sql>          # Execute raw SurrealQL
 ```
 
 ## Requirements
@@ -237,8 +237,8 @@ reverie db query <sql>          # Execute raw SurrealQL
 
 ```shell
 # Clone the repository
-git clone https://github.com/yourusername/reverie.git
-cd reverie
+git clone https://github.com/Oneiriq/surql-python.git
+cd surql
 
 # Install dependencies with uv
 uv sync
@@ -289,8 +289,8 @@ This project is licensed under the Apache License 2.0 - see the [LICENSE](LICENS
 ## Support
 
 - Documentation: [docs/](docs/)
-- Issues: [GitHub Issues](https://github.com/yourusername/reverie/issues)
-- Discussions: [GitHub Discussions](https://github.com/yourusername/reverie/discussions)
+- Issues: [GitHub Issues](https://github.com/Oneiriq/surql-python/issues)
+- Discussions: [GitHub Discussions](https://github.com/Oneiriq/surql-python/discussions)
 
 ## Roadmap
 

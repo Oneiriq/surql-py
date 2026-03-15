@@ -5,8 +5,8 @@ from unittest.mock import AsyncMock
 
 import pytest
 
-from reverie.connection.client import QueryError
-from reverie.migration.history import (
+from surql.connection.client import QueryError
+from surql.migration.history import (
   MIGRATION_TABLE_NAME,
   MigrationHistoryError,
   _extract_records,
@@ -20,7 +20,7 @@ from reverie.migration.history import (
   record_migration,
   remove_migration_record,
 )
-from reverie.migration.models import MigrationHistory
+from surql.migration.models import MigrationHistory
 
 
 class TestCreateMigrationTable:

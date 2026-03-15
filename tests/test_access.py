@@ -3,7 +3,7 @@
 import pytest
 from pydantic import ValidationError
 
-from reverie.schema.access import (
+from surql.schema.access import (
   AccessType,
   JwtConfig,
   RecordAccessConfig,
@@ -11,7 +11,7 @@ from reverie.schema.access import (
   jwt_access,
   record_access,
 )
-from reverie.schema.sql import generate_access_sql
+from surql.schema.sql import generate_access_sql
 
 
 class TestAccessSchema:

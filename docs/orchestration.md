@@ -1,6 +1,6 @@
 # Multi-Database Migration Orchestration
 
-Complete guide to deploying migrations across multiple database environments using reverie's orchestration features.
+Complete guide to deploying migrations across multiple database environments using surql's orchestration features.
 
 ## Table of Contents
 
@@ -42,8 +42,8 @@ Multi-database orchestration enables you to deploy migrations across multiple da
 An environment represents a single database instance or cluster:
 
 ```python
-from reverie.orchestration import EnvironmentConfig
-from reverie.connection.config import ConnectionConfig
+from surql.orchestration import EnvironmentConfig
+from surql.connection.config import ConnectionConfig
 
 env = EnvironmentConfig(
   name='production',
@@ -64,7 +64,7 @@ env = EnvironmentConfig(
 The registry manages all configured environments:
 
 ```python
-from reverie.orchestration import EnvironmentRegistry
+from surql.orchestration import EnvironmentRegistry
 
 registry = EnvironmentRegistry()
 registry.register_environment(
@@ -80,7 +80,7 @@ registry.register_environment(
 The coordinator orchestrates deployments across environments:
 
 ```python
-from reverie.orchestration import MigrationCoordinator
+from surql.orchestration import MigrationCoordinator
 
 coordinator = MigrationCoordinator(registry)
 results = await coordinator.deploy_to_environments(
@@ -164,7 +164,7 @@ Set variables before running:
 ```shell
 export STAGING_PASSWORD="secret123"
 export PROD_PASSWORD="prod_secret"
-reverie orchestrate deploy -e staging,production
+surql orchestrate deploy -e staging,production
 ```
 
 ### Loading Configuration
@@ -172,7 +172,7 @@ reverie orchestrate deploy -e staging,production
 **From File:**
 
 ```python
-from reverie.orchestration import configure_environments
+from surql.orchestration import configure_environments
 from pathlib import Path
 
 configure_environments(Path('environments.json'))
@@ -181,8 +181,8 @@ configure_environments(Path('environments.json'))
 **Programmatically:**
 
 ```python
-from reverie.orchestration import register_environment
-from reverie.connection.config import ConnectionConfig
+from surql.orchestration import register_environment
+from surql.connection.config import ConnectionConfig
 
 register_environment(
   name='production',
@@ -209,7 +209,7 @@ register_environment(
 
 ## Deployment Strategies
 
-reverie supports four deployment strategies, each suited for different scenarios.
+surql supports four deployment strategies, each suited for different scenarios.
 
 ### Sequential Strategy
 
@@ -228,7 +228,7 @@ Deploy to environments one at a time, in priority order.
 **Example:**
 
 ```shell
-reverie orchestrate deploy -e dev,staging,production --strategy sequential
+surql orchestrate deploy -e dev,staging,production --strategy sequential
 ```
 
 ```python
@@ -267,7 +267,7 @@ Deploy to all environments simultaneously.
 **Example:**
 
 ```shell
-reverie orchestrate deploy -e tenant1,tenant2,tenant3 --strategy parallel --max-concurrent 3
+surql orchestrate deploy -e tenant1,tenant2,tenant3 --strategy parallel --max-concurrent 3
 ```
 
 ```python
@@ -306,7 +306,7 @@ Deploy to environments in batches, waiting for each batch to complete.
 **Example:**
 
 ```shell
-reverie orchestrate deploy -e db1,db2,db3,db4 --strategy rolling --batch-size 2
+surql orchestrate deploy -e db1,db2,db3,db4 --strategy rolling --batch-size 2
 ```
 
 ```python
@@ -351,7 +351,7 @@ Deploy to a small percentage of environments first, then to the rest.
 **Example:**
 
 ```shell
-reverie orchestrate deploy -e prod1,prod2,prod3,prod4,prod5 --strategy canary --canary-percent 20
+surql orchestrate deploy -e prod1,prod2,prod3,prod4,prod5 --strategy canary --canary-percent 20
 ```
 
 ```python
@@ -407,16 +407,16 @@ Health checking ensures environments are ready for deployment.
 
 ```shell
 # Validate environments
-reverie orchestrate validate
+surql orchestrate validate
 
 # Deploy with health checks
-reverie orchestrate deploy -e production --verify-health
+surql orchestrate deploy -e production --verify-health
 ```
 
 **Programmatically:**
 
 ```python
-from reverie.orchestration import HealthCheck
+from surql.orchestration import HealthCheck
 
 health = HealthCheck()
 status = await health.check_environment(env_config)
@@ -462,7 +462,7 @@ for env_name, status in statuses.items():
 Deploy migrations to multiple environments.
 
 ```shell
-reverie orchestrate deploy [OPTIONS]
+surql orchestrate deploy [OPTIONS]
 ```
 
 **Options:**
@@ -482,19 +482,19 @@ reverie orchestrate deploy [OPTIONS]
 
 ```shell
 # Basic deployment
-reverie orchestrate deploy -e staging,production
+surql orchestrate deploy -e staging,production
 
 # Rolling deployment
-reverie orchestrate deploy -e db1,db2,db3,db4 --strategy rolling --batch-size 2
+surql orchestrate deploy -e db1,db2,db3,db4 --strategy rolling --batch-size 2
 
 # Canary deployment
-reverie orchestrate deploy -e prod1,prod2,prod3 --strategy canary --canary-percent 33
+surql orchestrate deploy -e prod1,prod2,prod3 --strategy canary --canary-percent 33
 
 # Dry run
-reverie orchestrate deploy -e production --dry-run
+surql orchestrate deploy -e production --dry-run
 
 # Custom config
-reverie orchestrate deploy -e all --config ./config/prod-envs.json
+surql orchestrate deploy -e all --config ./config/prod-envs.json
 ```
 
 ### status
@@ -502,7 +502,7 @@ reverie orchestrate deploy -e all --config ./config/prod-envs.json
 Check deployment status of environments.
 
 ```shell
-reverie orchestrate status -e ENVIRONMENTS [OPTIONS]
+surql orchestrate status -e ENVIRONMENTS [OPTIONS]
 ```
 
 **Options:**
@@ -513,7 +513,7 @@ reverie orchestrate status -e ENVIRONMENTS [OPTIONS]
 **Example:**
 
 ```shell
-reverie orchestrate status -e staging,production
+surql orchestrate status -e staging,production
 ```
 
 **Output:**
@@ -533,7 +533,7 @@ Environment Deployment Status
 Validate environment configuration and connectivity.
 
 ```shell
-reverie orchestrate validate [OPTIONS]
+surql orchestrate validate [OPTIONS]
 ```
 
 **Options:**
@@ -543,8 +543,8 @@ reverie orchestrate validate [OPTIONS]
 **Example:**
 
 ```shell
-reverie orchestrate validate
-reverie orchestrate validate --config prod-envs.json
+surql orchestrate validate
+surql orchestrate validate --config prod-envs.json
 ```
 
 **Output:**
@@ -568,12 +568,12 @@ Environment Validation
 
 ```python
 from pathlib import Path
-from reverie.orchestration import (
+from surql.orchestration import (
   configure_environments,
   get_registry,
   MigrationCoordinator,
 )
-from reverie.migration.discovery import discover_migrations
+from surql.migration.discovery import discover_migrations
 
 # Load configuration
 configure_environments(Path('environments.json'))
@@ -620,12 +620,12 @@ class DeploymentResult:
 ### Advanced Usage
 
 ```python
-from reverie.orchestration import (
+from surql.orchestration import (
   EnvironmentRegistry,
   EnvironmentConfig,
   MigrationCoordinator,
 )
-from reverie.connection.config import ConnectionConfig
+from surql.connection.config import ConnectionConfig
 
 # Create custom registry
 registry = EnvironmentRegistry()
@@ -673,7 +673,7 @@ if failed:
 ### Convenience Functions
 
 ```python
-from reverie.orchestration import (
+from surql.orchestration import (
   register_environment,
   get_registry,
   deploy_to_environments,
@@ -711,7 +711,7 @@ Require manual approval for sensitive environments:
 When deploying:
 
 ```shell
-reverie orchestrate deploy -e production
+surql orchestrate deploy -e production
 
 # Will prompt:
 # Deploy to production? [y/N]: _
@@ -752,7 +752,7 @@ Rollback behavior:
 Test deployments without making changes:
 
 ```shell
-reverie orchestrate deploy -e production --dry-run
+surql orchestrate deploy -e production --dry-run
 ```
 
 ```python
@@ -795,7 +795,7 @@ environments.prod.json      # Production config
 
 ```shell
 # Deploy with specific config
-reverie orchestrate deploy -e production --config environments.prod.json
+surql orchestrate deploy -e production --config environments.prod.json
 ```
 
 ### 2. Always Test with Dry Run
@@ -804,12 +804,12 @@ Preview deployments before executing:
 
 ```shell
 # 1. Dry run to preview
-reverie orchestrate deploy -e production --dry-run
+surql orchestrate deploy -e production --dry-run
 
 # 2. Review output
 
 # 3. Execute if looks good
-reverie orchestrate deploy -e production
+surql orchestrate deploy -e production
 ```
 
 ### 3. Use Environment Priorities
@@ -855,10 +855,10 @@ Always verify health before production deployments:
 
 ```shell
 # Validate first
-reverie orchestrate validate
+surql orchestrate validate
 
 # Deploy with health verification
-reverie orchestrate deploy -e production --verify-health
+surql orchestrate deploy -e production --verify-health
 ```
 
 ### 6. Use Rolling or Canary for Replicas
@@ -867,7 +867,7 @@ Maintain availability during replica deployments:
 
 ```shell
 # Rolling deployment to maintain service
-reverie orchestrate deploy \
+surql orchestrate deploy \
   -e db1,db2,db3,db4 \
   --strategy rolling \
   --batch-size 1 \
@@ -961,7 +961,7 @@ git commit -m "Add production-west replica to orchestration"
 ls -la environments.json
 
 # Validate configuration
-reverie orchestrate validate
+surql orchestrate validate
 
 # Check environment names
 cat environments.json | jq '.environments[].name'
@@ -986,8 +986,8 @@ cat environments.json | jq '.environments[].name'
 
 3. Test connection manually:
    ```python
-   from reverie.connection.client import get_client
-   from reverie.connection.config import ConnectionConfig
+   from surql.connection.client import get_client
+   from surql.connection.config import ConnectionConfig
    
    config = ConnectionConfig(
      db_url='ws://prod.example.com:8000/rpc',
@@ -1017,14 +1017,14 @@ cat environments.json | jq '.environments[].name'
 2. Review migration errors:
    ```shell
    # Check migration table
-   reverie migrate history --verbose
+   surql migrate history --verbose
    ```
 
 3. Test migrations locally:
    ```shell
    # Test on development first
-   reverie orchestrate deploy -e development --dry-run
-   reverie orchestrate deploy -e development
+   surql orchestrate deploy -e development --dry-run
+   surql orchestrate deploy -e development
    ```
 
 ### Partial Deployment Success
@@ -1059,10 +1059,10 @@ if failed:
 
 ```shell
 # Initialize migration table
-reverie migrate up --steps 0  # Creates table without applying migrations
+surql migrate up --steps 0  # Creates table without applying migrations
 
 # Or apply initial migration
-reverie migrate up --steps 1
+surql migrate up --steps 1
 ```
 
 ## Examples
@@ -1071,8 +1071,8 @@ reverie migrate up --steps 1
 
 ```python
 from pathlib import Path
-from reverie.orchestration import configure_environments, get_registry, MigrationCoordinator
-from reverie.migration.discovery import discover_migrations
+from surql.orchestration import configure_environments, get_registry, MigrationCoordinator
+from surql.migration.discovery import discover_migrations
 
 async def multi_stage_deployment():
   """Deploy to dev → staging → production sequentially."""

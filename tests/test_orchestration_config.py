@@ -6,8 +6,8 @@ from pathlib import Path
 import pytest
 from pydantic import ValidationError
 
-from reverie.connection.config import ConnectionConfig
-from reverie.orchestration.config import (
+from surql.connection.config import ConnectionConfig
+from surql.orchestration.config import (
   EnvironmentConfig,
   EnvironmentRegistry,
   configure_environments,

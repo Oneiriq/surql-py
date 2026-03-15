@@ -2,10 +2,10 @@
 
 import pytest
 
-from reverie.schema.edge import EdgeMode, edge_schema
-from reverie.schema.fields import datetime_field, int_field, string_field
-from reverie.schema.sql import generate_edge_sql, generate_schema_sql, generate_table_sql
-from reverie.schema.table import (
+from surql.schema.edge import EdgeMode, edge_schema
+from surql.schema.fields import datetime_field, int_field, string_field
+from surql.schema.sql import generate_edge_sql, generate_schema_sql, generate_table_sql
+from surql.schema.table import (
   IndexType,
   TableMode,
   event,

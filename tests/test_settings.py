@@ -7,7 +7,7 @@ from unittest.mock import patch
 import pytest
 from pydantic import ValidationError
 
-from reverie.settings import (
+from surql.settings import (
   PyProjectTomlSettingsSource,
   Settings,
   get_migration_path,
@@ -26,7 +26,7 @@ class TestSettings:
       assert settings.environment == 'development'
       assert settings.debug is True
       assert settings.log_level == 'INFO'
-      assert settings.app_name == 'reverie'
+      assert settings.app_name == 'surql'
       assert settings.version == '0.6.0'
 
   def test_settings_with_custom_values(self) -> None:
@@ -142,7 +142,7 @@ class TestPyProjectTomlSettingsSource:
   def test_load_toml_empty_tool_section(
     self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
   ) -> None:
-    """Test loading from pyproject.toml without [tool.reverie] section."""
+    """Test loading from pyproject.toml without [tool.surql] section."""
     monkeypatch.chdir(tmp_path)
     pyproject = tmp_path / 'pyproject.toml'
     pyproject.write_text('[project]\nname = "test"\n')
@@ -150,15 +150,15 @@ class TestPyProjectTomlSettingsSource:
     source = PyProjectTomlSettingsSource(Settings)
     assert source._toml_data == {}
 
-  def test_load_toml_with_reverie_section(
+  def test_load_toml_with_surql_section(
     self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
   ) -> None:
-    """Test loading from pyproject.toml with [tool.reverie] section."""
+    """Test loading from pyproject.toml with [tool.surql] section."""
     monkeypatch.chdir(tmp_path)
     pyproject = tmp_path / 'pyproject.toml'
     pyproject.write_text(
       '[project]\nname = "test"\n\n'
-      '[tool.reverie]\n'
+      '[tool.surql]\n'
       'migration_path = "db/migrations"\n'
       'environment = "production"\n'
     )
@@ -173,7 +173,7 @@ class TestPyProjectTomlSettingsSource:
     """Test get_field_value method."""
     monkeypatch.chdir(tmp_path)
     pyproject = tmp_path / 'pyproject.toml'
-    pyproject.write_text('[tool.reverie]\nmigration_path = "custom/path"\n')
+    pyproject.write_text('[tool.surql]\nmigration_path = "custom/path"\n')
 
     source = PyProjectTomlSettingsSource(Settings)
     value, name, is_complex = source.get_field_value(None, 'migration_path')
@@ -188,7 +188,7 @@ class TestPyProjectTomlSettingsSource:
     """Test get_field_value for missing field returns None."""
     monkeypatch.chdir(tmp_path)
     pyproject = tmp_path / 'pyproject.toml'
-    pyproject.write_text('[tool.reverie]\nmigration_path = "path"\n')
+    pyproject.write_text('[tool.surql]\nmigration_path = "path"\n')
 
     source = PyProjectTomlSettingsSource(Settings)
     value, name, is_complex = source.get_field_value(None, 'nonexistent')
@@ -203,7 +203,7 @@ class TestPyProjectTomlSettingsSource:
     """Test that environment variables take priority over pyproject.toml."""
     monkeypatch.chdir(tmp_path)
     pyproject = tmp_path / 'pyproject.toml'
-    pyproject.write_text('[tool.reverie]\nmigration_path = "toml/path"\n')
+    pyproject.write_text('[tool.surql]\nmigration_path = "toml/path"\n')
 
     with patch.dict(os.environ, {'REVERIE_MIGRATION_PATH': 'env/path'}, clear=True):
       settings = Settings(_env_file=None)
@@ -215,7 +215,7 @@ class TestPyProjectTomlSettingsSource:
     """Test that settings loads from pyproject.toml when no env var is set."""
     monkeypatch.chdir(tmp_path)
     pyproject = tmp_path / 'pyproject.toml'
-    pyproject.write_text('[tool.reverie]\nmigration_path = "toml/migrations"\n')
+    pyproject.write_text('[tool.surql]\nmigration_path = "toml/migrations"\n')
 
     with patch.dict(os.environ, {}, clear=True):
       settings = Settings(_env_file=None)

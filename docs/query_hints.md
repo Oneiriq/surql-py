@@ -1,6 +1,6 @@
 # Query Optimization Hints
 
-Complete guide to using query optimization hints in reverie to improve database query performance.
+Complete guide to using query optimization hints in surql to improve database query performance.
 
 ## Table of Contents
 
@@ -56,7 +56,7 @@ Avoid hints when:
 
 ## Available Hint Types
 
-reverie supports five types of query optimization hints:
+surql supports five types of query optimization hints:
 
 | Hint Type | Purpose | Use Case |
 |-----------|---------|----------|
@@ -73,7 +73,7 @@ reverie supports five types of query optimization hints:
 Add hints to queries using builder methods:
 
 ```python
-from reverie.query import Query
+from surql.query import Query
 
 # Add a single hint
 query = (
@@ -116,7 +116,7 @@ query = (
 Add multiple hints at once:
 
 ```python
-from reverie.query.hints import IndexHint, TimeoutHint, ParallelHint
+from surql.query.hints import IndexHint, TimeoutHint, ParallelHint
 
 query = (
   Query()
@@ -140,7 +140,7 @@ Force or suggest the use of a specific index.
 **Constructor:**
 
 ```python
-from reverie.query.hints import IndexHint
+from surql.query.hints import IndexHint
 
 hint = IndexHint(
   table='user',      # Table name
@@ -192,7 +192,7 @@ Enable or configure parallel query execution.
 **Constructor:**
 
 ```python
-from reverie.query.hints import ParallelHint
+from surql.query.hints import ParallelHint
 
 # Enable with default workers
 hint = ParallelHint(enabled=True)
@@ -256,7 +256,7 @@ Set a custom timeout for query execution.
 **Constructor:**
 
 ```python
-from reverie.query.hints import TimeoutHint
+from surql.query.hints import TimeoutHint
 
 hint = TimeoutHint(seconds=30.0)
 ```
@@ -307,7 +307,7 @@ Control how records are fetched from the database.
 **Constructor:**
 
 ```python
-from reverie.query.hints import FetchHint
+from surql.query.hints import FetchHint
 
 # Eager - load all results immediately
 hint = FetchHint(strategy='eager')
@@ -375,7 +375,7 @@ Request query execution plan for performance analysis.
 **Constructor:**
 
 ```python
-from reverie.query.hints import ExplainHint
+from surql.query.hints import ExplainHint
 
 # Basic explain
 hint = ExplainHint()
@@ -548,7 +548,7 @@ query = (
 Ensure IndexHint table matches the query table:
 
 ```python
-from reverie.query.hints import validate_hint, IndexHint
+from surql.query.hints import validate_hint, IndexHint
 
 hint = IndexHint(table='user', index='email_idx')
 errors = validate_hint(hint, table='user')  # Returns []
@@ -664,7 +664,7 @@ query = (
 ### Example 1: User Search Optimization
 
 ```python
-from reverie.query import Query
+from surql.query import Query
 
 async def search_users_optimized(search_term: str):
   """Optimized user search with hints."""
@@ -782,8 +782,8 @@ async def adaptive_query(table: str, filters: dict, row_estimate: int):
 ### Example 5: Production Query Template
 
 ```python
-from reverie.query import Query
-from reverie.query.hints import IndexHint, TimeoutHint, FetchHint
+from surql.query import Query
+from surql.query.hints import IndexHint, TimeoutHint, FetchHint
 
 class QueryTemplates:
   """Production-ready query templates with optimizations."""

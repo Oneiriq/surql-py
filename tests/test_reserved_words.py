@@ -4,8 +4,8 @@ import warnings
 
 import pytest
 
-from reverie.schema.fields import string_field
-from reverie.types.reserved import check_reserved_word
+from surql.schema.fields import string_field
+from surql.types.reserved import check_reserved_word
 
 
 class TestCheckReservedWord:

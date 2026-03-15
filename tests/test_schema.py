@@ -3,7 +3,7 @@
 import pytest
 from pydantic import ValidationError
 
-from reverie.schema.edge import (
+from surql.schema.edge import (
   EdgeDefinition,
   bidirectional_edge,
   edge_schema,
@@ -15,7 +15,7 @@ from reverie.schema.edge import (
   with_from_table,
   with_to_table,
 )
-from reverie.schema.fields import (
+from surql.schema.fields import (
   FieldDefinition,
   FieldType,
   _validate_field_name,
@@ -30,8 +30,8 @@ from reverie.schema.fields import (
   record_field,
   string_field,
 )
-from reverie.schema.sql import generate_edge_sql
-from reverie.schema.table import (
+from surql.schema.sql import generate_edge_sql
+from surql.schema.table import (
   EventDefinition,
   IndexDefinition,
   IndexType,
@@ -57,7 +57,7 @@ class TestFieldType:
 
   def test_field_type_values(self) -> None:
     """FieldType values produce correct type strings in SQL generation."""
-    from reverie.schema.sql import generate_table_sql
+    from surql.schema.sql import generate_table_sql
 
     # Verify a representative sample of field types generate correct SQL
     table = table_schema(
@@ -238,7 +238,7 @@ class TestTableMode:
 
   def test_table_mode_values(self) -> None:
     """TableMode values produce correct mode strings in SQL."""
-    from reverie.schema.sql import generate_table_sql
+    from surql.schema.sql import generate_table_sql
 
     for mode_val in [TableMode.SCHEMAFULL, TableMode.SCHEMALESS]:
       table = table_schema('test', mode=mode_val)
@@ -251,7 +251,7 @@ class TestIndexType:
 
   def test_index_type_values(self) -> None:
     """IndexType values produce correct index types in SQL."""
-    from reverie.schema.sql import generate_table_sql
+    from surql.schema.sql import generate_table_sql
 
     table = table_schema(
       'test',
@@ -671,7 +671,7 @@ class TestSchemaIntegration:
 
   def test_build_complete_table_schema(self) -> None:
     """Composed table schema generates valid SQL with all components."""
-    from reverie.schema.sql import generate_table_sql
+    from surql.schema.sql import generate_table_sql
 
     user_table = table_schema('user')
     user_table = with_fields(
@@ -707,7 +707,7 @@ class TestSchemaIntegration:
 
   def test_build_complete_edge_schema(self) -> None:
     """Composed edge schema generates valid SQL with all components."""
-    from reverie.schema.sql import generate_edge_sql
+    from surql.schema.sql import generate_edge_sql
 
     likes_edge = edge_schema('likes')
     likes_edge = with_from_table(likes_edge, 'user')

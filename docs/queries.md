@@ -1,6 +1,6 @@
 # Query Builder & ORM Guide
 
-This guide covers querying and manipulating data using reverie's type-safe query builder and ORM functions.
+This guide covers querying and manipulating data using surql's type-safe query builder and ORM functions.
 
 ## Table of Contents
 
@@ -19,7 +19,7 @@ This guide covers querying and manipulating data using reverie's type-safe query
 
 ## Overview
 
-reverie provides two ways to interact with your database:
+surql provides two ways to interact with your database:
 
 1. **High-level CRUD functions** - Simple async functions for common operations
 2. **Query Builder** - Composable query construction with type safety
@@ -39,8 +39,8 @@ Both approaches integrate with Pydantic for data validation.
 
 ```python
 from pydantic import BaseModel, EmailStr
-from reverie.connection.client import get_client
-from reverie.settings import get_db_config
+from surql.connection.client import get_client
+from surql.settings import get_db_config
 
 class User(BaseModel):
   username: str
@@ -56,7 +56,7 @@ config = get_db_config()
 #### Create Single Record
 
 ```python
-from reverie.query.crud import create_record
+from surql.query.crud import create_record
 
 async def create_user():
   async with get_client(config) as client:
@@ -77,7 +77,7 @@ async def create_user():
 #### Create Multiple Records
 
 ```python
-from reverie.query.crud import create_records
+from surql.query.crud import create_records
 
 async def create_multiple_users():
   async with get_client(config) as client:
@@ -97,7 +97,7 @@ async def create_multiple_users():
 #### Get Single Record by ID
 
 ```python
-from reverie.query.crud import get_record
+from surql.query.crud import get_record
 
 async def get_user(user_id: str):
   async with get_client(config) as client:
@@ -114,7 +114,7 @@ async def get_user(user_id: str):
 #### Query Multiple Records
 
 ```python
-from reverie.query.crud import query_records
+from surql.query.crud import query_records
 
 async def get_adult_users():
   async with get_client(config) as client:
@@ -136,7 +136,7 @@ async def get_adult_users():
 #### Get First/Last Record
 
 ```python
-from reverie.query.crud import first, last
+from surql.query.crud import first, last
 
 async def get_newest_user():
   async with get_client(config) as client:
@@ -162,7 +162,7 @@ async def get_oldest_user():
 #### Count Records
 
 ```python
-from reverie.query.crud import count_records
+from surql.query.crud import count_records
 
 async def count_active_users():
   async with get_client(config) as client:
@@ -178,7 +178,7 @@ async def count_active_users():
 #### Check if Record Exists
 
 ```python
-from reverie.query.crud import exists
+from surql.query.crud import exists
 
 async def user_exists(user_id: str):
   async with get_client(config) as client:
@@ -193,7 +193,7 @@ async def user_exists(user_id: str):
 #### Update Entire Record
 
 ```python
-from reverie.query.crud import update_record
+from surql.query.crud import update_record
 
 async def update_user(user_id: str):
   async with get_client(config) as client:
@@ -215,7 +215,7 @@ async def update_user(user_id: str):
 #### Merge Partial Data
 
 ```python
-from reverie.query.crud import merge_record
+from surql.query.crud import merge_record
 
 async def update_user_email(user_id: str, new_email: str):
   async with get_client(config) as client:
@@ -235,7 +235,7 @@ async def update_user_email(user_id: str, new_email: str):
 #### Delete Single Record
 
 ```python
-from reverie.query.crud import delete_record
+from surql.query.crud import delete_record
 
 async def delete_user(user_id: str):
   async with get_client(config) as client:
@@ -246,7 +246,7 @@ async def delete_user(user_id: str):
 #### Delete Multiple Records
 
 ```python
-from reverie.query.crud import delete_records
+from surql.query.crud import delete_records
 
 async def delete_inactive_users():
   async with get_client(config) as client:
@@ -265,7 +265,7 @@ The query builder provides a functional approach to building complex queries.
 ### Basic Query Construction
 
 ```python
-from reverie.query.builder import Query
+from surql.query.builder import Query
 
 # Build a query
 query = (
@@ -286,7 +286,7 @@ print(sql)
 ### Query Execution
 
 ```python
-from reverie.query.executor import fetch_all, fetch_one
+from surql.query.executor import fetch_all, fetch_one
 
 async def execute_query():
   async with get_client(config) as client:
@@ -410,7 +410,7 @@ query = Query().select().from_table('user').where(
 ### Using Operators
 
 ```python
-from reverie.types.operators import eq, gt, lt, gte, lte, contains, in_list
+from surql.types.operators import eq, gt, lt, gte, lte, contains, in_list
 
 # Equality
 Query().select().from_table('user').where(eq('status', 'active'))
@@ -561,14 +561,14 @@ SurrealDB returns results in two different formats depending on the method used:
 1. **Flat format** (from `db.select()`): `[{"id": "...", ...}]`
 2. **Nested format** (from `db.query()`): `[{"result": [{"id": "...", ...}]}]`
 
-Reverie automatically handles both formats in its high-level functions ([`fetch_one()`](src/query/executor.py:59), [`fetch_all()`](src/query/executor.py:107), etc.), but provides utilities for manual extraction when needed.
+surql automatically handles both formats in its high-level functions ([`fetch_one()`](src/query/executor.py:59), [`fetch_all()`](src/query/executor.py:107), etc.), but provides utilities for manual extraction when needed.
 
 ### Automatic Result Extraction
 
 High-level query functions handle result extraction automatically:
 
 ```python
-from reverie.query.executor import fetch_all, fetch_one
+from surql.query.executor import fetch_all, fetch_one
 
 async def query_users():
   async with get_client(config) as client:
@@ -588,7 +588,7 @@ For raw queries or when you need manual control:
 #### Extract All Results
 
 ```python
-from reverie.query.results import extract_result
+from surql.query.results import extract_result
 
 async def raw_query_example():
   async with get_client(config) as client:
@@ -605,7 +605,7 @@ async def raw_query_example():
 #### Extract Single Record
 
 ```python
-from reverie.query.results import extract_one
+from surql.query.results import extract_one
 
 async def get_user_raw(user_id: str):
   async with get_client(config) as client:
@@ -623,7 +623,7 @@ async def get_user_raw(user_id: str):
 For aggregate queries (COUNT, SUM, AVG, etc.):
 
 ```python
-from reverie.query.results import extract_scalar
+from surql.query.results import extract_scalar
 
 async def count_users():
   async with get_client(config) as client:
@@ -659,7 +659,7 @@ async def get_stats():
 #### Check if Results Exist
 
 ```python
-from reverie.query.results import has_results
+from surql.query.results import has_results
 
 async def user_exists(email: str):
   async with get_client(config) as client:
@@ -675,7 +675,7 @@ async def user_exists(email: str):
 ### Complete Example
 
 ```python
-from reverie.query.results import extract_result, extract_one, extract_scalar, has_results
+from surql.query.results import extract_result, extract_one, extract_scalar, has_results
 
 async def comprehensive_query_example():
   async with get_client(config) as client:
@@ -727,8 +727,8 @@ if result and isinstance(result[0], dict) and 'result' in result[0]:
 else:
   users = result
 
-# After (with reverie utilities)
-from reverie.query.results import extract_result
+# After (with surql utilities)
+from surql.query.results import extract_result
 
 result = await db.query('SELECT * FROM user')
 users = extract_result(result)  # Handles both formats
@@ -741,7 +741,7 @@ Execute multiple operations atomically.
 ### Using Context Manager
 
 ```python
-from reverie.connection.transaction import transaction
+from surql.connection.transaction import transaction
 
 async def transfer_credits(from_user: str, to_user: str, amount: int):
   async with get_client(config) as client:
@@ -798,9 +798,9 @@ for scenarios like read replicas, analytics databases, or multi-tenant architect
 ### Query Builder with Named Connections
 
 ```python
-from reverie.connection.registry import get_registry
-from reverie.query.builder import Query
-from reverie.query.executor import fetch_all
+from surql.connection.registry import get_registry
+from surql.query.builder import Query
+from surql.query.executor import fetch_all
 
 async def query_with_registry():
   """Execute queries using different named connections."""
@@ -819,8 +819,8 @@ async def query_with_registry():
 ### Read/Write Splitting Pattern
 
 ```python
-from reverie.connection.registry import get_registry
-from reverie.query.crud import create_record, query_records
+from surql.connection.registry import get_registry
+from surql.query.crud import create_record, query_records
 
 async def read_write_split():
   """Route writes to primary, reads to replica."""
@@ -888,7 +888,7 @@ async def query_tenant_database(tenant_id: str):
 ### Context Override for Testing
 
 ```python
-from reverie.connection.context import connection_override
+from surql.connection.context import connection_override
 
 async def test_with_mock_connection(mock_client):
   """Override connection for testing."""
@@ -1106,7 +1106,7 @@ user2 = await create_record('user', user_data2)
 ### 3. Handle Errors Gracefully
 
 ```python
-from reverie.connection.client import QueryError
+from surql.connection.client import QueryError
 
 async def safe_query():
   try:

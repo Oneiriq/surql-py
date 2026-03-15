@@ -5,7 +5,7 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [0.9.0] - 2026-03-11
+## [1.0.0] - 2026-03-13
 
 ### Added
 
@@ -31,6 +31,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- **Project renamed**: `reverie` -> `surql` (PyPI: `oneiriq-surql`, import: `surql`).
+  Unified branding with the TypeScript SurrealDB toolkit under the Oneiriq org
+- **Version 1.0.0**: First stable release. Development Status upgraded from Alpha to
+  Production/Stable
+- **CLI command**: `reverie` -> `surql` (e.g., `surql migrate up`, `surql schema show`)
+- **Settings section**: `[tool.reverie]` -> `[tool.surql]` in pyproject.toml
+- **Cache key prefix**: `reverie:` -> `surql:` by default
 - **Split cli/schema.py** (1954 LOC): Extracted into `schema_inspect.py`, `schema_diff.py`,
   `schema_validate.py`, `schema_watch.py`, `schema_visualize.py` with thin command wrappers
 - **Split cli/migrate.py** (1232 LOC): Extracted into `migrate_core.py`, `migrate_squash.py`,
@@ -252,4 +259,4 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
-[0.1.0]: https://github.com/yourusername/reverie/releases/tag/v0.1.0
+[0.1.0]: https://github.com/Oneiriq/surql/releases/tag/v0.1.0

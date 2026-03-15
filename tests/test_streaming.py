@@ -5,7 +5,7 @@ from uuid import uuid4
 
 import pytest
 
-from reverie.connection.streaming import LiveQuery, StreamingError, StreamingManager
+from surql.connection.streaming import LiveQuery, StreamingError, StreamingManager
 
 
 class TestLiveQuery:

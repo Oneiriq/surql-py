@@ -5,8 +5,8 @@ from unittest.mock import AsyncMock, patch
 
 import pytest
 
-from reverie.connection.client import QueryError
-from reverie.migration.executor import (
+from surql.connection.client import QueryError
+from surql.migration.executor import (
   MigrationExecutionError,
   create_migration_plan,
   execute_migration,
@@ -18,7 +18,7 @@ from reverie.migration.executor import (
   migrate_up,
   validate_migrations,
 )
-from reverie.migration.models import Migration, MigrationDirection, MigrationPlan, MigrationState
+from surql.migration.models import Migration, MigrationDirection, MigrationPlan, MigrationState
 
 
 class TestExecuteMigration:
@@ -36,7 +36,7 @@ class TestExecuteMigration:
       checksum='abc123',
     )
 
-    with patch('reverie.migration.executor.record_migration', new=AsyncMock()) as mock_record:
+    with patch('surql.migration.executor.record_migration', new=AsyncMock()) as mock_record:
       result = await execute_migration(mock_db_client, migration, MigrationDirection.UP)
 
       # Verify execution time returned
@@ -65,9 +65,7 @@ class TestExecuteMigration:
       checksum='abc123',
     )
 
-    with patch(
-      'reverie.migration.executor.remove_migration_record', new=AsyncMock()
-    ) as mock_remove:
+    with patch('surql.migration.executor.remove_migration_record', new=AsyncMock()) as mock_remove:
       result = await execute_migration(mock_db_client, migration, MigrationDirection.DOWN)
 
       # Verify execution time returned
@@ -117,7 +115,7 @@ class TestExecuteMigration:
       down=lambda: [],
     )
 
-    with patch('reverie.migration.executor.record_migration', new=AsyncMock()) as mock_record:
+    with patch('surql.migration.executor.record_migration', new=AsyncMock()) as mock_record:
       result = await execute_migration(mock_db_client, migration, MigrationDirection.UP)
 
       assert isinstance(result, int)
@@ -148,8 +146,8 @@ class TestMigrateUp:
     ]
 
     with (
-      patch('reverie.migration.executor.get_applied_versions', new=AsyncMock(return_value=set())),
-      patch('reverie.migration.executor.record_migration', new=AsyncMock()),
+      patch('surql.migration.executor.get_applied_versions', new=AsyncMock(return_value=set())),
+      patch('surql.migration.executor.record_migration', new=AsyncMock()),
     ):
       applied = await migrate_up(mock_db_client, migrations)
 
@@ -172,8 +170,8 @@ class TestMigrateUp:
     ]
 
     with (
-      patch('reverie.migration.executor.get_applied_versions', new=AsyncMock(return_value=set())),
-      patch('reverie.migration.executor.record_migration', new=AsyncMock()),
+      patch('surql.migration.executor.get_applied_versions', new=AsyncMock(return_value=set())),
+      patch('surql.migration.executor.record_migration', new=AsyncMock()),
     ):
       applied = await migrate_up(mock_db_client, migrations, steps=2)
 
@@ -196,7 +194,7 @@ class TestMigrateUp:
 
     # Mock all migrations as already applied
     with patch(
-      'reverie.migration.executor.get_applied_versions',
+      'surql.migration.executor.get_applied_versions',
       new=AsyncMock(return_value={'20260101_120000'}),
     ):
       applied = await migrate_up(mock_db_client, migrations)
@@ -218,9 +216,7 @@ class TestMigrateUp:
 
     mock_db_client._client.query = AsyncMock(side_effect=QueryError('Syntax error'))
 
-    with patch(
-      'reverie.migration.executor.get_applied_versions', new=AsyncMock(return_value=set())
-    ):
+    with patch('surql.migration.executor.get_applied_versions', new=AsyncMock(return_value=set())):
       with pytest.raises(MigrationExecutionError) as exc_info:
         await migrate_up(mock_db_client, migrations)
 
@@ -253,10 +249,10 @@ class TestMigrateDown:
     # Mock both migrations as applied
     with (
       patch(
-        'reverie.migration.executor.get_applied_versions',
+        'surql.migration.executor.get_applied_versions',
         new=AsyncMock(return_value={'20260101_120000', '20260102_120000'}),
       ),
-      patch('reverie.migration.executor.remove_migration_record', new=AsyncMock()),
+      patch('surql.migration.executor.remove_migration_record', new=AsyncMock()),
     ):
       rolled_back = await migrate_down(mock_db_client, migrations, steps=1)
 
@@ -281,10 +277,10 @@ class TestMigrateDown:
     applied_versions = {m.version for m in migrations}
     with (
       patch(
-        'reverie.migration.executor.get_applied_versions',
+        'surql.migration.executor.get_applied_versions',
         new=AsyncMock(return_value=applied_versions),
       ),
-      patch('reverie.migration.executor.remove_migration_record', new=AsyncMock()),
+      patch('surql.migration.executor.remove_migration_record', new=AsyncMock()),
     ):
       rolled_back = await migrate_down(mock_db_client, migrations, steps=2)
 
@@ -306,9 +302,7 @@ class TestMigrateDown:
       )
     ]
 
-    with patch(
-      'reverie.migration.executor.get_applied_versions', new=AsyncMock(return_value=set())
-    ):
+    with patch('surql.migration.executor.get_applied_versions', new=AsyncMock(return_value=set())):
       rolled_back = await migrate_down(mock_db_client, migrations, steps=1)
 
       assert len(rolled_back) == 0
@@ -329,7 +323,7 @@ class TestMigrateDown:
     mock_db_client._client.query = AsyncMock(side_effect=QueryError('Syntax error'))
 
     with patch(
-      'reverie.migration.executor.get_applied_versions',
+      'surql.migration.executor.get_applied_versions',
       new=AsyncMock(return_value={'20260101_120000'}),
     ):
       with pytest.raises(MigrationExecutionError) as exc_info:
@@ -361,9 +355,7 @@ class TestGetPendingMigrations:
       ),
     ]
 
-    with patch(
-      'reverie.migration.executor.get_applied_versions', new=AsyncMock(return_value=set())
-    ):
+    with patch('surql.migration.executor.get_applied_versions', new=AsyncMock(return_value=set())):
       pending = await get_pending_migrations(mock_db_client, migrations)
 
       assert len(pending) == 2
@@ -391,7 +383,7 @@ class TestGetPendingMigrations:
     ]
 
     with patch(
-      'reverie.migration.executor.get_applied_versions',
+      'surql.migration.executor.get_applied_versions',
       new=AsyncMock(return_value={'20260101_120000'}),
     ):
       pending = await get_pending_migrations(mock_db_client, migrations)
@@ -426,9 +418,7 @@ class TestGetPendingMigrations:
       ),
     ]
 
-    with patch(
-      'reverie.migration.executor.get_applied_versions', new=AsyncMock(return_value=set())
-    ):
+    with patch('surql.migration.executor.get_applied_versions', new=AsyncMock(return_value=set())):
       pending = await get_pending_migrations(mock_db_client, migrations)
 
       assert len(pending) == 3
@@ -468,7 +458,7 @@ class TestGetAppliedMigrationsOrdered:
     ]
 
     with patch(
-      'reverie.migration.executor.get_applied_versions',
+      'surql.migration.executor.get_applied_versions',
       new=AsyncMock(return_value={'20260101_120000', '20260103_120000'}),
     ):
       applied = await get_applied_migrations_ordered(mock_db_client, migrations)
@@ -491,9 +481,7 @@ class TestGetAppliedMigrationsOrdered:
       )
     ]
 
-    with patch(
-      'reverie.migration.executor.get_applied_versions', new=AsyncMock(return_value=set())
-    ):
+    with patch('surql.migration.executor.get_applied_versions', new=AsyncMock(return_value=set())):
       applied = await get_applied_migrations_ordered(mock_db_client, migrations)
 
       assert len(applied) == 0
@@ -523,7 +511,7 @@ class TestGetMigrationStatus:
     ]
 
     with patch(
-      'reverie.migration.executor.get_applied_versions',
+      'surql.migration.executor.get_applied_versions',
       new=AsyncMock(return_value={'20260101_120000'}),
     ):
       statuses = await get_migration_status(mock_db_client, migrations)
@@ -547,9 +535,7 @@ class TestGetMigrationStatus:
       )
     ]
 
-    with patch(
-      'reverie.migration.executor.get_applied_versions', new=AsyncMock(return_value=set())
-    ):
+    with patch('surql.migration.executor.get_applied_versions', new=AsyncMock(return_value=set())):
       statuses = await get_migration_status(mock_db_client, migrations)
 
       assert len(statuses) == 1
@@ -581,7 +567,7 @@ class TestExecuteMigrationPlan:
 
     plan = MigrationPlan(migrations=migrations, direction=MigrationDirection.UP)
 
-    with patch('reverie.migration.executor.record_migration', new=AsyncMock()):
+    with patch('surql.migration.executor.record_migration', new=AsyncMock()):
       await execute_migration_plan(mock_db_client, plan)
 
       # Verify both migrations were executed
@@ -610,7 +596,7 @@ class TestExecuteMigrationPlan:
 
     plan = MigrationPlan(migrations=migrations, direction=MigrationDirection.DOWN)
 
-    with patch('reverie.migration.executor.remove_migration_record', new=AsyncMock()):
+    with patch('surql.migration.executor.remove_migration_record', new=AsyncMock()):
       await execute_migration_plan(mock_db_client, plan)
 
       # 2 migrations x 3 calls each (BEGIN + statement + COMMIT)
@@ -781,9 +767,7 @@ class TestCreateMigrationPlan:
       ),
     ]
 
-    with patch(
-      'reverie.migration.executor.get_applied_versions', new=AsyncMock(return_value=set())
-    ):
+    with patch('surql.migration.executor.get_applied_versions', new=AsyncMock(return_value=set())):
       plan = await create_migration_plan(
         mock_db_client, migrations, MigrationDirection.UP, steps=None
       )
@@ -806,9 +790,7 @@ class TestCreateMigrationPlan:
       for i in range(1, 4)
     ]
 
-    with patch(
-      'reverie.migration.executor.get_applied_versions', new=AsyncMock(return_value=set())
-    ):
+    with patch('surql.migration.executor.get_applied_versions', new=AsyncMock(return_value=set())):
       plan = await create_migration_plan(mock_db_client, migrations, MigrationDirection.UP, steps=2)
 
       assert plan.count == 2
@@ -835,7 +817,7 @@ class TestCreateMigrationPlan:
 
     applied_versions = {m.version for m in migrations}
     with patch(
-      'reverie.migration.executor.get_applied_versions',
+      'surql.migration.executor.get_applied_versions',
       new=AsyncMock(return_value=applied_versions),
     ):
       plan = await create_migration_plan(
@@ -861,7 +843,7 @@ class TestCreateMigrationPlan:
 
     applied_versions = {m.version for m in migrations}
     with patch(
-      'reverie.migration.executor.get_applied_versions',
+      'surql.migration.executor.get_applied_versions',
       new=AsyncMock(return_value=applied_versions),
     ):
       plan = await create_migration_plan(
@@ -885,7 +867,7 @@ class TestCreateMigrationPlan:
 
     # All migrations already applied
     with patch(
-      'reverie.migration.executor.get_applied_versions',
+      'surql.migration.executor.get_applied_versions',
       new=AsyncMock(return_value={'20260101_120000'}),
     ):
       plan = await create_migration_plan(

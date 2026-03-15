@@ -4,9 +4,9 @@ from unittest.mock import AsyncMock, Mock, patch
 
 import pytest
 
-from reverie.connection.client import DatabaseClient
-from reverie.connection.config import ConnectionConfig
-from reverie.connection.context import (
+from surql.connection.client import DatabaseClient
+from surql.connection.config import ConnectionConfig
+from surql.connection.context import (
   ContextError,
   clear_db,
   connection_override,
@@ -112,7 +112,7 @@ class TestConnectionScope:
     mock_surreal.use = AsyncMock()
     mock_surreal.close = AsyncMock()
 
-    with patch('reverie.connection.client.AsyncSurreal', return_value=mock_surreal):
+    with patch('surql.connection.client.AsyncSurreal', return_value=mock_surreal):
       async with connection_scope(db_config) as client:
         # Context should be set during scope
         assert has_db()
@@ -133,7 +133,7 @@ class TestConnectionScope:
     mock_surreal.use = AsyncMock()
     mock_surreal.close = AsyncMock()
 
-    with patch('reverie.connection.client.AsyncSurreal', return_value=mock_surreal):
+    with patch('surql.connection.client.AsyncSurreal', return_value=mock_surreal):
       async with connection_scope(db_config):
         pass
 
@@ -155,7 +155,7 @@ class TestConnectionScope:
     mock_surreal.use = AsyncMock()
     mock_surreal.close = AsyncMock()
 
-    with patch('reverie.connection.client.AsyncSurreal', return_value=mock_surreal):
+    with patch('surql.connection.client.AsyncSurreal', return_value=mock_surreal):
       try:
         async with connection_scope(db_config):
           assert has_db()
@@ -179,7 +179,7 @@ class TestConnectionScope:
     mock_surreal.use = AsyncMock()
     mock_surreal.close = AsyncMock()
 
-    with patch('reverie.connection.client.AsyncSurreal', return_value=mock_surreal):
+    with patch('surql.connection.client.AsyncSurreal', return_value=mock_surreal):
       async with connection_scope(db_config) as client:
         assert isinstance(client, DatabaseClient)
         assert client.is_connected
@@ -302,7 +302,7 @@ class TestNestedContexts:
       call_count[0] += 1
       return mock_surreal1 if call_count[0] == 1 else mock_surreal2
 
-    with patch('reverie.connection.client.AsyncSurreal', side_effect=create_mock):
+    with patch('surql.connection.client.AsyncSurreal', side_effect=create_mock):
       async with connection_scope(db_config) as client1:
         assert get_db() is client1
 
@@ -356,7 +356,7 @@ class TestNestedContexts:
 
     override_client = DatabaseClient(db_config)
 
-    with patch('reverie.connection.client.AsyncSurreal', return_value=mock_surreal):
+    with patch('surql.connection.client.AsyncSurreal', return_value=mock_surreal):
       async with connection_scope(db_config) as scope_client:
         assert get_db() is scope_client
 

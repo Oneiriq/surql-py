@@ -1,6 +1,6 @@
 # Query Result Caching Guide
 
-This guide covers reverie's query result caching system for improving application performance.
+This guide covers surql's query result caching system for improving application performance.
 
 ## Table of Contents
 
@@ -16,7 +16,7 @@ This guide covers reverie's query result caching system for improving applicatio
 
 ## Overview
 
-reverie provides an optional caching layer for query results to reduce database load and improve response times. The caching system supports:
+surql provides an optional caching layer for query results to reduce database load and improve response times. The caching system supports:
 
 - **Multiple backends** - In-memory LRU cache or Redis for distributed caching
 - **Configurable TTL** - Per-query and global time-to-live settings
@@ -36,7 +36,7 @@ reverie provides an optional caching layer for query results to reduce database 
 ### Basic Setup
 
 ```python
-from reverie.cache import configure_cache, cache_query, CacheConfig
+from surql.cache import configure_cache, cache_query, CacheConfig
 
 # Configure global cache (do this once at startup)
 config = CacheConfig(
@@ -62,7 +62,7 @@ users = await get_active_users()  # From cache - no database hit
 ### Invalidating Cache
 
 ```python
-from reverie.cache import invalidate, clear_cache
+from surql.cache import invalidate, clear_cache
 
 # Invalidate specific key
 await invalidate(key='user:123')
@@ -81,10 +81,10 @@ await clear_cache()
 
 ### CacheConfig Options
 
-The [`CacheConfig`](src/reverie/cache/config.py:15) dataclass controls global cache behavior:
+The [`CacheConfig`](src/surql/cache/config.py:15) dataclass controls global cache behavior:
 
 ```python
-from reverie.cache import CacheConfig
+from surql.cache import CacheConfig
 
 config = CacheConfig(
   enabled=True,           # Enable/disable caching globally
@@ -92,7 +92,7 @@ config = CacheConfig(
   default_ttl=300,        # Default TTL in seconds (5 minutes)
   max_size=1000,          # Max entries for memory backend
   redis_url='redis://localhost:6379',  # Redis connection URL
-  key_prefix='reverie:',  # Prefix for all cache keys
+  key_prefix='surql:',  # Prefix for all cache keys
 )
 ```
 
@@ -103,14 +103,14 @@ config = CacheConfig(
 | `default_ttl` | `int` | `300` | Default time-to-live in seconds |
 | `max_size` | `int` | `1000` | Maximum entries for memory backend |
 | `redis_url` | `str` | `'redis://localhost:6379'` | Redis connection URL |
-| `key_prefix` | `str` | `'reverie:'` | Prefix applied to all cache keys |
+| `key_prefix` | `str` | `'surql:'` | Prefix applied to all cache keys |
 
 ### Per-Query Options
 
-The [`CacheOptions`](src/reverie/cache/config.py:47) dataclass allows per-query customization:
+The [`CacheOptions`](src/surql/cache/config.py:47) dataclass allows per-query customization:
 
 ```python
-from reverie.cache import CacheOptions
+from surql.cache import CacheOptions
 
 options = CacheOptions(
   ttl=60,                    # Override default TTL
@@ -129,7 +129,7 @@ options = CacheOptions(
 
 ```python
 import os
-from reverie.cache import configure_cache, CacheConfig
+from surql.cache import configure_cache, CacheConfig
 
 config = CacheConfig(
   enabled=os.getenv('CACHE_ENABLED', 'true').lower() == 'true',
@@ -146,10 +146,10 @@ configure_cache(config)
 
 ### Memory Backend (LRU)
 
-The [`MemoryCache`](src/reverie/cache/backends.py:87) backend uses an in-memory LRU (Least Recently Used) cache. It's ideal for single-instance applications.
+The [`MemoryCache`](src/surql/cache/backends.py:87) backend uses an in-memory LRU (Least Recently Used) cache. It's ideal for single-instance applications.
 
 ```python
-from reverie.cache import configure_cache, CacheConfig
+from surql.cache import configure_cache, CacheConfig
 
 # Memory backend (default)
 config = CacheConfig(
@@ -182,10 +182,10 @@ configure_cache(config)
 
 ### Redis Backend
 
-The [`RedisCache`](src/reverie/cache/backends.py:219) backend uses Redis for distributed caching. It's ideal for multi-instance deployments.
+The [`RedisCache`](src/surql/cache/backends.py:219) backend uses Redis for distributed caching. It's ideal for multi-instance deployments.
 
 ```python
-from reverie.cache import configure_cache, CacheConfig
+from surql.cache import configure_cache, CacheConfig
 
 # Redis backend
 config = CacheConfig(
@@ -203,7 +203,7 @@ The Redis backend requires the `redis` package:
 
 ```bash
 # Install with cache extras
-pip install reverie[cache]
+pip install surql[cache]
 
 # Or install redis directly
 pip install redis
@@ -247,12 +247,12 @@ config = CacheConfig(
 
 ## The @cache_query Decorator
 
-The [`@cache_query`](src/reverie/cache/decorator.py:89) decorator provides automatic caching for async functions.
+The [`@cache_query`](src/surql/cache/decorator.py:89) decorator provides automatic caching for async functions.
 
 ### Basic Usage
 
 ```python
-from reverie.cache import cache_query
+from surql.cache import cache_query
 
 # Cache with default settings
 @cache_query
@@ -334,12 +334,12 @@ await get_users()  # Works fine, just no caching
 
 ## Manual Cache Management
 
-For advanced use cases, use the [`CacheManager`](src/reverie/cache/manager.py:30) directly.
+For advanced use cases, use the [`CacheManager`](src/surql/cache/manager.py:30) directly.
 
 ### Getting the Manager
 
 ```python
-from reverie.cache import get_cache_manager, configure_cache, CacheConfig
+from surql.cache import get_cache_manager, configure_cache, CacheConfig
 
 # Configure first
 configure_cache(CacheConfig(backend='memory'))
@@ -350,7 +350,7 @@ manager = get_cache_manager()
 
 ### Get or Set Pattern
 
-The most common pattern using [`get_or_set()`](src/reverie/cache/manager.py:112):
+The most common pattern using [`get_or_set()`](src/surql/cache/manager.py:112):
 
 ```python
 async def get_user_stats(user_id: str) -> dict:
@@ -426,7 +426,7 @@ print(f'Size: {stats.size}')
 ### By Specific Key
 
 ```python
-from reverie.cache import invalidate, cache_key_for
+from surql.cache import invalidate, cache_key_for
 
 # Invalidate known key
 await invalidate(key='user:123')
@@ -446,7 +446,7 @@ await invalidate(key=key)
 Table-based invalidation removes all cached queries associated with a table:
 
 ```python
-from reverie.cache import invalidate
+from surql.cache import invalidate
 
 # After updating user data
 async def update_user(user_id: str, data: dict):
@@ -475,7 +475,7 @@ await invalidate(pattern='user:123:*')
 ### Clear All
 
 ```python
-from reverie.cache import clear_cache
+from surql.cache import clear_cache
 
 # Clear entire cache (use sparingly)
 count = await clear_cache()
@@ -588,10 +588,10 @@ async def log_cache_stats():
 
 | Function | Description |
 |----------|-------------|
-| [`configure_cache(config)`](src/reverie/cache/__init__.py:80) | Initialize global cache manager |
-| [`get_cache_manager()`](src/reverie/cache/__init__.py:110) | Get the global cache manager |
-| [`invalidate(key, table, pattern)`](src/reverie/cache/__init__.py:124) | Invalidate cache entries |
-| [`clear_cache()`](src/reverie/cache/__init__.py:160) | Clear all cache entries |
+| [`configure_cache(config)`](src/surql/cache/__init__.py:80) | Initialize global cache manager |
+| [`get_cache_manager()`](src/surql/cache/__init__.py:110) | Get the global cache manager |
+| [`invalidate(key, table, pattern)`](src/surql/cache/__init__.py:124) | Invalidate cache entries |
+| [`clear_cache()`](src/surql/cache/__init__.py:160) | Clear all cache entries |
 
 ### CacheConfig
 
@@ -603,7 +603,7 @@ class CacheConfig:
   default_ttl: int = 300
   max_size: int = 1000
   redis_url: str = 'redis://localhost:6379'
-  key_prefix: str = 'reverie:'
+  key_prefix: str = 'surql:'
 ```
 
 ### CacheOptions
@@ -634,16 +634,16 @@ class CacheStats:
 
 | Method | Description |
 |--------|-------------|
-| [`get_or_set(key, factory, ttl, tables)`](src/reverie/cache/manager.py:112) | Get from cache or execute factory |
-| [`get(key)`](src/reverie/cache/manager.py:177) | Get value from cache |
-| [`set(key, value, ttl, tables)`](src/reverie/cache/manager.py:203) | Set value in cache |
-| [`delete(key)`](src/reverie/cache/manager.py:236) | Delete key from cache |
-| [`invalidate(key, table, pattern)`](src/reverie/cache/manager.py:256) | Invalidate cache entries |
-| [`clear()`](src/reverie/cache/manager.py:316) | Clear all cache entries |
-| [`exists(key)`](src/reverie/cache/manager.py:333) | Check if key exists |
-| [`build_key(*parts)`](src/reverie/cache/manager.py:349) | Build a prefixed cache key |
-| [`track_table(table, key)`](src/reverie/cache/manager.py:370) | Associate key with table |
-| [`close()`](src/reverie/cache/manager.py:395) | Close manager and release resources |
+| [`get_or_set(key, factory, ttl, tables)`](src/surql/cache/manager.py:112) | Get from cache or execute factory |
+| [`get(key)`](src/surql/cache/manager.py:177) | Get value from cache |
+| [`set(key, value, ttl, tables)`](src/surql/cache/manager.py:203) | Set value in cache |
+| [`delete(key)`](src/surql/cache/manager.py:236) | Delete key from cache |
+| [`invalidate(key, table, pattern)`](src/surql/cache/manager.py:256) | Invalidate cache entries |
+| [`clear()`](src/surql/cache/manager.py:316) | Clear all cache entries |
+| [`exists(key)`](src/surql/cache/manager.py:333) | Check if key exists |
+| [`build_key(*parts)`](src/surql/cache/manager.py:349) | Build a prefixed cache key |
+| [`track_table(table, key)`](src/surql/cache/manager.py:370) | Associate key with table |
+| [`close()`](src/surql/cache/manager.py:395) | Close manager and release resources |
 
 ### cache_query Decorator
 
@@ -665,23 +665,23 @@ async def func(x): ...
 
 | Function | Description |
 |----------|-------------|
-| [`cache_key_for(func, *args, **kwargs)`](src/reverie/cache/decorator.py:186) | Get cache key for a function call |
-| [`is_cached(func)`](src/reverie/cache/decorator.py:226) | Check if function is decorated |
+| [`cache_key_for(func, *args, **kwargs)`](src/surql/cache/decorator.py:186) | Get cache key for a function call |
+| [`is_cached(func)`](src/surql/cache/decorator.py:226) | Check if function is decorated |
 
 ## Complete Example
 
 ```python
 from pydantic import BaseModel
-from reverie.cache import (
+from surql.cache import (
   configure_cache,
   cache_query,
   invalidate,
   get_cache_manager,
   CacheConfig,
 )
-from reverie.connection.client import get_client
-from reverie.settings import get_db_config
-from reverie.query.crud import query_records, create_record, get_record
+from surql.connection.client import get_client
+from surql.settings import get_db_config
+from surql.query.crud import query_records, create_record, get_record
 
 # Models
 class User(BaseModel):

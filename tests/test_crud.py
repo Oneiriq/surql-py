@@ -10,8 +10,8 @@ from unittest.mock import AsyncMock, patch
 import pytest
 from pydantic import BaseModel
 
-from reverie.connection.client import DatabaseClient
-from reverie.query.crud import (
+from surql.connection.client import DatabaseClient
+from surql.query.crud import (
   count_records,
   create_record,
   create_records,
@@ -26,8 +26,8 @@ from reverie.query.crud import (
   query_records_wrapped,
   update_record,
 )
-from reverie.types.operators import eq
-from reverie.types.record_id import RecordID
+from surql.types.operators import eq
+from surql.types.record_id import RecordID
 
 
 # Test models
@@ -98,7 +98,7 @@ class TestCreateRecord:
     """Test creating a record using context client."""
     mock_db_client.create = AsyncMock(return_value={'id': 'user:1', 'name': 'Bob'})
 
-    with patch('reverie.query.crud.get_db', return_value=mock_db_client):
+    with patch('surql.query.crud.get_db', return_value=mock_db_client):
       result = await create_record('user', {'name': 'Bob'})
 
     assert result['name'] == 'Bob'
@@ -238,7 +238,7 @@ class TestQueryRecords:
   async def test_query_records_no_filters(self, mock_db_client: DatabaseClient) -> None:
     """Test querying records without filters."""
     with patch(
-      'reverie.query.crud.fetch_all',
+      'surql.query.crud.fetch_all',
       AsyncMock(
         return_value=[
           User(name='Alice', email='alice@example.com'),
@@ -255,7 +255,7 @@ class TestQueryRecords:
   async def test_query_records_with_conditions(self, mock_db_client: DatabaseClient) -> None:
     """Test querying records with WHERE conditions."""
     with patch(
-      'reverie.query.crud.fetch_all',
+      'surql.query.crud.fetch_all',
       AsyncMock(return_value=[User(name='Alice', email='alice@example.com', age=30)]),
     ):
       results = await query_records(
@@ -269,7 +269,7 @@ class TestQueryRecords:
   async def test_query_records_with_order_by(self, mock_db_client: DatabaseClient) -> None:
     """Test querying records with ORDER BY."""
     with patch(
-      'reverie.query.crud.fetch_all',
+      'surql.query.crud.fetch_all',
       AsyncMock(
         return_value=[
           User(name='Alice', email='alice@example.com'),
@@ -285,7 +285,7 @@ class TestQueryRecords:
   async def test_query_records_with_limit(self, mock_db_client: DatabaseClient) -> None:
     """Test querying records with LIMIT."""
     with patch(
-      'reverie.query.crud.fetch_all',
+      'surql.query.crud.fetch_all',
       AsyncMock(return_value=[User(name='Alice', email='alice@example.com')]),
     ):
       results = await query_records('user', User, limit=1, client=mock_db_client)
@@ -296,7 +296,7 @@ class TestQueryRecords:
   async def test_query_records_with_offset(self, mock_db_client: DatabaseClient) -> None:
     """Test querying records with OFFSET."""
     with patch(
-      'reverie.query.crud.fetch_all',
+      'surql.query.crud.fetch_all',
       AsyncMock(return_value=[User(name='Bob', email='bob@example.com')]),
     ):
       results = await query_records('user', User, offset=1, client=mock_db_client)
@@ -307,7 +307,7 @@ class TestQueryRecords:
   async def test_query_records_complex_query(self, mock_db_client: DatabaseClient) -> None:
     """Test complex query with multiple parameters."""
     with patch(
-      'reverie.query.crud.fetch_all',
+      'surql.query.crud.fetch_all',
       AsyncMock(return_value=[User(name='Alice', email='alice@example.com', age=30)]),
     ):
       results = await query_records(
@@ -325,7 +325,7 @@ class TestQueryRecords:
   @pytest.mark.anyio
   async def test_query_records_empty_result(self, mock_db_client: DatabaseClient) -> None:
     """Test querying with no matching records."""
-    with patch('reverie.query.crud.fetch_all', AsyncMock(return_value=[])):
+    with patch('surql.query.crud.fetch_all', AsyncMock(return_value=[])):
       results = await query_records('user', User, conditions=['age > 100'], client=mock_db_client)
 
     assert results == []
@@ -340,7 +340,7 @@ class TestQueryRecordsWrapped:
   ) -> None:
     """Test that query_records_wrapped returns ListResult."""
     with patch(
-      'reverie.query.crud.query_records',
+      'surql.query.crud.query_records',
       AsyncMock(return_value=[User(name='Alice', email='alice@example.com')]),
     ):
       result = await query_records_wrapped('user', User, limit=10, offset=0, client=mock_db_client)
@@ -595,7 +595,7 @@ class TestExists:
   async def test_exists_record_found(self, mock_db_client: DatabaseClient) -> None:
     """Test exists returns True when record exists."""
     with patch(
-      'reverie.query.crud.get_record',
+      'surql.query.crud.get_record',
       AsyncMock(return_value=User(name='Alice', email='alice@example.com')),
     ):
       result = await exists('user', 'alice', client=mock_db_client)
@@ -605,7 +605,7 @@ class TestExists:
   @pytest.mark.anyio
   async def test_exists_record_not_found(self, mock_db_client: DatabaseClient) -> None:
     """Test exists returns False when record doesn't exist."""
-    with patch('reverie.query.crud.get_record', AsyncMock(return_value=None)):
+    with patch('surql.query.crud.get_record', AsyncMock(return_value=None)):
       result = await exists('user', 'nonexistent', client=mock_db_client)
 
     assert result is False
@@ -615,7 +615,7 @@ class TestExists:
     """Test exists with RecordID passes RecordID through correctly."""
     record_id = RecordID(table='user', id='alice')
     with patch(
-      'reverie.query.crud.get_record',
+      'surql.query.crud.get_record',
       AsyncMock(return_value=User(name='Alice', email='alice@example.com')),
     ) as mock_get:
       result = await exists('user', record_id, client=mock_db_client)
@@ -639,7 +639,7 @@ class TestFirst:
   async def test_first_with_results(self, mock_db_client: DatabaseClient) -> None:
     """Test first returns first matching record."""
     with patch(
-      'reverie.query.crud.query_records',
+      'surql.query.crud.query_records',
       AsyncMock(
         return_value=[
           User(name='Alice', email='alice@example.com'),
@@ -656,7 +656,7 @@ class TestFirst:
   async def test_first_with_condition(self, mock_db_client: DatabaseClient) -> None:
     """Test first with WHERE condition."""
     with patch(
-      'reverie.query.crud.query_records',
+      'surql.query.crud.query_records',
       AsyncMock(return_value=[User(name='Bob', email='bob@example.com', age=30)]),
     ):
       result = await first('user', User, condition='age > 25', client=mock_db_client)
@@ -668,7 +668,7 @@ class TestFirst:
   async def test_first_with_order_by(self, mock_db_client: DatabaseClient) -> None:
     """Test first with ORDER BY."""
     with patch(
-      'reverie.query.crud.query_records',
+      'surql.query.crud.query_records',
       AsyncMock(return_value=[User(name='Alice', email='alice@example.com')]),
     ):
       result = await first('user', User, order_by=('name', 'ASC'), client=mock_db_client)
@@ -679,7 +679,7 @@ class TestFirst:
   @pytest.mark.anyio
   async def test_first_no_results(self, mock_db_client: DatabaseClient) -> None:
     """Test first returns None when no records match."""
-    with patch('reverie.query.crud.query_records', AsyncMock(return_value=[])):
+    with patch('surql.query.crud.query_records', AsyncMock(return_value=[])):
       result = await first('user', User, condition='age > 200', client=mock_db_client)
 
     assert result is None
@@ -692,7 +692,7 @@ class TestLast:
   async def test_last_with_results(self, mock_db_client: DatabaseClient) -> None:
     """Test last returns last matching record."""
     with patch(
-      'reverie.query.crud.query_records',
+      'surql.query.crud.query_records',
       AsyncMock(return_value=[User(name='Charlie', email='charlie@example.com')]),
     ):
       result = await last('user', User, client=mock_db_client)
@@ -704,7 +704,7 @@ class TestLast:
   async def test_last_reverses_order(self, mock_db_client: DatabaseClient) -> None:
     """Test that last reverses the order direction."""
     with patch(
-      'reverie.query.crud.query_records',
+      'surql.query.crud.query_records',
       AsyncMock(return_value=[User(name='Zoe', email='zoe@example.com')]),
     ) as mock_query:
       await last('user', User, order_by=('name', 'ASC'), client=mock_db_client)
@@ -717,7 +717,7 @@ class TestLast:
   async def test_last_reverses_desc_to_asc(self, mock_db_client: DatabaseClient) -> None:
     """Test that last reverses DESC to ASC."""
     with patch(
-      'reverie.query.crud.query_records',
+      'surql.query.crud.query_records',
       AsyncMock(return_value=[User(name='Alice', email='alice@example.com')]),
     ) as mock_query:
       await last('user', User, order_by=('created_at', 'DESC'), client=mock_db_client)
@@ -730,7 +730,7 @@ class TestLast:
   async def test_last_with_condition(self, mock_db_client: DatabaseClient) -> None:
     """Test last with WHERE condition is passed through to query_records."""
     with patch(
-      'reverie.query.crud.query_records',
+      'surql.query.crud.query_records',
       AsyncMock(return_value=[User(name='Bob', email='bob@example.com')]),
     ) as mock_query:
       result = await last('user', User, condition='status = "active"', client=mock_db_client)
@@ -743,7 +743,7 @@ class TestLast:
   @pytest.mark.anyio
   async def test_last_no_results(self, mock_db_client: DatabaseClient) -> None:
     """Test last returns None when no records match."""
-    with patch('reverie.query.crud.query_records', AsyncMock(return_value=[])):
+    with patch('surql.query.crud.query_records', AsyncMock(return_value=[])):
       result = await last('user', User, client=mock_db_client)
 
     assert result is None
@@ -752,7 +752,7 @@ class TestLast:
   async def test_last_no_order_by(self, mock_db_client: DatabaseClient) -> None:
     """Test last without order_by parameter."""
     with patch(
-      'reverie.query.crud.query_records',
+      'surql.query.crud.query_records',
       AsyncMock(return_value=[User(name='Test', email='test@example.com')]),
     ):
       result = await last('user', User, client=mock_db_client)
@@ -812,7 +812,7 @@ class TestIntegration:
     """Test querying and counting records."""
     # Query
     with patch(
-      'reverie.query.crud.fetch_all',
+      'surql.query.crud.fetch_all',
       AsyncMock(
         return_value=[
           User(name='Alice', email='alice@example.com'),

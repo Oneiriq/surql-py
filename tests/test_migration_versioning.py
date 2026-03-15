@@ -7,8 +7,8 @@ from unittest.mock import AsyncMock
 import pytest
 from pydantic import ValidationError
 
-from reverie.migration.models import Migration
-from reverie.migration.versioning import (
+from surql.migration.models import Migration
+from surql.migration.versioning import (
   SchemaSnapshot,
   VersionGraph,
   VersionNode,

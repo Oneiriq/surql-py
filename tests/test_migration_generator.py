@@ -5,8 +5,8 @@ from unittest.mock import patch
 
 import pytest
 
-from reverie.migration.diff import _generate_add_field_diff
-from reverie.migration.generator import (
+from surql.migration.diff import _generate_add_field_diff
+from surql.migration.generator import (
   MigrationGenerationError,
   _calculate_schema_diffs,
   _format_statements,
@@ -18,10 +18,10 @@ from reverie.migration.generator import (
   generate_migration,
   generate_migration_from_diffs,
 )
-from reverie.migration.models import DiffOperation, SchemaDiff
-from reverie.schema.edge import EdgeDefinition, EdgeMode
-from reverie.schema.fields import FieldDefinition, FieldType
-from reverie.schema.table import IndexDefinition, IndexType, TableDefinition, TableMode
+from surql.migration.models import DiffOperation, SchemaDiff
+from surql.schema.edge import EdgeDefinition, EdgeMode
+from surql.schema.fields import FieldDefinition, FieldType
+from surql.schema.table import IndexDefinition, IndexType, TableDefinition, TableMode
 
 
 class TestGenerateVersion:
@@ -288,7 +288,7 @@ class TestCreateBlankMigration:
     """Test creating a blank migration file."""
     description = 'add_new_feature'
 
-    with patch('reverie.migration.generator._generate_version', return_value='20260102_120000'):
+    with patch('surql.migration.generator._generate_version', return_value='20260102_120000'):
       filepath = create_blank_migration(temp_migration_dir, description)
 
     assert filepath.exists()
@@ -306,7 +306,7 @@ class TestCreateBlankMigration:
     """Test that migration directory is created if it doesn't exist."""
     migrations_dir = tmp_path / 'new_migrations'
 
-    with patch('reverie.migration.generator._generate_version', return_value='20260102_120000'):
+    with patch('surql.migration.generator._generate_version', return_value='20260102_120000'):
       filepath = create_blank_migration(migrations_dir, 'test')
 
     assert migrations_dir.exists()
@@ -314,7 +314,7 @@ class TestCreateBlankMigration:
 
   def test_create_blank_migration_custom_author(self, temp_migration_dir: Path) -> None:
     """Test creating blank migration with custom author."""
-    with patch('reverie.migration.generator._generate_version', return_value='20260102_120000'):
+    with patch('surql.migration.generator._generate_version', return_value='20260102_120000'):
       filepath = create_blank_migration(temp_migration_dir, 'test', author='custom_author')
 
     content = filepath.read_text()
@@ -322,7 +322,7 @@ class TestCreateBlankMigration:
 
   def test_create_blank_migration_metadata(self, temp_migration_dir: Path) -> None:
     """Test that blank migration includes proper metadata."""
-    with patch('reverie.migration.generator._generate_version', return_value='20260102_120000'):
+    with patch('surql.migration.generator._generate_version', return_value='20260102_120000'):
       filepath = create_blank_migration(temp_migration_dir, 'test_migration')
 
     content = filepath.read_text()
@@ -345,7 +345,7 @@ class TestGenerateInitialMigration:
       )
     }
 
-    with patch('reverie.migration.generator._generate_version', return_value='20260102_120000'):
+    with patch('surql.migration.generator._generate_version', return_value='20260102_120000'):
       filepath = generate_initial_migration(temp_migration_dir, tables)
 
     assert filepath.exists()
@@ -368,7 +368,7 @@ class TestGenerateInitialMigration:
       )
     }
 
-    with patch('reverie.migration.generator._generate_version', return_value='20260102_120000'):
+    with patch('surql.migration.generator._generate_version', return_value='20260102_120000'):
       filepath = generate_initial_migration(temp_migration_dir, tables, edges=edges)
 
     content = filepath.read_text()
@@ -381,7 +381,7 @@ class TestGenerateInitialMigration:
       'user': TableDefinition(name='user', mode=TableMode.SCHEMAFULL),
     }
 
-    with patch('reverie.migration.generator._generate_version', return_value='20260102_120000'):
+    with patch('surql.migration.generator._generate_version', return_value='20260102_120000'):
       filepath = generate_initial_migration(
         temp_migration_dir, tables, description='Custom initial setup'
       )
@@ -405,7 +405,7 @@ class TestGenerateMigration:
       )
     }
 
-    with patch('reverie.migration.generator._generate_version', return_value='20260102_120000'):
+    with patch('surql.migration.generator._generate_version', return_value='20260102_120000'):
       filepath = generate_migration(
         temp_migration_dir,
         'Create user table',
@@ -432,7 +432,7 @@ class TestGenerateMigration:
       'user': TableDefinition(name='user', mode=TableMode.SCHEMAFULL),
     }
 
-    with patch('reverie.migration.generator._generate_version', return_value='20260102_120000'):
+    with patch('surql.migration.generator._generate_version', return_value='20260102_120000'):
       filepath = generate_migration(
         temp_migration_dir,
         'Drop user table',
@@ -462,7 +462,7 @@ class TestGenerateMigration:
       )
     }
 
-    with patch('reverie.migration.generator._generate_version', return_value='20260102_120000'):
+    with patch('surql.migration.generator._generate_version', return_value='20260102_120000'):
       filepath = generate_migration(
         temp_migration_dir,
         'Add email field',
@@ -480,7 +480,7 @@ class TestGenerateMigration:
       'user': TableDefinition(name='user', mode=TableMode.SCHEMAFULL),
     }
 
-    with patch('reverie.migration.generator._generate_version', return_value='20260102_120000'):
+    with patch('surql.migration.generator._generate_version', return_value='20260102_120000'):
       filepath = generate_migration(
         migrations_dir,
         'Test',
@@ -496,7 +496,7 @@ class TestGenerateMigration:
       'user': TableDefinition(name='user', mode=TableMode.SCHEMAFULL),
     }
 
-    with patch('reverie.migration.generator._generate_version', return_value='20260102_120000'):
+    with patch('surql.migration.generator._generate_version', return_value='20260102_120000'):
       filepath = generate_migration(
         temp_migration_dir,
         'Test',
@@ -524,7 +524,7 @@ class TestGenerateMigration:
       )
     }
 
-    with patch('reverie.migration.generator._generate_version', return_value='20260102_120000'):
+    with patch('surql.migration.generator._generate_version', return_value='20260102_120000'):
       filepath = generate_migration(
         temp_migration_dir,
         'Add user with index',
@@ -551,7 +551,7 @@ class TestGenerateMigrationFromDiffs:
       )
     ]
 
-    with patch('reverie.migration.generator._generate_version', return_value='20260102_120000'):
+    with patch('surql.migration.generator._generate_version', return_value='20260102_120000'):
       filepath = generate_migration_from_diffs(
         temp_migration_dir,
         'Update user table',
@@ -589,7 +589,7 @@ class TestGenerateMigrationFromDiffs:
       ),
     ]
 
-    with patch('reverie.migration.generator._generate_version', return_value='20260102_120000'):
+    with patch('surql.migration.generator._generate_version', return_value='20260102_120000'):
       filepath = generate_migration_from_diffs(
         temp_migration_dir,
         'Complex migration',
@@ -729,7 +729,7 @@ class TestGenerateMigrationWithBackfill:
       )
     }
 
-    with patch('reverie.migration.generator._generate_version', return_value='20260102_120000'):
+    with patch('surql.migration.generator._generate_version', return_value='20260102_120000'):
       filepath = generate_migration(
         temp_migration_dir,
         'Add is_active field',
@@ -762,7 +762,7 @@ class TestGenerateMigrationWithBackfill:
       )
     }
 
-    with patch('reverie.migration.generator._generate_version', return_value='20260102_120000'):
+    with patch('surql.migration.generator._generate_version', return_value='20260102_120000'):
       filepath = generate_migration(
         temp_migration_dir,
         'Add email field',

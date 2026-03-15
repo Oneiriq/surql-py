@@ -3,8 +3,8 @@
 import pytest
 from pydantic import ValidationError
 
-from reverie.query.builder import Query
-from reverie.query.hints import (
+from surql.query.builder import Query
+from surql.query.hints import (
   ExplainHint,
   FetchHint,
   HintRenderer,

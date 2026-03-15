@@ -7,8 +7,8 @@ from unittest.mock import AsyncMock, patch
 import pytest
 from pydantic import ValidationError
 
-from reverie.migration.models import Migration, MigrationHistory
-from reverie.migration.rollback import (
+from surql.migration.models import Migration, MigrationHistory
+from surql.migration.rollback import (
   RollbackIssue,
   RollbackPlan,
   RollbackResult,
@@ -236,7 +236,7 @@ class TestCreateRollbackPlan:
     )
 
     # Mock get_applied_migrations to return history
-    with patch('reverie.migration.history.get_applied_migrations') as mock_get:
+    with patch('surql.migration.history.get_applied_migrations') as mock_get:
       mock_get.return_value = [
         MigrationHistory(
           version='20260109_120000',
@@ -264,7 +264,7 @@ class TestCreateRollbackPlan:
     """Test creating plan when no migrations applied."""
     mock_client = AsyncMock()
 
-    with patch('reverie.migration.history.get_applied_migrations') as mock_get:
+    with patch('surql.migration.history.get_applied_migrations') as mock_get:
       mock_get.return_value = []
 
       with pytest.raises(ValueError, match='No migrations have been applied'):
@@ -275,7 +275,7 @@ class TestCreateRollbackPlan:
     """Test creating plan with invalid target version."""
     mock_client = AsyncMock()
 
-    with patch('reverie.migration.history.get_applied_migrations') as mock_get:
+    with patch('surql.migration.history.get_applied_migrations') as mock_get:
       mock_get.return_value = [
         MigrationHistory(
           version='20260109_120000',
@@ -306,7 +306,7 @@ class TestExecuteRollback:
       overall_safety=RollbackSafety.SAFE,
     )
 
-    with patch('reverie.migration.rollback.execute_migration') as mock_exec:
+    with patch('surql.migration.rollback.execute_migration') as mock_exec:
       mock_exec.return_value = None
 
       result = await execute_rollback(mock_client, plan)
@@ -342,7 +342,7 @@ class TestExecuteRollback:
       overall_safety=RollbackSafety.UNSAFE,
     )
 
-    with patch('reverie.migration.rollback.execute_migration') as mock_exec:
+    with patch('surql.migration.rollback.execute_migration') as mock_exec:
       mock_exec.return_value = None
 
       result = await execute_rollback(mock_client, plan, force=True)
@@ -361,7 +361,7 @@ class TestExecuteRollback:
       overall_safety=RollbackSafety.SAFE,
     )
 
-    with patch('reverie.migration.rollback.execute_migration') as mock_exec:
+    with patch('surql.migration.rollback.execute_migration') as mock_exec:
       mock_exec.side_effect = Exception('Rollback failed')
 
       result = await execute_rollback(mock_client, plan)
@@ -379,7 +379,7 @@ class TestAnalyzeRollbackSafety:
     """Test analyzing rollback safety."""
     mock_client = AsyncMock()
 
-    with patch('reverie.migration.rollback.create_rollback_plan') as mock_plan:
+    with patch('surql.migration.rollback.create_rollback_plan') as mock_plan:
       mock_plan.return_value = RollbackPlan(
         from_version='20260109_120000',
         to_version='20260108_120000',

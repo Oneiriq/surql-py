@@ -9,8 +9,8 @@ from unittest.mock import AsyncMock
 import pytest
 from pydantic import BaseModel, ValidationError
 
-from reverie.connection.client import DatabaseClient
-from reverie.query.typed import (
+from surql.connection.client import DatabaseClient
+from surql.query.typed import (
   create_typed,
   get_typed,
   query_typed,

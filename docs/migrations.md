@@ -1,6 +1,6 @@
 # Migration System Guide
 
-This guide covers creating, managing, and executing database migrations with reverie's migration system.
+This guide covers creating, managing, and executing database migrations with surql's migration system.
 
 ## Table of Contents
 
@@ -17,7 +17,7 @@ This guide covers creating, managing, and executing database migrations with rev
 
 ## Overview
 
-reverie's migration system provides:
+surql's migration system provides:
 
 - **Version control** - Track database schema changes over time
 - **Reversibility** - Roll back changes using down migrations
@@ -42,15 +42,15 @@ The migration path can be configured through multiple sources (in priority order
 1. **CLI flag** (`--directory` / `-d`) - highest priority
 2. **Environment variable** (`REVERIE_MIGRATION_PATH`)
 3. **`.env` file** (`REVERIE_MIGRATION_PATH=...`)
-4. **`pyproject.toml`** (`[tool.reverie]` section)
+4. **`pyproject.toml`** (`[tool.surql]` section)
 5. **Default value** (`./migrations`) - lowest priority
 
 ### pyproject.toml Configuration
 
-Add a `[tool.reverie]` section to your `pyproject.toml`:
+Add a `[tool.surql]` section to your `pyproject.toml`:
 
 ```toml
-[tool.reverie]
+[tool.surql]
 migration_path = "db/migrations"
 ```
 
@@ -82,8 +82,8 @@ REVERIE_MIGRATION_PATH=db/migrations
 Override the configured path for a single command:
 
 ```shell
-reverie migrate up --directory custom/migrations
-reverie migrate status -d ./other/migrations
+surql migrate up --directory custom/migrations
+surql migrate status -d ./other/migrations
 ```
 
 ### Configuration Priority Example
@@ -101,7 +101,7 @@ Without the CLI flag, it would use `shell/migrations` (environment variable).
 ### Accessing Configuration Programmatically
 
 ```python
-from reverie.settings import get_migration_path, get_settings
+from surql.settings import get_migration_path, get_settings
 
 # Get just the migration path
 migration_dir = get_migration_path()
@@ -139,7 +139,7 @@ def down() -> list[str]:
 metadata = {
   'version': '20260102_120000',
   'description': 'Create user table',
-  'author': 'reverie',
+  'author': 'surql',
   'depends_on': [],
 }
 ```
@@ -156,7 +156,7 @@ metadata = {
 metadata = {
   'version': '20260102_120000',        # Unique version (timestamp)
   'description': 'Create user table',   # Human-readable description
-  'author': 'reverie',                 # Migration author
+  'author': 'surql',                 # Migration author
   'depends_on': [],                     # List of required migrations
 }
 ```
@@ -168,7 +168,7 @@ metadata = {
 Create a blank migration file:
 
 ```shell
-reverie migrate create "Add user table"
+surql migrate create "Add user table"
 ```
 
 This generates:
@@ -331,14 +331,14 @@ Examples:
 
 ```shell
 # Good - Clear and descriptive
-reverie migrate create "Create user and post tables"
-reverie migrate create "Add email verification fields"
-reverie migrate create "Create follows edge table"
+surql migrate create "Create user and post tables"
+surql migrate create "Add email verification fields"
+surql migrate create "Create follows edge table"
 
 # Avoid - Vague or generic
-reverie migrate create "Update database"
-reverie migrate create "Changes"
-reverie migrate create "Fix"
+surql migrate create "Update database"
+surql migrate create "Changes"
+surql migrate create "Fix"
 ```
 
 ## Running Migrations
@@ -346,7 +346,7 @@ reverie migrate create "Fix"
 ### Apply All Pending Migrations
 
 ```shell
-reverie migrate up
+surql migrate up
 ```
 
 Output:
@@ -363,17 +363,17 @@ Successfully applied 2 migration(s)
 
 ```shell
 # Apply only the next migration
-reverie migrate up --steps 1
+surql migrate up --steps 1
 
 # Apply next 3 migrations
-reverie migrate up --steps 3
+surql migrate up --steps 3
 ```
 
 ### Dry Run (Preview)
 
 ```shell
 # See what will be executed without applying
-reverie migrate up --dry-run
+surql migrate up --dry-run
 ```
 
 Output shows SQL that would be executed:
@@ -395,7 +395,7 @@ Dry run mode - no changes will be made
 ### Check Migration Status
 
 ```shell
-reverie migrate status
+surql migrate status
 ```
 
 Output:
@@ -414,7 +414,7 @@ Total: 2 | Applied: 1 | Pending: 1
 ### View Migration History
 
 ```shell
-reverie migrate history
+surql migrate history
 ```
 
 Output:
@@ -432,7 +432,7 @@ Migration History
 
 ### History Storage
 
-reverie stores migration history in a special table:
+surql stores migration history in a special table:
 
 ```sql
 CREATE TABLE _migration_history SCHEMAFULL;
@@ -447,9 +447,9 @@ DEFINE INDEX version_idx ON TABLE _migration_history COLUMNS version UNIQUE;
 ### Querying History
 
 ```python
-from reverie.migration.history import get_applied_migrations
-from reverie.connection.client import get_client
-from reverie.settings import get_db_config
+from surql.migration.history import get_applied_migrations
+from surql.connection.client import get_client
+from surql.settings import get_db_config
 
 async def view_history():
   config = get_db_config()
@@ -467,20 +467,20 @@ async def view_history():
 ### Rollback Last Migration
 
 ```shell
-reverie migrate down
+surql migrate down
 ```
 
 ### Rollback Multiple Migrations
 
 ```shell
 # Rollback last 3 migrations
-reverie migrate down --steps 3
+surql migrate down --steps 3
 ```
 
 ### Preview Rollback
 
 ```shell
-reverie migrate down --dry-run
+surql migrate down --dry-run
 ```
 
 ### Writing Reversible Migrations
@@ -547,28 +547,28 @@ def down() -> list[str]:
 
 ```shell
 # Good - Focused migrations
-reverie migrate create "Create user table"
-reverie migrate create "Create post table"
-reverie migrate create "Add user indexes"
+surql migrate create "Create user table"
+surql migrate create "Create post table"
+surql migrate create "Add user indexes"
 
 # Avoid - Multiple unrelated changes
-reverie migrate create "Create all tables and indexes"
+surql migrate create "Create all tables and indexes"
 ```
 
 ### 2. Test Migrations Locally
 
 ```shell
 # Apply migration
-reverie migrate up
+surql migrate up
 
 # Verify it works
-reverie schema show user
+surql schema show user
 
 # Test rollback
-reverie migrate down
+surql migrate down
 
 # Verify rollback worked
-reverie schema show user  # Should not exist
+surql schema show user  # Should not exist
 ```
 
 ### 3. Use Transactions for Safety
@@ -653,7 +653,7 @@ def up() -> list[str]:
 
 ```shell
 # Validate before committing
-reverie migrate validate
+surql migrate validate
 ```
 
 ### 9. Use Dependencies
@@ -787,7 +787,7 @@ def down() -> list[str]:
 ```python
 # Future feature - not yet implemented
 from schemas.user import user_schema
-from reverie.migration.generator import generate_migration
+from surql.migration.generator import generate_migration
 
 # Generate migration from schema
 migration = generate_migration(
@@ -804,11 +804,11 @@ Migrations run in transactions. If a statement fails, all changes are rolled bac
 
 ```shell
 # Check what went wrong
-reverie migrate status --verbose
+surql migrate status --verbose
 
 # Fix the migration file
 # Then try again
-reverie migrate up
+surql migrate up
 ```
 
 ### Migration Already Applied
@@ -816,17 +816,17 @@ reverie migrate up
 ```shell
 # If you need to re-run a migration:
 # 1. Rollback first
-reverie migrate down
+surql migrate down
 
 # 2. Re-apply
-reverie migrate up
+surql migrate up
 ```
 
 ### Duplicate Version Numbers
 
 ```shell
 # Check for duplicates
-reverie migrate validate
+surql migrate validate
 
 # Rename file with new timestamp
 mv migrations/20260102_120000_old.py \
@@ -837,8 +837,8 @@ mv migrations/20260102_120000_old.py \
 
 ```python
 # Manually check history
-from reverie.connection.client import get_client
-from reverie.settings import get_db_config
+from surql.connection.client import get_client
+from surql.settings import get_db_config
 
 async def check_history():
   async with get_client(get_db_config()) as client:
@@ -848,14 +848,14 @@ async def check_history():
 
 ## Schema Versioning and Rollback
 
-reverie provides advanced versioning and rollback capabilities for managing schema evolution safely.
+surql provides advanced versioning and rollback capabilities for managing schema evolution safely.
 
 ### Version Tracking
 
 Track schema state at each migration:
 
 ```python
-from reverie.migration.versioning import create_snapshot, store_snapshot
+from surql.migration.versioning import create_snapshot, store_snapshot
 
 async def track_schema_version():
   async with get_client(config) as client:
@@ -875,7 +875,7 @@ async def track_schema_version():
 Plan and execute rollbacks with safety analysis:
 
 ```python
-from reverie.migration.rollback import create_rollback_plan, execute_rollback
+from surql.migration.rollback import create_rollback_plan, execute_rollback
 
 async def safe_rollback():
   async with get_client(config) as client:
@@ -902,19 +902,19 @@ async def safe_rollback():
 
 ```shell
 # Create snapshot
-reverie migrate snapshot
+surql migrate snapshot
 
 # List snapshots
-reverie migrate list-snapshots
+surql migrate list-snapshots
 
 # Plan rollback
-reverie migrate plan-rollback 20260108_120000
+surql migrate plan-rollback 20260108_120000
 
 # Execute rollback
-reverie migrate rollback 20260108_120000
+surql migrate rollback 20260108_120000
 
 # Compare snapshots
-reverie migrate compare 20260108_120000 20260109_120000
+surql migrate compare 20260108_120000 20260109_120000
 ```
 
 For comprehensive versioning and rollback documentation, see:
