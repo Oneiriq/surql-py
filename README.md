@@ -63,6 +63,10 @@ Full documentation at **[oneiriq.github.io/surql-py](https://oneiriq.github.io/s
 
 Apache License 2.0 - see [LICENSE](LICENSE).
 
+## TypeScript / Deno / Node.js
+
+Looking for SurrealDB tooling in TypeScript? Check out **[surql](https://github.com/Oneiriq/surql)** -- a type-safe query builder and client for SurrealDB available on JSR and NPM.
+
 ## Support
 
 - Documentation: [oneiriq.github.io/surql-py](https://oneiriq.github.io/surql-py/)
