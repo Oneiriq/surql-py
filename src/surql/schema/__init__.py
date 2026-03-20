@@ -62,6 +62,7 @@ from surql.schema.sql import (
 )
 from surql.schema.table import (
   EventDefinition,
+  HnswDistanceType,
   IndexDefinition,
   IndexType,
   MTreeDistanceType,
@@ -69,6 +70,7 @@ from surql.schema.table import (
   TableDefinition,
   TableMode,
   event,
+  hnsw_index,
   index,
   mtree_index,
   search_index,
@@ -113,6 +115,7 @@ __all__ = [
   'IndexType',
   'MTreeDistanceType',
   'MTreeVectorType',
+  'HnswDistanceType',
   'IndexDefinition',
   'EventDefinition',
   'TableDefinition',
@@ -121,6 +124,7 @@ __all__ = [
   'unique_index',
   'search_index',
   'mtree_index',
+  'hnsw_index',
   'event',
   'with_fields',
   'with_indexes',

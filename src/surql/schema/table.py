@@ -32,6 +32,7 @@ class IndexType(Enum):
   SEARCH = 'SEARCH'
   STANDARD = 'INDEX'
   MTREE = 'MTREE'
+  HNSW = 'HNSW'
 
 
 class MTreeDistanceType(Enum):
@@ -44,6 +45,23 @@ class MTreeDistanceType(Enum):
   EUCLIDEAN = 'EUCLIDEAN'
   MANHATTAN = 'MANHATTAN'
   MINKOWSKI = 'MINKOWSKI'
+
+
+class HnswDistanceType(Enum):
+  """Distance metric types for HNSW vector indexes.
+
+  Defines the distance metric used for HNSW vector similarity search.
+  This is a superset of MTreeDistanceType with additional metrics.
+  """
+
+  CHEBYSHEV = 'CHEBYSHEV'
+  COSINE = 'COSINE'
+  EUCLIDEAN = 'EUCLIDEAN'
+  HAMMING = 'HAMMING'
+  JACCARD = 'JACCARD'
+  MANHATTAN = 'MANHATTAN'
+  MINKOWSKI = 'MINKOWSKI'
+  PEARSON = 'PEARSON'
 
 
 class MTreeVectorType(Enum):
@@ -86,6 +104,10 @@ class IndexDefinition(BaseModel):
   dimension: int | None = None
   distance: MTreeDistanceType | None = None
   vector_type: MTreeVectorType | None = None
+  # HNSW-specific parameters
+  hnsw_distance: HnswDistanceType | None = None
+  efc: int | None = None
+  m: int | None = None
 
   model_config = ConfigDict(frozen=True)
 
@@ -307,6 +329,52 @@ def mtree_index(
     dimension=dimension,
     distance=distance,
     vector_type=vector_type,
+  )
+
+
+def hnsw_index(
+  name: str,
+  column: str,
+  dimension: int,
+  *,
+  distance: HnswDistanceType = HnswDistanceType.EUCLIDEAN,
+  vector_type: MTreeVectorType = MTreeVectorType.F64,
+  efc: int | None = None,
+  m: int | None = None,
+) -> IndexDefinition:
+  """Create an HNSW vector index definition.
+
+  Convenience function for creating HNSW vector similarity search indexes.
+
+  Args:
+    name: Index name
+    column: Column name containing the vector data
+    dimension: Number of dimensions in the vector
+    distance: Distance metric (CHEBYSHEV, COSINE, EUCLIDEAN, HAMMING, JACCARD,
+      MANHATTAN, MINKOWSKI, PEARSON)
+    vector_type: Vector component data type (F64, F32, I64, I32, I16)
+    efc: Exploration factor during construction (default: SurrealDB default 150)
+    m: Max bidirectional links per node (default: SurrealDB default 12)
+
+  Returns:
+    Immutable IndexDefinition with HNSW type
+
+  Examples:
+    OpenAI embeddings with cosine similarity:
+    >>> hnsw_index('embedding_idx', 'embedding', 1536, distance=HnswDistanceType.COSINE, vector_type=MTreeVectorType.F32)
+
+    With tuning parameters:
+    >>> hnsw_index('feature_idx', 'features', 128, efc=500, m=16)
+  """
+  return IndexDefinition(
+    name=name,
+    columns=[column],
+    type=IndexType.HNSW,
+    dimension=dimension,
+    vector_type=vector_type,
+    hnsw_distance=distance,
+    efc=efc,
+    m=m,
   )
 
 

@@ -600,6 +600,10 @@ def _validate_index(
   if code_index.type == IndexType.MTREE:
     results.extend(_validate_mtree_index(table_name, code_index, db_index))
 
+  # For HNSW indexes, check additional parameters
+  if code_index.type == IndexType.HNSW:
+    results.extend(_validate_hnsw_index(table_name, code_index, db_index))
+
   return results
 
 
@@ -661,6 +665,96 @@ def _validate_mtree_index(
         message='MTREE index vector type mismatch',
         code_value=code_vt,
         db_value=db_vt,
+      )
+    )
+
+  return results
+
+
+def _validate_hnsw_index(
+  table_name: str,
+  code_index: IndexDefinition,
+  db_index: IndexDefinition,
+) -> list[ValidationResult]:
+  """Validate HNSW-specific index parameters.
+
+  Args:
+    table_name: Name of the table containing the index
+    code_index: Code-defined HNSW index
+    db_index: Database HNSW index
+
+  Returns:
+    List of validation results for HNSW parameters
+  """
+  results: list[ValidationResult] = []
+  index_field = f'index:{code_index.name}'
+
+  # Check dimension
+  if code_index.dimension != db_index.dimension:
+    results.append(
+      ValidationResult(
+        severity=ValidationSeverity.ERROR,
+        table=table_name,
+        field=index_field,
+        message='HNSW index dimension mismatch',
+        code_value=str(code_index.dimension),
+        db_value=str(db_index.dimension),
+      )
+    )
+
+  # Check distance metric
+  if code_index.hnsw_distance != db_index.hnsw_distance:
+    code_dist = code_index.hnsw_distance.value if code_index.hnsw_distance else None
+    db_dist = db_index.hnsw_distance.value if db_index.hnsw_distance else None
+    results.append(
+      ValidationResult(
+        severity=ValidationSeverity.WARNING,
+        table=table_name,
+        field=index_field,
+        message='HNSW index distance metric mismatch',
+        code_value=code_dist,
+        db_value=db_dist,
+      )
+    )
+
+  # Check vector type
+  if code_index.vector_type != db_index.vector_type:
+    code_vt = code_index.vector_type.value if code_index.vector_type else None
+    db_vt = db_index.vector_type.value if db_index.vector_type else None
+    results.append(
+      ValidationResult(
+        severity=ValidationSeverity.WARNING,
+        table=table_name,
+        field=index_field,
+        message='HNSW index vector type mismatch',
+        code_value=code_vt,
+        db_value=db_vt,
+      )
+    )
+
+  # Check EFC
+  if code_index.efc != db_index.efc:
+    results.append(
+      ValidationResult(
+        severity=ValidationSeverity.WARNING,
+        table=table_name,
+        field=index_field,
+        message='HNSW index EFC mismatch',
+        code_value=str(code_index.efc),
+        db_value=str(db_index.efc),
+      )
+    )
+
+  # Check M
+  if code_index.m != db_index.m:
+    results.append(
+      ValidationResult(
+        severity=ValidationSeverity.WARNING,
+        table=table_name,
+        field=index_field,
+        message='HNSW index M mismatch',
+        code_value=str(code_index.m),
+        db_value=str(db_index.m),
       )
     )
 

@@ -5,6 +5,35 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.1.0] - 2026-03-19
+
+### Added
+
+- **HNSW vector indexes**: `IndexType.HNSW` for SurrealDB's HNSW (Hierarchical Navigable
+  Small World) approximate nearest-neighbor index, the successor to MTREE in SurrealDB 2.x/3.x
+- **HnswDistanceType enum**: 8 distance metrics -- CHEBYSHEV, COSINE, EUCLIDEAN, HAMMING,
+  JACCARD, MANHATTAN, MINKOWSKI, PEARSON (superset of MTreeDistanceType)
+- **hnsw_index() builder**: Convenience function for creating HNSW index definitions with
+  dimension, distance metric, vector type, and optional EFC/M tuning parameters
+- **HNSW SQL generation**: `generate_table_sql()` and `generate_edge_sql()` emit correct
+  `DEFINE INDEX ... HNSW DIMENSION <n> DIST <dist> TYPE <type> [EFC <n>] [M <n>]` syntax
+- **HNSW parsing**: Schema parser detects and extracts HNSW indexes with all parameters
+  (dimension, distance, vector type, EFC, M) from SurrealDB INFO responses
+- **HNSW validation**: Schema validator checks HNSW dimension, distance metric, vector type,
+  EFC, and M parameters for code-vs-database consistency
+- **HNSW migration diffs**: `diff_indexes()` generates correct forward/backward SQL for
+  adding and dropping HNSW indexes
+- **HNSW example**: `docs/examples/hnsw_vector_search.py` demonstrating HNSW usage with
+  OpenAI embeddings, multiple distance types, and EFC/M tuning
+
+### Testing
+
+- **Test coverage**: 2215 tests passing (up from 2191 in 1.0.0), 9 skipped
+- New test suite: `test_hnsw_diff.py` (24 tests covering SQL generation, add/drop diffs,
+  all 8 distance types, EFC/M parameters, mixed index type diffs, error cases)
+
+---
+
 ## [1.0.0] - 2026-03-13
 
 ### Added
@@ -202,6 +231,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+[1.1.0]: https://github.com/Oneiriq/surql-py/releases/tag/v1.1.0
 [1.0.0]: https://github.com/Oneiriq/surql-py/releases/tag/v1.0.0
 [0.8.0]: https://github.com/Oneiriq/surql-py/releases/tag/v0.8.0
 [0.7.0]: https://github.com/Oneiriq/surql-py/releases/tag/v0.7.0

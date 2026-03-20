@@ -98,6 +98,23 @@ def _generate_index_sql(
     sql += ';'
     return sql
 
+  if index_def.type == IndexType.HNSW:
+    field_name = index_def.columns[0] if index_def.columns else ''
+    sql = (
+      f'DEFINE INDEX{ine} {index_def.name} ON TABLE {table_name}'
+      f' COLUMNS {field_name} HNSW DIMENSION {index_def.dimension}'
+    )
+    if index_def.hnsw_distance:
+      sql += f' DIST {index_def.hnsw_distance.value}'
+    if index_def.vector_type:
+      sql += f' TYPE {index_def.vector_type.value}'
+    if index_def.efc is not None:
+      sql += f' EFC {index_def.efc}'
+    if index_def.m is not None:
+      sql += f' M {index_def.m}'
+    sql += ';'
+    return sql
+
   sql = f'DEFINE INDEX{ine} {index_def.name} ON TABLE {table_name} COLUMNS {columns}'
 
   if index_def.type == IndexType.UNIQUE:

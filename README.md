@@ -10,7 +10,7 @@ A code-first database toolkit for [SurrealDB](https://surrealdb.com/). Define sc
 
 - **Code-First Migrations** - Schema changes defined in code with automatic migration generation
 - **Type-Safe Query Builder** - Composable queries with Pydantic model integration
-- **Vector Search** - MTREE index support with 9 distance metrics
+- **Vector Search** - HNSW and MTREE index support with 8 distance metrics and EFC/M tuning
 - **Graph Traversal** - Native SurrealDB graph features with edge relationships
 - **Query Caching** - Memory and Redis-backed caching with `@cache_query` decorator
 - **Live Queries** - Real-time change notifications and streaming

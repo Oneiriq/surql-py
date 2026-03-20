@@ -8,7 +8,7 @@ surql provides a seamless developer experience by integrating database operation
 
 - **Code-First Migrations** - Define and manage schema changes directly in code with automatic generation
 - **Type Safety** - Pydantic integration for validation and reduced runtime errors
-- **Vector Search** - MTREE index support with 9 distance metrics and similarity scoring
+- **Vector Search** - HNSW and MTREE index support with 8 distance metrics, EFC/M tuning, and similarity scoring
 - **Query Builder** - Composable, type-safe query building with Pydantic model integration
 - **Graph Traversal** - Native support for SurrealDB's graph features and edge relationships
 - **Schema Visualization** - Generate Mermaid, GraphViz, and ASCII diagrams

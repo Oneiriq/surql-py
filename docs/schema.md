@@ -511,6 +511,78 @@ product_table = table_schema(
 )
 ```
 
+### Vector Indexes (HNSW)
+
+HNSW (Hierarchical Navigable Small World) indexes enable approximate nearest-neighbor
+search for vector embeddings. HNSW is the recommended vector index type for SurrealDB 2.x+.
+
+```python
+from surql.schema.table import hnsw_index, HnswDistanceType, MTreeVectorType
+
+# Basic HNSW index (defaults: EUCLIDEAN distance, F64 vector type)
+hnsw_index('embedding_idx', 'embedding', 1536)
+
+# OpenAI embeddings with cosine similarity
+hnsw_index(
+  'embedding_idx',
+  'embedding',
+  1536,
+  distance=HnswDistanceType.COSINE,
+  vector_type=MTreeVectorType.F32,
+)
+
+# With EFC and M tuning parameters
+hnsw_index(
+  'embedding_idx',
+  'embedding',
+  3072,
+  distance=HnswDistanceType.COSINE,
+  vector_type=MTreeVectorType.F32,
+  efc=500,   # Exploration factor during construction (default: 150)
+  m=16,      # Max bidirectional links per node (default: 12)
+)
+```
+
+**Distance metrics** (`HnswDistanceType`):
+
+| Metric | Use case |
+|---|---|
+| `COSINE` | Normalized vectors (OpenAI, Cohere, sentence transformers) |
+| `EUCLIDEAN` | Raw feature vectors, spatial data |
+| `MANHATTAN` | Grid-based or sparse vectors |
+| `CHEBYSHEV` | Maximum-dimension deviation |
+| `HAMMING` | Binary or categorical vectors |
+| `JACCARD` | Set similarity |
+| `MINKOWSKI` | Generalized distance |
+| `PEARSON` | Correlation-based similarity |
+
+**Vector types** (`MTreeVectorType`): `F64`, `F32`, `I64`, `I32`, `I16`
+
+**Generated SQL**:
+
+```sql
+DEFINE INDEX embedding_idx ON TABLE documents
+  COLUMNS embedding HNSW DIMENSION 1536 DIST COSINE TYPE F32 EFC 500 M 16;
+```
+
+### Vector Indexes (MTREE)
+
+MTREE indexes are the legacy vector index type. For new projects, prefer HNSW.
+
+```python
+from surql.schema.table import mtree_index, MTreeDistanceType, MTreeVectorType
+
+mtree_index(
+  'embedding_idx',
+  'embedding',
+  1536,
+  distance=MTreeDistanceType.COSINE,
+  vector_type=MTreeVectorType.F32,
+)
+```
+
+`MTreeDistanceType` supports: `COSINE`, `EUCLIDEAN`, `MANHATTAN`, `MINKOWSKI`.
+
 ## Events and Triggers
 
 Events are database triggers that execute when conditions are met.

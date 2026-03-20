@@ -7,13 +7,13 @@
 - Built on functional composition patterns with immutable data structures
 - Integrates Pydantic for runtime validation and type safety
 - Supports SurrealDB's graph features including edge relationships and graph traversal
-- Supports vector similarity search through MTREE indexes for AI/ML embeddings
+- Supports vector similarity search through HNSW and MTREE indexes for AI/ML embeddings
 - Includes query result caching with Redis and in-memory backends
 - Provides real-time streaming and live query support via WebSocket
 - Supports multiple named database connections with connection registry
 - **Advanced features**: Query optimization hints, multi-database orchestration, schema versioning and rollback
 - **Requirements**: Python 3.12+ and SurrealDB 1.0+
-- **Version**: 0.1.0 (Alpha)
+- **Version**: 1.1.0 (Production/Stable)
 - **License**: Apache 2.0
 
 # Installation
@@ -639,10 +639,85 @@ posts = await (
 
 # Vector Operations
 
-## MTREE Vector Indexes
+## HNSW Vector Indexes (Recommended)
 
 ### Overview
-- surqlsupports vector similarity search through MTREE indexes in SurrealDB
+- HNSW (Hierarchical Navigable Small World) is the recommended vector index type for SurrealDB 2.x+
+- Successor to MTREE indexes with better performance characteristics
+- Supports 8 distance metrics and 5 vector data types
+- Optional EFC and M tuning parameters for quality/speed tradeoff
+- Ideal for AI/ML applications with embeddings (OpenAI, sentence transformers, etc.)
+
+### Distance Metrics
+- Import: `from surql.schema.table import HnswDistanceType`
+- `HnswDistanceType.CHEBYSHEV`: Maximum-dimension deviation
+- `HnswDistanceType.COSINE`: Cosine similarity (ideal for normalized vectors like embeddings)
+- `HnswDistanceType.EUCLIDEAN`: Euclidean distance (L2 norm, default)
+- `HnswDistanceType.HAMMING`: Hamming distance (binary/categorical vectors)
+- `HnswDistanceType.JACCARD`: Set similarity
+- `HnswDistanceType.MANHATTAN`: Manhattan distance (L1 norm)
+- `HnswDistanceType.MINKOWSKI`: Minkowski distance
+- `HnswDistanceType.PEARSON`: Correlation-based similarity
+
+### Creating HNSW Indexes
+- Import: `from surql.schema.table import hnsw_index, HnswDistanceType, MTreeVectorType`
+- Basic: `hnsw_index('embedding_idx', 'embedding', 1536)`
+- With distance metric: `hnsw_index('embedding_idx', 'embedding', 1536, distance=HnswDistanceType.COSINE)`
+- With vector type: `hnsw_index('embedding_idx', 'embedding', 1536, distance=HnswDistanceType.COSINE, vector_type=MTreeVectorType.F32)`
+- With tuning: `hnsw_index('embedding_idx', 'embedding', 1536, distance=HnswDistanceType.COSINE, efc=500, m=16)`
+- Parameters:
+  * `name`: Index name (required)
+  * `column`: Column containing vector data (required)
+  * `dimension`: Number of dimensions in the vector (required)
+  * `distance`: Distance metric (optional, default: EUCLIDEAN)
+  * `vector_type`: Vector component data type (optional, default: F64)
+  * `efc`: Exploration factor during construction (optional, SurrealDB default: 150)
+  * `m`: Max bidirectional links per node (optional, SurrealDB default: 12)
+
+### HNSW Example
+```python
+from surql.schema import (
+  table_schema,
+  with_fields,
+  with_indexes,
+  hnsw_index,
+  array_field,
+  string_field,
+  HnswDistanceType,
+  MTreeVectorType,
+)
+
+documents = table_schema('documents')
+documents = with_fields(
+  documents,
+  string_field('title'),
+  string_field('content'),
+  array_field('embedding'),
+)
+documents = with_indexes(
+  documents,
+  hnsw_index(
+    'embedding_idx',
+    'embedding',
+    1536,
+    distance=HnswDistanceType.COSINE,
+    vector_type=MTreeVectorType.F32,
+    efc=500,
+    m=16,
+  ),
+)
+```
+
+### Generated SQL
+- HNSW indexes generate SurrealDB DEFINE INDEX statements
+- Example: `DEFINE INDEX embedding_idx ON TABLE documents COLUMNS embedding HNSW DIMENSION 1536 DIST COSINE TYPE F32 EFC 500 M 16;`
+- Migrations automatically handle creation and removal
+- Use `surql migrate up` to apply HNSW indexes to database
+
+## MTREE Vector Indexes (Legacy)
+
+### Overview
+- MTREE indexes are the legacy vector index type; prefer HNSW for new projects
 - MTREE indexes enable efficient nearest-neighbor search for embeddings and vectors
 - Supports multiple distance metrics and vector data types
 - Ideal for AI/ML applications with embeddings (OpenAI, sentence transformers, etc.)
@@ -767,7 +842,7 @@ products = with_indexes(
 - Use query builder's `vector_search()` method: `Query().from_('documents').vector_search('embedding', vector, k=10, distance=VectorDistanceType.COSINE)`
 - Generates SurrealQL: `SELECT * FROM documents WHERE embedding <|10,COSINE|> [0.1, 0.2, ...]`
 - Search returns k nearest neighbors based on configured distance metric
-- Works with any MTREE indexed field
+- Works with any HNSW or MTREE indexed field
 
 ### Choosing Distance Metrics
 - **COSINE**: Use for normalized vectors (embeddings from ML models like OpenAI, Cohere, sentence transformers)
@@ -781,7 +856,7 @@ products = with_indexes(
 - **I16/I32/I64**: Use for quantized or integer-based vectors
 
 ### Performance Considerations
-- MTREE indexes improve query performance for similarity search
+- HNSW and MTREE indexes improve query performance for similarity search
 - Index creation time increases with vector dimension and dataset size
 - F32 uses less memory than F64 while maintaining good precision for embeddings
 - COSINE distance is optimized for normalized vectors
@@ -2599,7 +2674,7 @@ def downgrade():
 - Index frequently queried fields
 - Use search indexes for full-text search
 - Don't over-index (overhead on writes)
-- Add MTREE indexes for vector fields used in similarity search
+- Add HNSW indexes (or MTREE) for vector fields used in similarity search
 
 ### Table Mode
 - Use SCHEMAFULL for production: Enforces data integrity
@@ -2741,7 +2816,7 @@ def downgrade():
 
 ### src.schema.table
 - Table schema composition
-- Exports: `TableMode`, `TableDefinition`, `IndexDefinition`, `EventDefinition`, `table_schema`, `index`, `unique_index`, `search_index`, `mtree_index`, `event`
+- Exports: `TableMode`, `TableDefinition`, `IndexDefinition`, `EventDefinition`, `table_schema`, `index`, `unique_index`, `search_index`, `mtree_index`, `hnsw_index`, `HnswDistanceType`, `event`
 - Functional composition helpers: `with_fields`, `with_indexes`, etc.
 
 ### src.schema.edge

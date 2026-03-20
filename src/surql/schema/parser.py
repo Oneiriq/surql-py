@@ -12,6 +12,7 @@ import structlog
 from surql.schema.fields import FieldDefinition, FieldType
 from surql.schema.table import (
   EventDefinition,
+  HnswDistanceType,
   IndexDefinition,
   IndexType,
   MTreeDistanceType,
@@ -338,6 +339,18 @@ def _parse_index_definition(index_name: str, definition: str) -> IndexDefinition
     distance = _extract_mtree_distance(definition)
     vector_type = _extract_mtree_vector_type(definition)
 
+  # For HNSW indexes, extract additional parameters
+  hnsw_distance = None
+  efc = None
+  m = None
+
+  if index_type == IndexType.HNSW:
+    dimension = _extract_mtree_dimension(definition)
+    vector_type = _extract_mtree_vector_type(definition)
+    hnsw_distance = _extract_hnsw_distance(definition)
+    efc = _extract_hnsw_efc(definition)
+    m = _extract_hnsw_m(definition)
+
   return IndexDefinition(
     name=index_name,
     columns=columns,
@@ -345,6 +358,9 @@ def _parse_index_definition(index_name: str, definition: str) -> IndexDefinition
     dimension=dimension,
     distance=distance,
     vector_type=vector_type,
+    hnsw_distance=hnsw_distance,
+    efc=efc,
+    m=m,
   )
 
 
@@ -358,7 +374,7 @@ def _extract_index_columns(definition: str) -> list[str]:
     List of column names
   """
   # Match COLUMNS followed by comma-separated column names
-  columns_pattern = r'COLUMNS\s+([^;]+?)(?:UNIQUE|SEARCH|MTREE|\s*;|\s*$)'
+  columns_pattern = r'COLUMNS\s+([^;]+?)(?:UNIQUE|SEARCH|HNSW|MTREE|\s*;|\s*$)'
   match = re.search(columns_pattern, definition, re.IGNORECASE)
 
   if match:
@@ -379,7 +395,7 @@ def _extract_index_fields(definition: str) -> list[str]:
     List of field names
   """
   # Match FIELDS followed by comma-separated field names
-  fields_pattern = r'FIELDS\s+([^;]+?)(?:UNIQUE|SEARCH|MTREE|\s*;|\s*$)'
+  fields_pattern = r'FIELDS\s+([^;]+?)(?:UNIQUE|SEARCH|HNSW|MTREE|\s*;|\s*$)'
   match = re.search(fields_pattern, definition, re.IGNORECASE)
 
   if match:
@@ -405,6 +421,8 @@ def _extract_index_type(definition: str) -> IndexType:
     return IndexType.UNIQUE
   if 'SEARCH' in definition_upper:
     return IndexType.SEARCH
+  if 'HNSW' in definition_upper:
+    return IndexType.HNSW
   if 'MTREE' in definition_upper:
     return IndexType.MTREE
 
@@ -483,6 +501,73 @@ def _extract_mtree_vector_type(definition: str) -> MTreeVectorType | None:
   }
 
   return type_mapping.get(type_str)
+
+
+def _extract_hnsw_distance(definition: str) -> HnswDistanceType | None:
+  """Extract DIST/DISTANCE from HNSW index definition.
+
+  Args:
+    definition: DEFINE INDEX statement
+
+  Returns:
+    HnswDistanceType or None
+  """
+  dist_pattern = r'(?:DIST|DISTANCE)\s+(\w+)'
+  match = re.search(dist_pattern, definition, re.IGNORECASE)
+
+  if not match:
+    return None
+
+  dist_str = match.group(1).upper()
+
+  distance_mapping = {
+    'CHEBYSHEV': HnswDistanceType.CHEBYSHEV,
+    'COSINE': HnswDistanceType.COSINE,
+    'EUCLIDEAN': HnswDistanceType.EUCLIDEAN,
+    'HAMMING': HnswDistanceType.HAMMING,
+    'JACCARD': HnswDistanceType.JACCARD,
+    'MANHATTAN': HnswDistanceType.MANHATTAN,
+    'MINKOWSKI': HnswDistanceType.MINKOWSKI,
+    'PEARSON': HnswDistanceType.PEARSON,
+  }
+
+  return distance_mapping.get(dist_str)
+
+
+def _extract_hnsw_efc(definition: str) -> int | None:
+  """Extract EFC from HNSW index definition.
+
+  Args:
+    definition: DEFINE INDEX statement
+
+  Returns:
+    EFC value or None
+  """
+  efc_pattern = r'EFC\s+(\d+)'
+  match = re.search(efc_pattern, definition, re.IGNORECASE)
+
+  if match:
+    return int(match.group(1))
+
+  return None
+
+
+def _extract_hnsw_m(definition: str) -> int | None:
+  """Extract M from HNSW index definition.
+
+  Args:
+    definition: DEFINE INDEX statement
+
+  Returns:
+    M value or None
+  """
+  m_pattern = r'\bM\s+(\d+)'
+  match = re.search(m_pattern, definition, re.IGNORECASE)
+
+  if match:
+    return int(match.group(1))
+
+  return None
 
 
 def _parse_events(ev_dict: dict[str, str]) -> list[EventDefinition]:
