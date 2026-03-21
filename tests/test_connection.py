@@ -382,7 +382,15 @@ class TestDatabaseClient:
     data = {'in': 'user:alice', 'out': 'post:123'}
     await mock_db_client.insert_relation('likes', data)
 
-    mock_db_client._client.insert_relation.assert_called_once_with('likes', data)
+    mock_db_client._client.insert_relation.assert_called_once()
+    call_args = mock_db_client._client.insert_relation.call_args
+    assert call_args[0][0] == 'likes'
+    sent_data = call_args[0][1]
+    # Data is denormalized: record ID strings become SDK RecordID objects
+    assert sent_data['in'].table_name == 'user'
+    assert sent_data['in'].id == 'alice'
+    assert sent_data['out'].table_name == 'post'
+    assert sent_data['out'].id == '123'
 
   @pytest.mark.anyio
   async def test_context_manager(self, db_config: ConnectionConfig) -> None:

@@ -5,6 +5,22 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.2.1] - 2026-03-20
+
+### Fixed
+
+- **RecordID round-trip denormalization**: Added `_denormalize_params()` that recursively
+  converts record ID strings (e.g. `'repo:abc123'`) back to `surrealdb.RecordID` objects
+  before sending to the SDK. Applied to `create()`, `update()`, `merge()`, `execute()`, and
+  `insert_relation()` input data/params. This fixes the round-trip where normalized response
+  IDs (strings) were rejected by SurrealDB 3.x when passed back as field values in subsequent
+  operations ("Expected `record` but found string")
+
+### Testing
+
+- Added 18 tests covering `_denormalize_params` unit behavior, round-trip identity,
+  and input denormalization verification across all CRUD methods
+
 ## [1.2.0] - 2026-03-20
 
 ### Fixed
@@ -248,6 +264,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+[1.2.1]: https://github.com/Oneiriq/surql-py/releases/tag/v1.2.1
+[1.2.0]: https://github.com/Oneiriq/surql-py/releases/tag/v1.2.0
 [1.1.0]: https://github.com/Oneiriq/surql-py/releases/tag/v1.1.0
 [1.0.0]: https://github.com/Oneiriq/surql-py/releases/tag/v1.0.0
 [0.8.0]: https://github.com/Oneiriq/surql-py/releases/tag/v0.8.0

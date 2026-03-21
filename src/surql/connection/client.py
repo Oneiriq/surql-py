@@ -37,6 +37,31 @@ def _is_record_id_target(target: str) -> bool:
   return bool(_RECORD_ID_PATTERN.match(target))
 
 
+def _denormalize_params(value: Any) -> Any:
+  """Recursively convert record ID strings back to SDK RecordID objects.
+
+  When consumers receive normalized responses (RecordID -> string), they may
+  pass those strings back as field values in subsequent create/update calls.
+  SurrealDB 3.x rejects plain strings where it expects record types, so this
+  function detects strings matching the ``table:id`` pattern and converts them
+  back to ``surrealdb.RecordID`` objects before sending to the SDK.
+
+  Args:
+    value: Any value from user-provided data (dicts, lists, scalars)
+
+  Returns:
+    The value with record ID strings replaced by SDK RecordID objects
+  """
+  if isinstance(value, str) and _is_record_id_target(value):
+    table, id_part = value.split(':', 1)
+    return SdkRecordID(table, id_part)
+  if isinstance(value, dict):
+    return {k: _denormalize_params(v) for k, v in value.items()}
+  if isinstance(value, list):
+    return [_denormalize_params(item) for item in value]
+  return value
+
+
 def _normalize_sdk_value(value: Any) -> Any:
   """Recursively convert SurrealDB SDK types to plain Python types.
 
@@ -210,7 +235,8 @@ class DatabaseClient:
       try:
         self._log.debug('executing_query', query=query, params=params)
 
-        result = await self._client.query(query, params or {})
+        resolved_params = _denormalize_params(params) if params else {}
+        result = await self._client.query(query, resolved_params)
 
         self._log.debug('query_executed_successfully', result_type=type(result).__name__)
         return _normalize_sdk_value(result)
@@ -284,7 +310,7 @@ class DatabaseClient:
     async with self._semaphore:
       try:
         self._log.debug('executing_create', table=table, data=data)
-        result = await self._client.create(table, data)
+        result = await self._client.create(table, _denormalize_params(data))
         return _normalize_sdk_value(result)
       except Exception as e:
         self._log.error('create_failed', error=str(e), table=table)
@@ -310,7 +336,7 @@ class DatabaseClient:
     async with self._semaphore:
       try:
         self._log.debug('executing_update', target=target, data=data)
-        result = await self._client.update(target, data)
+        result = await self._client.update(target, _denormalize_params(data))
         return _normalize_sdk_value(result)
       except Exception as e:
         self._log.error('update_failed', error=str(e), target=target)
@@ -336,7 +362,7 @@ class DatabaseClient:
     async with self._semaphore:
       try:
         self._log.debug('executing_merge', target=target, data=data)
-        result = await self._client.merge(target, data)
+        result = await self._client.merge(target, _denormalize_params(data))
         return _normalize_sdk_value(result)
       except Exception as e:
         self._log.error('merge_failed', error=str(e), target=target)
@@ -387,7 +413,7 @@ class DatabaseClient:
     async with self._semaphore:
       try:
         self._log.debug('executing_insert_relation', table=table, data=data)
-        result = await self._client.insert_relation(table, data)
+        result = await self._client.insert_relation(table, _denormalize_params(data))
         return _normalize_sdk_value(result)
       except Exception as e:
         self._log.error('insert_relation_failed', error=str(e), table=table)

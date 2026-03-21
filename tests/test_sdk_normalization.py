@@ -1,8 +1,9 @@
-"""Tests for SurrealDB 3.x SDK type normalization and single-record select unwrapping.
+"""Tests for SurrealDB 3.x SDK type normalization, denormalization, and round-trip.
 
-Covers two fixes:
+Covers three concerns:
 1. select() unwraps single-record results (record ID targets) from list to dict
 2. All CRUD responses normalize SDK RecordID objects to plain strings
+3. Record ID strings in input data are denormalized back to SDK RecordID objects
 """
 
 from unittest.mock import AsyncMock
@@ -12,6 +13,7 @@ from surrealdb import RecordID as SdkRecordID
 
 from surql.connection.client import (
   DatabaseClient,
+  _denormalize_params,
   _is_record_id_target,
   _normalize_sdk_value,
 )
@@ -333,3 +335,293 @@ class TestUpdateMergeNormalization:
 
     assert result['id'] == 'user:alice'
     assert isinstance(result['id'], str)
+
+
+# ============================================================================
+# _denormalize_params
+# ============================================================================
+
+
+class TestDenormalizeParams:
+  """Tests for _denormalize_params helper."""
+
+  def test_record_id_string_to_sdk_object(self) -> None:
+    """Converts a record ID string to an SDK RecordID."""
+    result = _denormalize_params('repo:abc123')
+
+    assert isinstance(result, SdkRecordID)
+    assert str(result) == 'repo:abc123'
+
+  def test_dict_with_record_id_string(self) -> None:
+    """Converts record ID strings inside dict values."""
+    data = {'repo_id': 'repo:abc123', 'name': 'test.py'}
+    result = _denormalize_params(data)
+
+    assert isinstance(result['repo_id'], SdkRecordID)
+    assert str(result['repo_id']) == 'repo:abc123'
+    assert result['name'] == 'test.py'
+
+  def test_nested_dict_with_record_id_strings(self) -> None:
+    """Converts record ID strings in nested dicts."""
+    data = {'meta': {'project_id': 'project:xyz'}, 'name': 'foo'}
+    result = _denormalize_params(data)
+
+    assert isinstance(result['meta']['project_id'], SdkRecordID)
+    assert str(result['meta']['project_id']) == 'project:xyz'
+
+  def test_list_with_record_id_strings(self) -> None:
+    """Converts record ID strings inside lists."""
+    data = ['repo:abc', 'file:def']
+    result = _denormalize_params(data)
+
+    assert all(isinstance(item, SdkRecordID) for item in result)
+    assert str(result[0]) == 'repo:abc'
+    assert str(result[1]) == 'file:def'
+
+  def test_plain_strings_unchanged(self) -> None:
+    """Leaves non-record-ID strings untouched."""
+    assert _denormalize_params('hello') == 'hello'
+    assert _denormalize_params('just_a_name') == 'just_a_name'
+    assert _denormalize_params('') == ''
+
+  def test_non_string_values_unchanged(self) -> None:
+    """Leaves non-string values untouched."""
+    assert _denormalize_params(42) == 42
+    assert _denormalize_params(3.14) == 3.14
+    assert _denormalize_params(True) is True
+    assert _denormalize_params(None) is None
+
+  def test_empty_structures(self) -> None:
+    """Handles empty dicts and lists."""
+    assert _denormalize_params({}) == {}
+    assert _denormalize_params([]) == []
+
+  def test_mixed_dict_with_plain_and_record_id_strings(self) -> None:
+    """Converts only record ID strings, leaving other values intact."""
+    data = {
+      'repo_id': 'repo:abc123',
+      'path': '/src/main.py',
+      'line_count': 42,
+      'active': True,
+    }
+    result = _denormalize_params(data)
+
+    assert isinstance(result['repo_id'], SdkRecordID)
+    assert result['path'] == '/src/main.py'
+    assert result['line_count'] == 42
+    assert result['active'] is True
+
+  def test_ulid_style_record_id(self) -> None:
+    """Converts ULID-style record ID strings."""
+    result = _denormalize_params('file:01JQXYZ1234ABCDEF5678')
+
+    assert isinstance(result, SdkRecordID)
+    assert str(result) == 'file:01JQXYZ1234ABCDEF5678'
+
+  def test_underscore_table_record_id(self) -> None:
+    """Converts record IDs with underscored table names."""
+    result = _denormalize_params('user_profile:abc')
+
+    assert isinstance(result, SdkRecordID)
+    assert str(result) == 'user_profile:abc'
+
+  def test_numeric_start_not_converted(self) -> None:
+    """Strings starting with digits are not treated as record IDs."""
+    result = _denormalize_params('123:abc')
+
+    assert isinstance(result, str)
+    assert result == '123:abc'
+
+  def test_deeply_nested_record_id(self) -> None:
+    """Converts record ID strings in deeply nested structures."""
+    data = {'a': [{'b': {'c': 'tbl:deep'}}]}
+    result = _denormalize_params(data)
+
+    assert isinstance(result['a'][0]['b']['c'], SdkRecordID)
+    assert str(result['a'][0]['b']['c']) == 'tbl:deep'
+
+
+# ============================================================================
+# Round-trip: normalize (response) -> denormalize (next request)
+# ============================================================================
+
+
+class TestRoundTrip:
+  """Tests verifying the normalize -> denormalize round-trip is transparent."""
+
+  def test_normalize_then_denormalize_preserves_identity(self) -> None:
+    """A normalized RecordID string denormalizes back to an equivalent SDK RecordID."""
+    original = SdkRecordID('repo', 'abc123')
+    normalized = _normalize_sdk_value(original)
+    denormalized = _denormalize_params(normalized)
+
+    assert isinstance(denormalized, SdkRecordID)
+    assert str(denormalized) == str(original)
+
+  def test_round_trip_dict(self) -> None:
+    """Round-trip works for dicts containing RecordID values."""
+    sdk_response = {
+      'id': SdkRecordID('file', 'abc'),
+      'repo_id': SdkRecordID('repo', 'xyz'),
+      'path': '/src/main.py',
+    }
+    normalized = _normalize_sdk_value(sdk_response)
+
+    # Consumer takes the normalized response and passes fields back
+    next_request = {'file_id': normalized['id'], 'repo_id': normalized['repo_id']}
+    denormalized = _denormalize_params(next_request)
+
+    assert isinstance(denormalized['file_id'], SdkRecordID)
+    assert isinstance(denormalized['repo_id'], SdkRecordID)
+    assert str(denormalized['file_id']) == 'file:abc'
+    assert str(denormalized['repo_id']) == 'repo:xyz'
+
+
+# ============================================================================
+# DatabaseClient CRUD -- input denormalization
+# ============================================================================
+
+
+class TestCreateDenormalization:
+  """Tests for DatabaseClient.create() input denormalization."""
+
+  @pytest.mark.anyio
+  async def test_create_denormalizes_record_id_string(self, mock_db_client: DatabaseClient) -> None:
+    """Create converts record ID strings in data to SDK RecordID before sending."""
+    mock_db_client._client.create = AsyncMock(
+      return_value={
+        'id': SdkRecordID('file', 'f1'),
+        'repo_id': SdkRecordID('repo', 'r1'),
+        'path': 'foo.py',
+      }
+    )
+
+    await mock_db_client.create('file', {'repo_id': 'repo:r1', 'path': 'foo.py'})
+
+    # Verify the SDK received a RecordID object, not a plain string
+    call_args = mock_db_client._client.create.call_args
+    sent_data = call_args[0][1]
+    assert isinstance(sent_data['repo_id'], SdkRecordID)
+    assert str(sent_data['repo_id']) == 'repo:r1'
+    assert sent_data['path'] == 'foo.py'
+
+  @pytest.mark.anyio
+  async def test_create_round_trip(self, mock_db_client: DatabaseClient) -> None:
+    """Full round-trip: create repo, use its ID to create file."""
+    # Step 1: create repo -- SDK returns RecordID, client normalizes to string
+    mock_db_client._client.create = AsyncMock(
+      return_value={'id': SdkRecordID('repo', 'r1'), 'name': 'my-repo'}
+    )
+    repo = await mock_db_client.create('repo', {'name': 'my-repo'})
+    assert repo['id'] == 'repo:r1'
+    assert isinstance(repo['id'], str)
+
+    # Step 2: create file using the string ID -- client denormalizes to RecordID
+    mock_db_client._client.create = AsyncMock(
+      return_value={
+        'id': SdkRecordID('file', 'f1'),
+        'repo_id': SdkRecordID('repo', 'r1'),
+        'path': 'foo.py',
+      }
+    )
+    file_record = await mock_db_client.create('file', {'repo_id': repo['id'], 'path': 'foo.py'})
+
+    # Verify SDK received RecordID object
+    call_args = mock_db_client._client.create.call_args
+    sent_data = call_args[0][1]
+    assert isinstance(sent_data['repo_id'], SdkRecordID)
+
+    # Verify response is normalized back to strings
+    assert file_record['id'] == 'file:f1'
+    assert file_record['repo_id'] == 'repo:r1'
+    assert isinstance(file_record['repo_id'], str)
+
+
+class TestUpdateDenormalization:
+  """Tests for DatabaseClient.update() input denormalization."""
+
+  @pytest.mark.anyio
+  async def test_update_denormalizes_record_id_string(self, mock_db_client: DatabaseClient) -> None:
+    """Update converts record ID strings in data to SDK RecordID before sending."""
+    mock_db_client._client.update = AsyncMock(
+      return_value={'id': SdkRecordID('file', 'f1'), 'repo_id': SdkRecordID('repo', 'r2')}
+    )
+
+    await mock_db_client.update('file:f1', {'repo_id': 'repo:r2'})
+
+    call_args = mock_db_client._client.update.call_args
+    sent_data = call_args[0][1]
+    assert isinstance(sent_data['repo_id'], SdkRecordID)
+    assert str(sent_data['repo_id']) == 'repo:r2'
+
+
+class TestMergeDenormalization:
+  """Tests for DatabaseClient.merge() input denormalization."""
+
+  @pytest.mark.anyio
+  async def test_merge_denormalizes_record_id_string(self, mock_db_client: DatabaseClient) -> None:
+    """Merge converts record ID strings in data to SDK RecordID before sending."""
+    mock_db_client._client.merge = AsyncMock(
+      return_value={'id': SdkRecordID('file', 'f1'), 'owner_id': SdkRecordID('user', 'u1')}
+    )
+
+    await mock_db_client.merge('file:f1', {'owner_id': 'user:u1'})
+
+    call_args = mock_db_client._client.merge.call_args
+    sent_data = call_args[0][1]
+    assert isinstance(sent_data['owner_id'], SdkRecordID)
+    assert str(sent_data['owner_id']) == 'user:u1'
+
+
+class TestExecuteDenormalization:
+  """Tests for DatabaseClient.execute() params denormalization."""
+
+  @pytest.mark.anyio
+  async def test_execute_denormalizes_params(self, mock_db_client: DatabaseClient) -> None:
+    """Execute converts record ID strings in params to SDK RecordID before sending."""
+    mock_db_client._client.query = AsyncMock(return_value=[{'result': []}])
+
+    await mock_db_client.execute(
+      'CREATE file SET repo_id = $repo_id',
+      params={'repo_id': 'repo:r1'},
+    )
+
+    call_args = mock_db_client._client.query.call_args
+    sent_params = call_args[0][1]
+    assert isinstance(sent_params['repo_id'], SdkRecordID)
+    assert str(sent_params['repo_id']) == 'repo:r1'
+
+  @pytest.mark.anyio
+  async def test_execute_no_params_unchanged(self, mock_db_client: DatabaseClient) -> None:
+    """Execute without params passes empty dict."""
+    mock_db_client._client.query = AsyncMock(return_value=[{'result': []}])
+
+    await mock_db_client.execute('SELECT * FROM user')
+
+    call_args = mock_db_client._client.query.call_args
+    sent_params = call_args[0][1]
+    assert sent_params == {}
+
+
+class TestInsertRelationDenormalization:
+  """Tests for DatabaseClient.insert_relation() input denormalization."""
+
+  @pytest.mark.anyio
+  async def test_insert_relation_denormalizes_in_out(self, mock_db_client: DatabaseClient) -> None:
+    """insert_relation converts 'in' and 'out' record ID strings to SDK RecordID."""
+    mock_db_client._client.insert_relation = AsyncMock(
+      return_value={
+        'id': SdkRecordID('likes', '123'),
+        'in': SdkRecordID('user', 'alice'),
+        'out': SdkRecordID('post', 'p1'),
+      }
+    )
+
+    await mock_db_client.insert_relation('likes', {'in': 'user:alice', 'out': 'post:p1'})
+
+    call_args = mock_db_client._client.insert_relation.call_args
+    sent_data = call_args[0][1]
+    assert isinstance(sent_data['in'], SdkRecordID)
+    assert isinstance(sent_data['out'], SdkRecordID)
+    assert str(sent_data['in']) == 'user:alice'
+    assert str(sent_data['out']) == 'post:p1'
