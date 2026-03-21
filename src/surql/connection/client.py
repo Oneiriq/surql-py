@@ -1,12 +1,14 @@
 """Async SurrealDB client wrapper with connection pooling and retry logic."""
 
 import asyncio
+import re
 from collections.abc import AsyncIterator
 from contextlib import asynccontextmanager
 from typing import Any
 
 import structlog
 from surrealdb import AsyncSurreal
+from surrealdb import RecordID as SdkRecordID
 from tenacity import (
   AsyncRetrying,
   RetryError,
@@ -18,6 +20,43 @@ from tenacity import (
 from surql.connection.config import ConnectionConfig
 
 logger = structlog.get_logger(__name__)
+
+# Pattern matching SurrealDB record ID targets: "table:id" or "table:<complex_id>"
+_RECORD_ID_PATTERN = re.compile(r'^[a-zA-Z_][a-zA-Z0-9_]*:.+$')
+
+
+def _is_record_id_target(target: str) -> bool:
+  """Check whether a target string looks like a single record ID (table:id).
+
+  Args:
+    target: The select target string
+
+  Returns:
+    True if target matches record ID format, False for table-only targets
+  """
+  return bool(_RECORD_ID_PATTERN.match(target))
+
+
+def _normalize_sdk_value(value: Any) -> Any:
+  """Recursively convert SurrealDB SDK types to plain Python types.
+
+  Converts SDK RecordID objects to their string representation so consumers
+  receive plain strings they can pass back to subsequent operations without
+  SurrealDB 3.x rejecting them with type coercion errors.
+
+  Args:
+    value: Any value returned by the SurrealDB SDK
+
+  Returns:
+    The value with SDK types replaced by plain Python equivalents
+  """
+  if isinstance(value, SdkRecordID):
+    return str(value)
+  if isinstance(value, dict):
+    return {k: _normalize_sdk_value(v) for k, v in value.items()}
+  if isinstance(value, list):
+    return [_normalize_sdk_value(item) for item in value]
+  return value
 
 
 class DatabaseError(Exception):
@@ -174,7 +213,7 @@ class DatabaseClient:
         result = await self._client.query(query, params or {})
 
         self._log.debug('query_executed_successfully', result_type=type(result).__name__)
-        return result
+        return _normalize_sdk_value(result)
 
       except Exception as e:
         self._log.error(
@@ -188,11 +227,16 @@ class DatabaseClient:
   async def select(self, target: str) -> Any:
     """Execute SELECT operation.
 
+    When the target is a single record ID (e.g. ``user:alice``), the SDK may
+    return a list.  This method detects that case and unwraps the first
+    element so callers always receive a dict (or ``None``) for single-record
+    selects, and a list for table-level selects.
+
     Args:
       target: Target table or record ID
 
     Returns:
-      Selected records
+      Selected record dict (single ID) or list of records (table)
 
     Raises:
       ConnectionError: If client is not connected
@@ -205,6 +249,12 @@ class DatabaseClient:
       try:
         self._log.debug('executing_select', target=target)
         result = await self._client.select(target)
+        result = _normalize_sdk_value(result)
+
+        # Unwrap single-record selects: SDK returns a list even for record IDs
+        if _is_record_id_target(target) and isinstance(result, list):
+          return result[0] if result else None
+
         return result
       except Exception as e:
         self._log.error('select_failed', error=str(e), target=target)
@@ -213,12 +263,16 @@ class DatabaseClient:
   async def create(self, table: str, data: dict[str, Any]) -> Any:
     """Execute CREATE operation.
 
+    Normalizes SDK-specific types (e.g. ``RecordID`` objects) in the
+    response so that consumers receive plain Python types they can safely
+    pass back to subsequent operations.
+
     Args:
       table: Target table name
       data: Record data
 
     Returns:
-      Created record
+      Created record with SDK types normalized to plain Python types
 
     Raises:
       ConnectionError: If client is not connected
@@ -231,7 +285,7 @@ class DatabaseClient:
       try:
         self._log.debug('executing_create', table=table, data=data)
         result = await self._client.create(table, data)
-        return result
+        return _normalize_sdk_value(result)
       except Exception as e:
         self._log.error('create_failed', error=str(e), table=table)
         raise QueryError(f'CREATE operation failed: {e}') from e
@@ -244,7 +298,7 @@ class DatabaseClient:
       data: Update data
 
     Returns:
-      Updated record
+      Updated record with SDK types normalized
 
     Raises:
       ConnectionError: If client is not connected
@@ -257,7 +311,7 @@ class DatabaseClient:
       try:
         self._log.debug('executing_update', target=target, data=data)
         result = await self._client.update(target, data)
-        return result
+        return _normalize_sdk_value(result)
       except Exception as e:
         self._log.error('update_failed', error=str(e), target=target)
         raise QueryError(f'UPDATE operation failed: {e}') from e
@@ -270,7 +324,7 @@ class DatabaseClient:
       data: Data to merge
 
     Returns:
-      Merged record
+      Merged record with SDK types normalized
 
     Raises:
       ConnectionError: If client is not connected
@@ -283,7 +337,7 @@ class DatabaseClient:
       try:
         self._log.debug('executing_merge', target=target, data=data)
         result = await self._client.merge(target, data)
-        return result
+        return _normalize_sdk_value(result)
       except Exception as e:
         self._log.error('merge_failed', error=str(e), target=target)
         raise QueryError(f'MERGE operation failed: {e}') from e
@@ -295,7 +349,7 @@ class DatabaseClient:
       target: Target table or record ID
 
     Returns:
-      Deletion result
+      Deletion result with SDK types normalized
 
     Raises:
       ConnectionError: If client is not connected
@@ -308,7 +362,7 @@ class DatabaseClient:
       try:
         self._log.debug('executing_delete', target=target)
         result = await self._client.delete(target)
-        return result
+        return _normalize_sdk_value(result)
       except Exception as e:
         self._log.error('delete_failed', error=str(e), target=target)
         raise QueryError(f'DELETE operation failed: {e}') from e
@@ -321,7 +375,7 @@ class DatabaseClient:
       data: Relation data with 'in' and 'out' fields
 
     Returns:
-      Created relation
+      Created relation with SDK types normalized
 
     Raises:
       ConnectionError: If client is not connected
@@ -334,7 +388,7 @@ class DatabaseClient:
       try:
         self._log.debug('executing_insert_relation', table=table, data=data)
         result = await self._client.insert_relation(table, data)
-        return result
+        return _normalize_sdk_value(result)
       except Exception as e:
         self._log.error('insert_relation_failed', error=str(e), table=table)
         raise QueryError(f'INSERT RELATION operation failed: {e}') from e

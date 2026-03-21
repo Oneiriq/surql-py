@@ -5,6 +5,23 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.2.0] - 2026-03-20
+
+### Fixed
+
+- **select() single-record unwrap**: `DatabaseClient.select()` now detects record ID targets
+  (e.g. `user:alice`) and unwraps the single-element list returned by the SurrealDB 3.x SDK,
+  returning a dict (or None) instead of a list for single-record selects
+- **SDK RecordID normalization**: All `DatabaseClient` CRUD responses (`create`, `select`,
+  `update`, `merge`, `delete`, `execute`, `insert_relation`) now recursively normalize
+  SurrealDB SDK `RecordID` objects to plain strings, preventing type coercion errors when
+  consumers pass returned IDs back as field values in subsequent operations
+
+### Testing
+
+- Added 38 tests covering `_is_record_id_target`, `_normalize_sdk_value`, single-record
+  select unwrapping, and SDK type normalization across all CRUD methods
+
 ## [1.1.0] - 2026-03-19
 
 ### Added
