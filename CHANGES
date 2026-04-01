@@ -5,6 +5,20 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.3.0] - 2026-04-01
+
+### Added
+
+- **Aggregation functions** (#1): `math_mean()`, `math_sum()`, `math_max()`, `math_min()` for
+  SurrealQL aggregation queries. Compose with `as_()` aliases and `group_by()`/`group_all()` clauses.
+- **Query builder GROUP ALL** (#1): `group_all()` method on `Query` for full-table aggregation.
+- **Record references** (#2): `record_ref(table, id)` generates `type::record('table', 'id')` expressions
+  that render as raw SurrealQL in CRUD operations, not quoted as strings.
+- **SurrealDB function values** (#3): `surql_fn(name, *args)` for passing server-side functions
+  (time::now(), math::sum, etc.) as field values in CREATE/UPDATE operations.
+- **Result extraction integration tests** (#4): Comprehensive tests for `extract_result()`,
+  `extract_one()`, `extract_scalar()` against realistic SurrealDB response formats.
+
 ## [1.2.1] - 2026-03-20
 
 ### Fixed

@@ -477,3 +477,70 @@ def raw(sql: str) -> Expression:
     >>> raw('meta::id(id)')
   """
   return Expression(sql=sql)
+
+
+# SurrealQL-native math aggregation functions
+
+
+def math_mean(field_name: str) -> FunctionExpression:
+  """Create math::mean() SurrealQL aggregate function.
+
+  Args:
+    field_name: Field name to calculate mean of
+
+  Returns:
+    FunctionExpression instance
+
+  Examples:
+    >>> math_mean('score')
+    >>> as_(math_mean('score'), 'avg_score')
+  """
+  return FunctionExpression(sql=f'math::mean({field_name})')
+
+
+def math_sum(field_name: str) -> FunctionExpression:
+  """Create math::sum() SurrealQL aggregate function.
+
+  Args:
+    field_name: Field name to sum
+
+  Returns:
+    FunctionExpression instance
+
+  Examples:
+    >>> math_sum('price')
+    >>> as_(math_sum('price'), 'total')
+  """
+  return FunctionExpression(sql=f'math::sum({field_name})')
+
+
+def math_max(field_name: str) -> FunctionExpression:
+  """Create math::max() SurrealQL aggregate function.
+
+  Args:
+    field_name: Field name to find maximum of
+
+  Returns:
+    FunctionExpression instance
+
+  Examples:
+    >>> math_max('score')
+    >>> as_(math_max('score'), 'highest')
+  """
+  return FunctionExpression(sql=f'math::max({field_name})')
+
+
+def math_min(field_name: str) -> FunctionExpression:
+  """Create math::min() SurrealQL aggregate function.
+
+  Args:
+    field_name: Field name to find minimum of
+
+  Returns:
+    FunctionExpression instance
+
+  Examples:
+    >>> math_min('price')
+    >>> as_(math_min('price'), 'lowest')
+  """
+  return FunctionExpression(sql=f'math::min({field_name})')

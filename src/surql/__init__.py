@@ -24,6 +24,8 @@ from surql.query import (
   ListResult,
   Query,
   RecordResult,
+  as_,
+  count,
   count_records,
   create_record,
   create_records,
@@ -47,6 +49,10 @@ from surql.query import (
   has_results,
   insert,
   last,
+  math_max,
+  math_mean,
+  math_min,
+  math_sum,
   merge_record,
   query_records,
   query_typed,
@@ -65,6 +71,8 @@ from surql.query import (
 from surql.types import (
   Operator,
   RecordID,
+  RecordRef,
+  SurrealFn,
   and_,
   contains,
   eq,
@@ -75,6 +83,8 @@ from surql.types import (
   ne,
   not_,
   or_,
+  record_ref,
+  surql_fn,
 )
 
 __version__ = '1.2.1'
@@ -111,6 +121,13 @@ __all__ = [
   'delete',
   'upsert',
   'relate',
+  # Aggregation functions
+  'count',
+  'math_mean',
+  'math_sum',
+  'math_max',
+  'math_min',
+  'as_',
   # Query execution
   'execute_query',
   'fetch_one',
@@ -152,6 +169,10 @@ __all__ = [
   'has_results',
   # Types
   'RecordID',
+  'RecordRef',
+  'record_ref',
+  'SurrealFn',
+  'surql_fn',
   'Operator',
   'eq',
   'ne',
