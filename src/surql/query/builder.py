@@ -87,6 +87,7 @@ class Query[T: BaseModel](BaseModel):
   conditions: list[str] = Field(default_factory=list)
   order_fields: list[tuple[str, str]] = Field(default_factory=list)
   group_fields: list[str] = Field(default_factory=list)
+  group_all_flag: bool = False
   limit_value: int | None = None
   offset_value: int | None = None
   insert_data: dict[str, Any] | None = None
@@ -200,6 +201,20 @@ class Query[T: BaseModel](BaseModel):
       >>> Query().select(['status', 'COUNT(*)']).from_table('user').group_by('status')
     """
     return self.model_copy(update={'group_fields': [*self.group_fields, *fields]})
+
+  def group_all(self) -> Query[T]:
+    """Add GROUP ALL clause to aggregate across all records.
+
+    Unlike GROUP BY which groups by specific fields, GROUP ALL aggregates
+    the entire result set into a single row.
+
+    Returns:
+      New Query instance with GROUP ALL set
+
+    Examples:
+      >>> Query().select(['count()', 'math::mean(score) AS avg_score']).from_table('user').group_all()
+    """
+    return self.model_copy(update={'group_all_flag': True})
 
   def limit(self, n: int) -> Query[T]:
     """Add LIMIT clause.
@@ -837,8 +852,10 @@ class Query[T: BaseModel](BaseModel):
     if where_conditions:
       parts.append(f'WHERE {" AND ".join(where_conditions)}')
 
-    # Add GROUP BY
-    if self.group_fields:
+    # Add GROUP BY or GROUP ALL
+    if self.group_all_flag:
+      parts.append('GROUP ALL')
+    elif self.group_fields:
       group_str = ', '.join(self.group_fields)
       parts.append(f'GROUP BY {group_str}')
 
