@@ -54,6 +54,94 @@ class TestExecuteMigration:
       assert call_args[0][3] == 'abc123'
 
   @pytest.mark.anyio
+  async def test_execute_migration_up_skips_transaction_for_embedded(
+    self,
+    clean_env,  # noqa: ARG002
+    tmp_path: Path,
+  ):
+    """BEGIN/COMMIT are skipped when the client is connected to an embedded engine.
+
+    The underlying surrealdb Python SDK (v1.0.x) crashes on transaction control
+    statements in embedded mode (IndexError in async_ws.query()). Migrations in
+    embedded are atomic-by-process so we elide the wrapper.
+    """
+    from unittest.mock import Mock
+
+    from surql.connection.client import DatabaseClient
+    from surql.connection.config import ConnectionConfig
+
+    embedded_config = ConnectionConfig(
+      _env_file=None,
+      url='surrealkv:///tmp/test.db',
+      namespace='test',
+      database='test_db',
+    )
+    embedded_client = DatabaseClient(embedded_config)
+    sdk = Mock()
+    sdk.query = AsyncMock(return_value=[{'result': []}])
+    embedded_client._client = sdk
+    embedded_client._connected = True
+
+    migration = Migration(
+      version='20260101_120000',
+      description='Create test table',
+      path=tmp_path / 'test.py',
+      up=lambda: ['CREATE TABLE test;', 'CREATE TABLE test2;'],
+      down=lambda: ['DROP TABLE test2;', 'DROP TABLE test;'],
+      checksum='abc123',
+    )
+
+    with patch('surql.migration.executor.record_migration', new=AsyncMock()) as mock_record:
+      await execute_migration(embedded_client, migration, MigrationDirection.UP)
+
+    executed = [call.args[0] for call in sdk.query.call_args_list]
+    assert executed == ['CREATE TABLE test;', 'CREATE TABLE test2;'], (
+      f'embedded migration must not wrap in BEGIN/COMMIT, got {executed!r}'
+    )
+    mock_record.assert_called_once()
+
+  @pytest.mark.anyio
+  async def test_execute_migration_down_skips_transaction_for_embedded(
+    self,
+    clean_env,  # noqa: ARG002
+    tmp_path: Path,
+  ):
+    """Mirror of the UP test: DOWN direction on embedded also skips txn wrap."""
+    from unittest.mock import Mock
+
+    from surql.connection.client import DatabaseClient
+    from surql.connection.config import ConnectionConfig
+
+    embedded_config = ConnectionConfig(
+      _env_file=None,
+      url='memory://',
+      namespace='test',
+      database='test_db',
+    )
+    embedded_client = DatabaseClient(embedded_config)
+    sdk = Mock()
+    sdk.query = AsyncMock(return_value=[{'result': []}])
+    embedded_client._client = sdk
+    embedded_client._connected = True
+
+    migration = Migration(
+      version='20260101_120000',
+      description='Create test table',
+      path=tmp_path / 'test.py',
+      up=lambda: ['CREATE TABLE test;'],
+      down=lambda: ['DROP TABLE test;'],
+      checksum='abc123',
+    )
+
+    with patch('surql.migration.executor.remove_migration_record', new=AsyncMock()):
+      await execute_migration(embedded_client, migration, MigrationDirection.DOWN)
+
+    executed = [call.args[0] for call in sdk.query.call_args_list]
+    assert executed == ['DROP TABLE test;'], (
+      f'embedded migration must not wrap in BEGIN/COMMIT, got {executed!r}'
+    )
+
+  @pytest.mark.anyio
   async def test_execute_migration_down_success(self, mock_db_client, tmp_path: Path):
     """Test successful execution of migration in DOWN direction."""
     migration = Migration(

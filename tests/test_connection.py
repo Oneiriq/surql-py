@@ -133,6 +133,52 @@ class TestConnectionConfig:
 
     assert 'URL must use' in str(exc_info.value)
 
+  def test_validate_url_valid_memory(self, clean_env) -> None:  # noqa: ARG002
+    """Test URL validation with valid memory:// embedded protocol."""
+    config = ConnectionConfig(_env_file=None, url='memory://')
+    assert config.url == 'memory://'
+
+  def test_validate_url_valid_mem(self, clean_env) -> None:  # noqa: ARG002
+    """Test URL validation with valid mem:// (short form) embedded protocol."""
+    config = ConnectionConfig(_env_file=None, url='mem://')
+    assert config.url == 'mem://'
+
+  def test_validate_url_valid_file(self, clean_env) -> None:  # noqa: ARG002
+    """Test URL validation with valid file:// embedded protocol."""
+    config = ConnectionConfig(_env_file=None, url='file:///var/lib/app.db')
+    assert config.url == 'file:///var/lib/app.db'
+
+  def test_validate_url_valid_surrealkv(self, clean_env) -> None:  # noqa: ARG002
+    """Test URL validation with valid surrealkv:// embedded protocol."""
+    config = ConnectionConfig(_env_file=None, url='surrealkv:///var/lib/app.db')
+    assert config.url == 'surrealkv:///var/lib/app.db'
+
+  def test_validate_live_queries_allowed_with_embedded(self, clean_env) -> None:  # noqa: ARG002
+    """Live queries must be allowed with embedded engines (they run in-process)."""
+    config = ConnectionConfig(
+      _env_file=None,
+      url='surrealkv:///tmp/app.db',
+      enable_live_queries=True,
+    )
+    assert config.enable_live_queries is True
+
+  def test_validate_live_queries_allowed_with_memory(self, clean_env) -> None:  # noqa: ARG002
+    """Live queries must be allowed with the in-memory embedded engine."""
+    config = ConnectionConfig(
+      _env_file=None,
+      url='memory://',
+      enable_live_queries=True,
+    )
+    assert config.enable_live_queries is True
+
+  def test_validate_url_error_message_lists_embedded(self, clean_env) -> None:  # noqa: ARG002
+    """Error message for invalid URLs should list embedded schemes so users discover them."""
+    with pytest.raises(ValidationError) as exc_info:
+      ConnectionConfig(_env_file=None, url='unknown://foo')
+    message = str(exc_info.value)
+    assert 'surrealkv://' in message
+    assert 'memory://' in message
+
   def test_validate_url_empty(self, clean_env) -> None:  # noqa: ARG002
     """Test URL validation with empty string."""
     with pytest.raises(ValidationError) as exc_info:

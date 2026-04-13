@@ -107,21 +107,46 @@ class ConnectionConfig(BaseSettings):
   @field_validator('db_url')
   @classmethod
   def validate_url(cls, v: str) -> str:
-    """Validate connection URL format."""
+    """Validate connection URL format.
+
+    Accepts the full set of schemes supported by the underlying ``surrealdb``
+    Python SDK: remote (``ws://``, ``wss://``, ``http://``, ``https://``) and
+    embedded (``mem://``, ``memory://``, ``file://``, ``surrealkv://``).
+    """
     if not v:
       raise ValueError('URL cannot be empty')
-    if not any(v.startswith(proto) for proto in ['ws://', 'wss://', 'http://', 'https://']):
-      raise ValueError('URL must use ws://, wss://, http://, or https:// protocol')
+    supported = (
+      'ws://',
+      'wss://',
+      'http://',
+      'https://',
+      'mem://',
+      'memory://',
+      'file://',
+      'surrealkv://',
+    )
+    if not any(v.startswith(proto) for proto in supported):
+      raise ValueError(
+        'URL must use one of: ws://, wss://, http://, https://, '
+        'mem://, memory://, file://, surrealkv://'
+      )
     return v
 
   @field_validator('enable_live_queries')
   @classmethod
   def validate_live_queries(cls, v: bool, info: Any) -> bool:
-    """Validate live query support based on connection protocol."""
+    """Validate live query support based on connection protocol.
+
+    Live queries require either a WebSocket connection or an embedded engine
+    (which runs in-process). HTTP/HTTPS connections do not support live queries.
+    """
     data = info.data if hasattr(info, 'data') else {}
     url = data.get('db_url', '')
     if v and (url.startswith('http://') or url.startswith('https://')):
-      raise ValueError('Live queries require WebSocket connection (ws:// or wss://)')
+      raise ValueError(
+        'Live queries require WebSocket (ws://, wss://) or embedded '
+        '(mem://, memory://, file://, surrealkv://) connection'
+      )
     return v
 
   @field_validator('db_retry_max_wait')

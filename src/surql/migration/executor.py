@@ -25,6 +25,27 @@ from surql.migration.models import (
 logger = structlog.get_logger(__name__)
 
 
+# Embedded URL schemes route through the SurrealDB Python SDK's
+# AsyncEmbeddedSurrealConnection. That path currently crashes on BEGIN/COMMIT
+# TRANSACTION with `IndexError: list index out of range` because the SDK's
+# query() method assumes response["result"][0]["result"] is populated, which
+# isn't the case for transaction-control statements in embedded mode. Until
+# the upstream SDK is fixed we skip the transaction wrapper in embedded mode;
+# embedded migrations are still effectively atomic because the engine lives
+# in the application process (a crash during migration takes the whole process
+# with it, rather than leaving a partial remote schema).
+_EMBEDDED_URL_SCHEMES = ('mem://', 'memory://', 'file://', 'surrealkv://')
+
+
+def _is_embedded_client(client: DatabaseClient) -> bool:
+  """Return True when the client is connected via an embedded engine."""
+  try:
+    url = client._config.db_url
+  except AttributeError:
+    return False
+  return any(url.startswith(scheme) for scheme in _EMBEDDED_URL_SCHEMES)
+
+
 class MigrationExecutionError(Exception):
   """Raised when migration execution fails."""
 
@@ -68,9 +89,12 @@ async def execute_migration(
     # Record start time
     start_time = time.time()
 
-    # Execute statements within a transaction for atomicity
-    await client.execute('BEGIN TRANSACTION;')
-    try:
+    # Execute statements within a transaction for atomicity on remote
+    # connections. Embedded engines skip the wrapper (see
+    # _is_embedded_client note at module top).
+    embedded = _is_embedded_client(client)
+
+    async def _run_statements() -> None:
       for i, statement in enumerate(statements):
         try:
           log.debug('executing_statement', statement_index=i, statement=statement)
@@ -85,13 +109,21 @@ async def execute_migration(
           raise MigrationExecutionError(
             f'Failed to execute statement {i} in migration {migration.version}: {e}'
           ) from e
-      await client.execute('COMMIT TRANSACTION;')
-    except BaseException:
+
+    if embedded:
+      log.debug('migration_transaction_skipped', reason='embedded_connection')
+      await _run_statements()
+    else:
+      await client.execute('BEGIN TRANSACTION;')
       try:
-        await client.execute('CANCEL TRANSACTION;')
-      except Exception as cancel_err:
-        log.error('transaction_cancel_failed', error=str(cancel_err))
-      raise
+        await _run_statements()
+        await client.execute('COMMIT TRANSACTION;')
+      except BaseException:
+        try:
+          await client.execute('CANCEL TRANSACTION;')
+        except Exception as cancel_err:
+          log.error('transaction_cancel_failed', error=str(cancel_err))
+        raise
 
     # Calculate execution time
     execution_time_ms = int((time.time() - start_time) * 1000)
