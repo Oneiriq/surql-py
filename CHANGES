@@ -18,6 +18,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   (time::now(), math::sum, etc.) as field values in CREATE/UPDATE operations.
 - **Result extraction integration tests** (#4): Comprehensive tests for `extract_result()`,
   `extract_one()`, `extract_scalar()` against realistic SurrealDB response formats.
+- **Embedded connection URLs**: `ConnectionConfig.validate_url` now accepts the full set of
+  schemes supported by the underlying `surrealdb` SDK, including the embedded engines
+  `mem://`, `memory://`, `file://`, and `surrealkv://`. `enable_live_queries=True` is now
+  compatible with embedded engines (they run in-process), and only rejected for `http://` /
+  `https://`. Enables edge/device deployments where each host owns its own SurrealDB
+  instance without a separate server process.
 
 ## [1.2.1] - 2026-03-20
 
