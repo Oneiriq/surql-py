@@ -5,6 +5,22 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.3.1] - 2026-04-13
+
+### Fixed
+
+- **Embedded migration execution**: Migrations now run end-to-end against embedded
+  engines (`mem://`, `memory://`, `file://`, `surrealkv://`). Previously
+  `execute_migration()` wrapped statements in `BEGIN TRANSACTION;` / `COMMIT
+  TRANSACTION;`, which crashes with `IndexError: list index out of range` on
+  embedded connections because the upstream `surrealdb` Python SDK's `query()`
+  returns an empty result list for transaction-control statements in embedded
+  mode. `execute_migration()` now detects embedded URL schemes on the client
+  and skips the transaction wrapper. Migrations remain effectively atomic in
+  embedded mode because the engine lives in the application process, so a
+  crash during migration takes the whole process with it rather than leaving a
+  partial remote schema.
+
 ## [1.3.0] - 2026-04-01
 
 ### Added
