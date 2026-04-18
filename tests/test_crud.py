@@ -587,6 +587,38 @@ class TestCountRecords:
 
     assert count == 0
 
+  @pytest.mark.anyio
+  async def test_count_records_emits_group_all_for_v3(self, mock_db_client: DatabaseClient) -> None:
+    """Regression (bug #14): count query must include GROUP ALL.
+
+    Without GROUP ALL, SurrealDB v3 returns one result row per matched
+    record for ``SELECT count() FROM <table>`` (42 records -> 42 rows
+    of ``{count: 1}``). The downstream extractor reads only ``data[0]``
+    and would silently return ``1`` whenever any row exists.
+    """
+    mock_db_client.execute = AsyncMock(return_value=[{'result': [{'count': 7}]}])
+
+    await count_records('user', client=mock_db_client)
+
+    query = mock_db_client.execute.call_args[0][0]
+    assert 'GROUP ALL' in query, (
+      f'count_records must append GROUP ALL for SurrealDB v3 compatibility; got {query!r}'
+    )
+
+  @pytest.mark.anyio
+  async def test_count_records_emits_group_all_with_condition(
+    self, mock_db_client: DatabaseClient
+  ) -> None:
+    """GROUP ALL is emitted regardless of WHERE condition."""
+    mock_db_client.execute = AsyncMock(return_value=[{'result': [{'count': 3}]}])
+
+    await count_records('user', 'age > 18', client=mock_db_client)
+
+    query = mock_db_client.execute.call_args[0][0]
+    assert 'GROUP ALL' in query
+    # WHERE must still appear in a sane position relative to the count.
+    assert 'WHERE' in query
+
 
 class TestExists:
   """Test suite for exists function."""

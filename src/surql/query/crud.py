@@ -416,7 +416,12 @@ async def count_records(
   """
   db = client or get_db()
 
-  query: Query[Any] = Query().select(['count()']).from_table(table)
+  # SurrealDB v3 returns one result row per matched record for a bare
+  # `SELECT count() FROM <table>`, e.g. 42 records -> 42 rows of
+  # `{count: 1}`. Our downstream extractor reads only `data[0]`, which
+  # would silently collapse the count to `1`. Append `GROUP ALL` so the
+  # server returns a single aggregated row `[{count: N}]`.
+  query: Query[Any] = Query().select(['count()']).from_table(table).group_all()
 
   if condition:
     query = query.where(condition)
