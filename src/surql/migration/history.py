@@ -28,6 +28,22 @@ class MigrationHistoryError(Exception):
 MIGRATION_TABLE_NAME = '_migration_history'
 
 
+def _record_id_for(version: str) -> str:
+  """Sanitize a migration version into a safe SurrealDB record id.
+
+  SurrealDB record ids must be alphanumeric/underscore (or bracketed).
+  Replace anything else with ``_`` so ``type::thing($table, $id)``
+  accepts the value without extra quoting.
+
+  Args:
+    version: Migration version string (may contain dashes, dots, etc.)
+
+  Returns:
+    Sanitized id using only alphanumeric characters and underscores.
+  """
+  return ''.join(c if c.isalnum() else '_' for c in version)
+
+
 async def create_migration_table(client: DatabaseClient) -> None:
   """Create the migration history table if it doesn't exist.
 
@@ -125,18 +141,32 @@ async def record_migration(
     # Ensure table exists
     await ensure_migration_table(client)
 
-    # Create migration history record
-    data: dict[str, Any] = {
+    # SurrealDB v3 rejects bare ISO-8601 strings against `TYPE datetime`
+    # fields. Emit the write as raw SurrealQL with an explicit
+    # `<datetime>` cast so the SDK ships an already-typed value and the
+    # server does not have to coerce. Mirrors the rs/go ports.
+    params: dict[str, Any] = {
+      'table': MIGRATION_TABLE_NAME,
+      'id': _record_id_for(version),
       'version': version,
       'description': description,
       'applied_at': datetime.now(UTC).isoformat(),
       'checksum': checksum,
     }
 
-    if execution_time_ms is not None:
-      data['execution_time_ms'] = execution_time_ms
+    set_clauses = [
+      'version = $version',
+      'description = $description',
+      'applied_at = <datetime> $applied_at',
+      'checksum = $checksum',
+    ]
 
-    await client.create(MIGRATION_TABLE_NAME, data)
+    if execution_time_ms is not None:
+      params['execution_time_ms'] = execution_time_ms
+      set_clauses.append('execution_time_ms = $execution_time_ms')
+
+    statement = f'CREATE type::thing($table, $id) SET {", ".join(set_clauses)};'
+    await client.execute(statement, params)
 
     log.info('migration_recorded', version=version)
 
