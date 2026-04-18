@@ -84,6 +84,45 @@ def _normalize_sdk_value(value: Any) -> Any:
   return value
 
 
+def _extract_select_rows(value: Any) -> list[Any]:
+  """Flatten a SurrealDB query response to a list of result rows.
+
+  The SDK's ``query`` method may return any of these shapes depending
+  on the server version and statement count:
+
+  - ``[{'result': [rows...], 'status': 'OK', ...}, ...]`` -- classic
+    response envelope, one entry per statement in the batch.
+  - ``[rows...]`` -- a bare list of rows (SDK 2.x unwraps single-
+    statement queries).
+  - ``rows...`` -- a scalar or dict (single-record selects on some
+    paths).
+
+  This helper flattens all of those into a list of row dicts.
+
+  Args:
+    value: Raw SDK response
+
+  Returns:
+    List of row dicts (possibly empty)
+  """
+  if value is None:
+    return []
+  if isinstance(value, dict):
+    if 'result' in value:
+      inner = value['result']
+      return inner if isinstance(inner, list) else [inner] if inner is not None else []
+    return [value]
+  if isinstance(value, list):
+    if len(value) == 0:
+      return []
+    if isinstance(value[0], dict) and 'result' in value[0] and 'status' in value[0]:
+      # Statement envelope form; flatten the first statement's rows.
+      inner = value[0].get('result')
+      return inner if isinstance(inner, list) else [inner] if inner is not None else []
+    return list(value)
+  return [value]
+
+
 class DatabaseError(Exception):
   """Base exception for database operations."""
 
@@ -258,6 +297,13 @@ class DatabaseClient:
     element so callers always receive a dict (or ``None``) for single-record
     selects, and a list for table-level selects.
 
+    On SurrealDB v3, passing ``'table:id'`` as a bare string to
+    ``db.select`` is interpreted as a table name containing a colon
+    (and silently returns nothing). When the target matches the
+    record-id pattern we dispatch via raw SurrealQL
+    ``SELECT * FROM type::thing($table, $id)`` so the server treats it
+    as a specific record. Mirrors the TS / rs / go ports.
+
     Args:
       target: Target table or record ID
 
@@ -274,14 +320,18 @@ class DatabaseClient:
     async with self._semaphore:
       try:
         self._log.debug('executing_select', target=target)
+
+        if _is_record_id_target(target):
+          table, id_part = target.split(':', 1)
+          raw = await self._client.query(
+            'SELECT * FROM type::thing($table, $id)',
+            {'table': table, 'id': id_part},
+          )
+          rows = _extract_select_rows(_normalize_sdk_value(raw))
+          return rows[0] if rows else None
+
         result = await self._client.select(target)
-        result = _normalize_sdk_value(result)
-
-        # Unwrap single-record selects: SDK returns a list even for record IDs
-        if _is_record_id_target(target) and isinstance(result, list):
-          return result[0] if result else None
-
-        return result
+        return _normalize_sdk_value(result)
       except Exception as e:
         self._log.error('select_failed', error=str(e), target=target)
         raise QueryError(f'SELECT operation failed: {e}') from e

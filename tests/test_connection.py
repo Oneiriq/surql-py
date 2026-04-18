@@ -377,10 +377,51 @@ class TestDatabaseClient:
 
   @pytest.mark.anyio
   async def test_select_success(self, mock_db_client: DatabaseClient) -> None:
-    """Test successful SELECT operation."""
+    """Test successful SELECT operation on a bare table target."""
     await mock_db_client.select('user')
 
     mock_db_client._client.select.assert_called_once_with('user')
+
+  @pytest.mark.anyio
+  async def test_select_record_id_uses_type_thing_query(
+    self, mock_db_client: DatabaseClient
+  ) -> None:
+    """Regression (bug #15): `"table:id"` targets must route through
+    `SELECT * FROM type::thing($table, $id)`.
+
+    On SurrealDB v3, passing a bare ``"user:alice"`` string to
+    ``db.select`` is interpreted as a table name containing a colon
+    and returns nothing. The client must detect record-id-shaped
+    targets and dispatch via raw SurrealQL so the server treats them
+    as record ids. TS / rs / go ports all do this.
+    """
+    mock_db_client._client.query = AsyncMock(return_value=[{'id': 'user:alice', 'name': 'Alice'}])
+
+    result = await mock_db_client.select('user:alice')
+
+    # Must NOT go through the SDK's bare string `select` path.
+    mock_db_client._client.select.assert_not_called()
+
+    # Must hit `query` with `type::thing($table, $id)` and bound params.
+    mock_db_client._client.query.assert_called_once()
+    sql, params = mock_db_client._client.query.call_args.args
+    assert 'type::thing($table, $id)' in sql
+    assert params == {'table': 'user', 'id': 'alice'}
+
+    # Single-record unwrap still yields a dict (not a list).
+    assert isinstance(result, dict)
+    assert result['id'] == 'user:alice'
+
+  @pytest.mark.anyio
+  async def test_select_record_id_returns_none_when_missing(
+    self, mock_db_client: DatabaseClient
+  ) -> None:
+    """Missing record yields `None`, not an empty list."""
+    mock_db_client._client.query = AsyncMock(return_value=[])
+
+    result = await mock_db_client.select('user:ghost')
+
+    assert result is None
 
   @pytest.mark.anyio
   async def test_select_not_connected(self, db_config: ConnectionConfig) -> None:
