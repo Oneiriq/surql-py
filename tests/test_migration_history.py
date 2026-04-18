@@ -119,6 +119,24 @@ class TestEnsureMigrationTable:
     # Should query first, then create table (multiple DEFINE statements)
     assert mock_db_client.execute.call_count > 1
 
+  @pytest.mark.anyio
+  async def test_ensure_migration_table_propagates_non_missing_errors(self, mock_db_client):
+    """Regression (bug #17): non-table-missing errors must propagate.
+
+    Pre-patch ``ensure_migration_table`` caught any ``QueryError`` and
+    attempted to recreate the table, which masks permissions/auth/
+    syntax/network issues and yields misleading "already exists"
+    errors on the following CREATE.
+    """
+    mock_db_client.execute = AsyncMock(side_effect=QueryError('Insufficient permissions to SELECT'))
+
+    with pytest.raises(QueryError) as exc_info:
+      await ensure_migration_table(mock_db_client)
+
+    assert 'Insufficient permissions' in str(exc_info.value)
+    # Only one call -- the SELECT probe. No CREATE TABLE re-emission.
+    assert mock_db_client.execute.call_count == 1
+
 
 class TestRecordMigration:
   """Test suite for record_migration function."""
@@ -408,14 +426,20 @@ class TestGetAppliedMigrations:
 
   @pytest.mark.anyio
   async def test_get_applied_migrations_query_error(self, mock_db_client):
-    """Test get_applied_migrations handles QueryError from ensure_migration_table."""
+    """Test get_applied_migrations handles QueryError from ensure_migration_table.
+
+    Post bug #17, a non-missing-table QueryError propagates as-is out
+    of ``ensure_migration_table`` and is caught by the outer
+    ``except QueryError`` in ``get_applied_migrations`` -- producing
+    the 'Failed to fetch applied migrations' wrapper rather than the
+    generic 'Unexpected error' branch.
+    """
     mock_db_client.execute = AsyncMock(side_effect=QueryError('Database error'))
 
     with pytest.raises(MigrationHistoryError) as exc_info:
       await get_applied_migrations(mock_db_client)
 
-    # Error is wrapped by ensure_migration_table, then caught as unexpected error
-    assert 'Unexpected error fetching applied migrations' in str(exc_info.value)
+    assert 'Failed to fetch applied migrations' in str(exc_info.value)
 
   @pytest.mark.anyio
   async def test_get_applied_migrations_unexpected_error(self, mock_db_client):
@@ -599,14 +623,17 @@ class TestGetMigrationHistory:
 
   @pytest.mark.anyio
   async def test_get_migration_history_query_error(self, mock_db_client):
-    """Test get_migration_history handles QueryError from ensure_migration_table."""
+    """Test get_migration_history handles QueryError from ensure_migration_table.
+
+    Post bug #17: non-missing QueryErrors propagate into the outer
+    `except QueryError` wrapper rather than the `Exception` fallback.
+    """
     mock_db_client.execute = AsyncMock(side_effect=QueryError('Database error'))
 
     with pytest.raises(MigrationHistoryError) as exc_info:
       await get_migration_history(mock_db_client, '20240101_000000')
 
-    # Error is wrapped by ensure_migration_table, then caught as unexpected error
-    assert 'Unexpected error getting migration history' in str(exc_info.value)
+    assert 'Failed to get migration history' in str(exc_info.value)
 
   @pytest.mark.anyio
   async def test_get_migration_history_unexpected_error(self, mock_db_client):

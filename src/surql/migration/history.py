@@ -44,6 +44,28 @@ def _record_id_for(version: str) -> str:
   return ''.join(c if c.isalnum() else '_' for c in version)
 
 
+def _is_table_missing_error(err: Exception) -> bool:
+  """Return True if the given error looks like SurrealDB's
+  'table does not exist' response.
+
+  SurrealDB v2.x treated a missing table as an empty result;
+  v3+ surfaces 'The table X does not exist' (or similar
+  'not found'/'does not exist' wording depending on server
+  version). Case-insensitive substring check mirrors go's
+  ``isTableMissingError``.
+
+  Args:
+    err: The raised exception, typically a ``QueryError``.
+
+  Returns:
+    True when the message looks like a missing-table response; False
+    for permissions/auth/syntax errors, which must propagate.
+  """
+  msg = str(err).lower()
+  return 'does not exist' in msg or 'not found' in msg
+
+
+
 async def create_migration_table(client: DatabaseClient) -> None:
   """Create the migration history table if it doesn't exist.
 
@@ -105,8 +127,14 @@ async def ensure_migration_table(client: DatabaseClient) -> None:
   try:
     # Try to query the table to see if it exists
     await client.execute(f'SELECT * FROM {MIGRATION_TABLE_NAME} LIMIT 1')
-  except QueryError:
-    # Table doesn't exist, create it
+  except QueryError as err:
+    # Narrow the catch: only a table-missing error should trigger
+    # table creation. Permissions/auth/syntax/network errors must
+    # propagate, otherwise we mask the real problem and produce
+    # misleading "table already exists" errors afterwards.
+    # Mirrors go's ``isTableMissingError`` heuristic.
+    if not _is_table_missing_error(err):
+      raise
     await create_migration_table(client)
 
 
