@@ -205,8 +205,14 @@ def _extract_assertion(definition: str) -> str | None:
   Returns:
     Assertion expression or None
   """
-  # Match ASSERT followed by the assertion expression
-  assert_pattern = r'ASSERT\s+(.+?)(?:DEFAULT|VALUE|READONLY|FLEXIBLE|PERMISSIONS|\s*;|\s*$)'
+  # Match ASSERT followed by the assertion expression. The terminator
+  # keywords (DEFAULT/VALUE/READONLY/FLEXIBLE/PERMISSIONS) must be preceded
+  # by whitespace AND not by a `$` (so that identifiers like `$value`
+  # inside the expression don't match the VALUE alternative -- previously
+  # `ASSERT $value >= 0` captured only `$` because `value` matched).
+  assert_pattern = (
+    r'ASSERT\s+(.+?)(?:\s+(?<!\$)(?:DEFAULT|VALUE|READONLY|FLEXIBLE|PERMISSIONS)\b|\s*;|\s*$)'
+  )
   match = re.search(assert_pattern, definition, re.IGNORECASE | re.DOTALL)
 
   if match:
@@ -231,8 +237,11 @@ def _extract_default(definition: str) -> str | None:
   Returns:
     Default expression or None
   """
-  # Match DEFAULT followed by the default value
-  default_pattern = r'DEFAULT\s+(.+?)(?:VALUE|READONLY|FLEXIBLE|PERMISSIONS|ASSERT|\s*;|\s*$)'
+  # Match DEFAULT followed by the default value. The starting DEFAULT
+  # keyword must NOT be preceded by `$` (to avoid matching `$default`),
+  # and terminator keywords must be preceded by whitespace AND not by `$`
+  # (to avoid matching `$value` inside the default expression).
+  default_pattern = r'(?<!\$)DEFAULT\s+(.+?)(?:\s+(?<!\$)(?:VALUE|READONLY|FLEXIBLE|PERMISSIONS|ASSERT)\b|\s*;|\s*$)'
   match = re.search(default_pattern, definition, re.IGNORECASE | re.DOTALL)
 
   if match:
@@ -250,8 +259,11 @@ def _extract_value(definition: str) -> str | None:
   Returns:
     Value expression or None
   """
-  # Match VALUE followed by the computed value
-  value_pattern = r'VALUE\s+(.+?)(?:DEFAULT|READONLY|FLEXIBLE|PERMISSIONS|ASSERT|\s*;|\s*$)'
+  # Match VALUE followed by the computed value. The starting VALUE
+  # keyword must NOT be preceded by `$` (to avoid matching `$value` in
+  # an unrelated clause like `ASSERT $value > 0`). Terminator keywords
+  # must also be preceded by whitespace AND not by `$`.
+  value_pattern = r'(?<!\$)VALUE\s+(.+?)(?:\s+(?<!\$)(?:DEFAULT|READONLY|FLEXIBLE|PERMISSIONS|ASSERT)\b|\s*;|\s*$)'
   match = re.search(value_pattern, definition, re.IGNORECASE | re.DOTALL)
 
   if match:
