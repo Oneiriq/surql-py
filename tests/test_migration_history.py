@@ -449,6 +449,54 @@ class TestIsMigrationApplied:
 
     assert result is False
 
+  @pytest.mark.anyio
+  async def test_is_migration_applied_uses_targeted_query(self, mock_db_client):
+    """Regression (bug #12): must issue a targeted WHERE query, not
+    fetch the whole table.
+
+    Pre-patch the function delegated to ``get_applied_versions`` which
+    pulled every row from ``_migration_history`` on every call. Mirror
+    the rs/go pattern and issue a single
+    ``SELECT * FROM _migration_history WHERE version = $version LIMIT 1``.
+    """
+    mock_db_client.execute = AsyncMock(return_value=[{'result': []}])
+
+    await is_migration_applied(mock_db_client, '20240101_000000')
+
+    # At least one execute call must be the targeted WHERE query with
+    # a bound `version` parameter. No full-table scan should appear.
+    targeted_calls = [
+      call
+      for call in mock_db_client.execute.call_args_list
+      if 'WHERE version = $version' in call.args[0]
+      and 'LIMIT 1' in call.args[0]
+      and len(call.args) > 1
+      and call.args[1].get('version') == '20240101_000000'
+    ]
+    assert targeted_calls, (
+      'is_migration_applied must issue a bound WHERE version query; '
+      'pre-bug#12 implementation scanned the full table via '
+      'get_applied_versions()'
+    )
+
+    # And critically, `SELECT *` -- not `SELECT version` -- so the row
+    # carries `applied_at` for downstream extract helpers.
+    for call in targeted_calls:
+      assert 'SELECT *' in call.args[0], (
+        'is_migration_applied must `SELECT *` so rows round-trip '
+        'through _extract_records with applied_at present'
+      )
+
+  @pytest.mark.anyio
+  async def test_is_migration_applied_wraps_query_error(self, mock_db_client):
+    """Query failures surface as MigrationHistoryError, not QueryError."""
+    mock_db_client.execute = AsyncMock(side_effect=[[], QueryError('network gone')])
+
+    with pytest.raises(MigrationHistoryError) as exc_info:
+      await is_migration_applied(mock_db_client, 'v1')
+
+    assert 'Failed to check migration v1' in str(exc_info.value)
+
 
 class TestGetMigrationHistory:
   """Test suite for get_migration_history function."""
