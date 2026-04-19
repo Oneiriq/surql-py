@@ -85,6 +85,8 @@ from surql.types import (
   or_,
   record_ref,
   surql_fn,
+  type_record,
+  type_thing,
 )
 
 __version__ = '1.2.1'
@@ -173,6 +175,8 @@ __all__ = [
   'record_ref',
   'SurrealFn',
   'surql_fn',
+  'type_record',
+  'type_thing',
   'Operator',
   'eq',
   'ne',
