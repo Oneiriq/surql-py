@@ -1,0 +1,34 @@
+#!/usr/bin/env bash
+# pre-push: run the same checks as .github/workflows/ci.yml before the push
+# reaches GitHub Actions. CI minutes cost money — fail locally first.
+#
+# Opt in to the integration suite by exporting SURQL_PRE_PUSH_INTEGRATION=1
+# and booting the v3.0.5 container:
+#
+#   docker run -d -p 8000:8000 --name surrealdb surrealdb/surrealdb:v3.0.5 \
+#     start --user root --pass root memory
+#
+# Bypass (rarely): `git push --no-verify` — only when explicitly authorised.
+
+set -euo pipefail
+
+echo "[pre-push] ruff check"
+uv run ruff check src tests
+
+echo "[pre-push] ruff format --check"
+uv run ruff format --check src tests
+
+echo "[pre-push] mypy src"
+uv run mypy src
+
+echo "[pre-push] pytest (unit)"
+uv run pytest --ignore=tests/integration -q
+
+if [[ "${SURQL_PRE_PUSH_INTEGRATION:-0}" == "1" ]]; then
+  echo "[pre-push] pytest (integration, SURQL_PRE_PUSH_INTEGRATION=1)"
+  uv run pytest tests/integration -q
+else
+  echo "[pre-push] skipping integration tests (set SURQL_PRE_PUSH_INTEGRATION=1 to run)"
+fi
+
+echo "[pre-push] all checks passed"
