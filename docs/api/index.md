@@ -192,7 +192,8 @@ High-level CRUD operations.
 - `delete_record()` - Delete a record
 - `delete_records()` - Delete multiple records
 - `query_records()` - Query with filters
-- `count_records()` - Count records
+- `count_records()` - Count records (emits `count() ... GROUP ALL` for v3)
+- `aggregate_records()` - Typed `SELECT ... GROUP BY | GROUP ALL` returning list-of-dicts (added in 1.5.0)
 - `exists()` - Check if record exists
 - `first()` - Get first matching record
 - `last()` - Get last matching record
@@ -205,6 +206,29 @@ from surql.query.crud import create_record, query_records
 user = await create_record('user', user_data, client=client)
 users = await query_records('user', User, conditions=['age >= 18'], client=client)
 ```
+
+#### `functions.py`
+
+Pre-built SurrealQL function factories returning `SurrealFn` wrappers. Each factory composes with `Query.set(...)`, `Query.select([...])`, and `aggregate_records(select={...})`.
+
+**Time:**
+
+- `time_now_fn()` - `time::now()`
+
+**Math:**
+
+- `math_mean_fn(field)`, `math_sum_fn(field)`, `math_min_fn(field)`, `math_max_fn(field)`
+- `math_ceil_fn(field)`, `math_floor_fn(field)`, `math_round_fn(field, precision=None)`, `math_abs_fn(field)`
+
+**Strings:**
+
+- `string_len(field)`, `string_concat(*parts)`, `string_lower(field)`, `string_upper(field)`
+
+**Aggregation:**
+
+- `count_if(predicate=None)` - renders `count()` or `count(<predicate>)` (v3 rejects `count(*)`)
+
+See the [Query UX Helpers guide](../query-ux.md) for worked examples.
 
 #### `results.py`
 
@@ -222,9 +246,11 @@ Result wrapper classes and extraction utilities for SurrealDB responses.
 **Result Extraction Utilities (SurrealDB Response Format Handling):**
 
 - `extract_result(result)` - Extract data from nested/flat SurrealDB response formats
+- `extract_many(result)` - Alias for `extract_result` (naming parity with `extract_one` / `extract_scalar`, added in 1.5.0)
 - `extract_one(result)` - Extract first record or None
 - `extract_scalar(result, key, default)` - Extract scalar value from aggregate queries
 - `has_results(result)` - Check if result contains any records
+- `has_result(result)` - Alias for `has_results` (added in 1.5.0)
 
 **Example:**
 
@@ -464,6 +490,22 @@ Query operators for type-safe conditions.
 - `contains()` - String contains operator
 - `in_list()` - IN operator
 
+#### `surreal_fn.py`
+
+Raw SurrealQL function-call wrapper that renders verbatim when used as a value.
+
+**Key Classes:**
+
+- `SurrealFn` - Immutable wrapper whose `.to_surql()` emits the bare function expression
+
+**Key Functions:**
+
+- `surql_fn(name, *args)` - Build a `SurrealFn` from a function name and arguments
+- `type_record(table, id)` - Build `type::record('table', id)` (v3-preferred form)
+- `type_thing(table, id)` - Build `type::thing('table', id)` (v2-compatible alias)
+
+See [Query UX Helpers](../query-ux.md#type_record-type_thing) for composition examples.
+
 ## CLI Module
 
 **Location:** `src/cli/`
@@ -499,8 +541,24 @@ Database management commands.
 
 **Commands:**
 
+- `db init` - Initialize database and create migration tracking table
 - `db ping` - Check database connection
 - `db info` - Show database information
+- `db reset` - Reset database by removing all tables
+- `db query` - Execute a raw SurrealQL query
+- `db version` - Show database version information
+
+#### `orchestrate.py`
+
+Multi-database orchestration commands.
+
+**Commands:**
+
+- `orchestrate deploy` - Deploy migrations across environments (sequential, parallel, rolling, canary)
+- `orchestrate status` - Check deployment status of environments
+- `orchestrate validate` - Validate environment configuration and connectivity
+
+See the [CLI Reference](../cli.md#orchestrate-commands) for full options.
 
 #### `common.py`
 
@@ -602,5 +660,8 @@ mypy src/
 - [Schema Definition Guide](../schema.md)
 - [Migration System Guide](../migrations.md)
 - [Query Builder Guide](../queries.md)
-- [CLI Reference](../cli.md)
+- [Query UX Helpers](../query-ux.md) - typed wrappers for `time::now`, `math::*`, `string::*`, `count_if`, `type_record`, and `aggregate_records`
+- [SurrealDB v3 Patterns](../v3-patterns.md) - v3-required SurrealQL forms
+- [Upgrade Notes](../migration.md) - 1.3.1 -> 1.4.0 -> 1.5.0 -> 1.5.1 migration guide
+- [CLI Reference](../cli.md) - `migrate`, `schema`, `db`, `orchestrate` subcommands
 - [Examples](../examples/index.md)
