@@ -106,17 +106,9 @@ class TestRecordMigration:
 
   @pytest.mark.anyio
   async def test_record_migration_success(self, mock_db_client):
-    """Test successfully recording a migration."""
+    """Test successfully recording a migration via raw SurrealQL."""
     mock_db_client.execute = AsyncMock(return_value=[])
-    mock_db_client.create = AsyncMock(
-      return_value={
-        'id': f'{MIGRATION_TABLE_NAME}:20240101_000000',
-        'version': '20240101_000000',
-        'description': 'test migration',
-        'applied_at': '2024-01-01T00:00:00Z',
-        'checksum': 'abc123',
-      }
-    )
+    mock_db_client.create = AsyncMock()
 
     await record_migration(
       mock_db_client,
@@ -125,24 +117,72 @@ class TestRecordMigration:
       checksum='abc123',
     )
 
-    # Verify ensure_migration_table was called (execute)
-    assert mock_db_client.execute.called
+    # The write must go through `execute`, never `create` (see bug #11):
+    # `client.create` sends a plain ISO string, which v3 rejects on a
+    # `TYPE datetime` field.
+    mock_db_client.create.assert_not_called()
 
-    # Verify create was called with correct data
-    mock_db_client.create.assert_called_once()
-    call_args = mock_db_client.create.call_args
-    assert call_args[0][0] == MIGRATION_TABLE_NAME
-    data = call_args[0][1]
-    assert data['version'] == '20240101_000000'
-    assert data['description'] == 'test migration'
-    assert data['checksum'] == 'abc123'
-    assert 'applied_at' in data
+    # Last execute call is the CREATE ... SET with <datetime> cast.
+    assert mock_db_client.execute.call_count >= 1
+    statement, params = mock_db_client.execute.call_args[0]
+    assert 'CREATE type::thing($table, $id)' in statement
+    assert '<datetime> $applied_at' in statement
+    assert params['table'] == MIGRATION_TABLE_NAME
+    assert params['version'] == '20240101_000000'
+    assert params['description'] == 'test migration'
+    assert params['checksum'] == 'abc123'
+    assert params['id'] == '20240101_000000'
+    assert 'applied_at' in params
+
+  @pytest.mark.anyio
+  async def test_record_migration_uses_datetime_cast_for_v3_compat(self, mock_db_client):
+    """Regression: v3 rejects bare ISO strings against TYPE datetime.
+
+    Prior to bug #11 the function dispatched the write via
+    ``client.create(table, data)`` with ``applied_at`` set to an ISO
+    string, which SurrealDB v3 rejects with
+    "Found '...' for field `applied_at` ... but expected a datetime".
+    The fix emits ``applied_at = <datetime> $applied_at`` so the cast is
+    explicit. This test guards against a regression to
+    ``client.create``.
+    """
+    mock_db_client.execute = AsyncMock(return_value=[])
+    mock_db_client.create = AsyncMock()
+
+    await record_migration(mock_db_client, version='v1', description='x', checksum='c')
+
+    # Never dispatch via create(); the cast only works through execute()
+    # with raw SurrealQL.
+    mock_db_client.create.assert_not_called()
+
+    # Explicit cast must appear in the emitted statement.
+    statements = [call[0][0] for call in mock_db_client.execute.call_args_list]
+    assert any('<datetime> $applied_at' in stmt for stmt in statements), (
+      'record_migration must emit `applied_at = <datetime> $applied_at` '
+      'for SurrealDB v3 compatibility'
+    )
+
+  @pytest.mark.anyio
+  async def test_record_migration_sanitizes_record_id(self, mock_db_client):
+    """Record id is derived from version with non-alphanumerics replaced."""
+    mock_db_client.execute = AsyncMock(return_value=[])
+
+    await record_migration(
+      mock_db_client,
+      version='2026-01-02T12:00:00',
+      description='x',
+      checksum='c',
+    )
+
+    _, params = mock_db_client.execute.call_args[0]
+    # Dashes, colons must become underscores so `type::thing($table, $id)`
+    # accepts the value without bracket quoting.
+    assert params['id'] == '2026_01_02T12_00_00'
 
   @pytest.mark.anyio
   async def test_record_migration_with_execution_time(self, mock_db_client):
     """Test recording migration with execution time."""
     mock_db_client.execute = AsyncMock(return_value=[])
-    mock_db_client.create = AsyncMock(return_value={})
 
     await record_migration(
       mock_db_client,
@@ -152,14 +192,15 @@ class TestRecordMigration:
       execution_time_ms=150,
     )
 
-    data = mock_db_client.create.call_args[0][1]
-    assert data['execution_time_ms'] == 150
+    statement, params = mock_db_client.execute.call_args[0]
+    assert 'execution_time_ms = $execution_time_ms' in statement
+    assert params['execution_time_ms'] == 150
 
   @pytest.mark.anyio
   async def test_record_migration_query_error(self, mock_db_client):
     """Test record_migration handles QueryError."""
-    mock_db_client.execute = AsyncMock(return_value=[])
-    mock_db_client.create = AsyncMock(side_effect=QueryError('Duplicate version'))
+    # First call (ensure_migration_table probe) succeeds, second raises
+    mock_db_client.execute = AsyncMock(side_effect=[[], QueryError('Duplicate version')])
 
     with pytest.raises(MigrationHistoryError) as exc_info:
       await record_migration(
@@ -171,8 +212,7 @@ class TestRecordMigration:
   @pytest.mark.anyio
   async def test_record_migration_unexpected_error(self, mock_db_client):
     """Test record_migration handles unexpected errors."""
-    mock_db_client.execute = AsyncMock(return_value=[])
-    mock_db_client.create = AsyncMock(side_effect=RuntimeError('Unexpected'))
+    mock_db_client.execute = AsyncMock(side_effect=[[], RuntimeError('Unexpected')])
 
     with pytest.raises(MigrationHistoryError) as exc_info:
       await record_migration(
