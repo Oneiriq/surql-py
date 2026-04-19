@@ -65,11 +65,13 @@ async def find_mutual_connections[T: BaseModel](
 
   logger.info('finding_mutual_connections', record=record_str, edge=edge)
 
-  # Query: Find records that I follow AND that follow me back
-  # This uses set intersection via SurrealDB's graph traversal
+  # Query: Find records that I follow AND that follow me back.
+  # SurrealDB v3 rejects `FROM <-edge<-record` (no left anchor). Use
+  # `FROM record<-edge` form, which is v2- and v3-valid. See
+  # Oneiriq/surql-py#33.
   sql = f"""
     SELECT * FROM {record_str}->{edge}
-    WHERE id IN (SELECT VALUE id FROM <-{edge}<-{record_str})
+    WHERE id IN (SELECT VALUE id FROM {record_str}<-{edge})
   """
 
   db = client or get_db()
@@ -129,12 +131,14 @@ async def find_shortest_path(
     result = await db.execute(sql)
     return _extract_graph_result(result)
 
-  # Iterative deepening search
+  # Iterative deepening search.
+  # SurrealDB v3 rejects the v2 `->edge{depth}->` suffix form
+  # ("Parse error: trailing arrow has no target"). Use the grouped
+  # `(->edge->?){depth}` form with a `?` wildcard target — v3-valid and
+  # v2-compatible. See Oneiriq/surql-py#34.
   for depth in range(1, max_depth + 1):
-    # Build path query for current depth
-    # Use depth notation: ->edge{depth}->
     sql = f"""
-      SELECT * FROM {from_str}->{edge}{depth}->
+      SELECT * FROM {from_str}(->{edge}->?){{{depth}}}
       WHERE id = {to_str}
       LIMIT 1
     """
@@ -192,12 +196,13 @@ async def _reconstruct_path(
 
   current = from_str
   for _ in range(depth):
-    # Find next node in path towards target
+    # Find next node in path towards target. v3-safe incoming form:
+    # `{to_str}(<-edge<-?){depth}` instead of `<-edge{depth}<-{to_str}`.
     sql = f"""
       SELECT * FROM {current}->{edge}
       WHERE id = {to_str} OR id IN (
         SELECT VALUE id FROM {current}->{edge}
-        WHERE id IN (SELECT VALUE id FROM <-{edge}{depth}<-{to_str})
+        WHERE id IN (SELECT VALUE id FROM {to_str}(<-{edge}<-?){{{depth}}})
       )
       LIMIT 1
     """
@@ -271,8 +276,12 @@ async def get_neighbors(
 
   db = client or get_db()
 
+  # SurrealDB v3 rejects the v2 `{arrow}{edge}{d}` suffix form
+  # ("Parse error: trailing arrow has no target"). Use the grouped
+  # ``({arrow}{edge}{arrow}?){d}`` wildcard form which v3 accepts and
+  # is v2-compatible. See Oneiriq/surql-py#34.
   for d in range(1, depth + 1):
-    sql = f'SELECT * FROM {record_str}{arrow}{edge}{d}'
+    sql = f'SELECT * FROM {record_str}({arrow}{edge}{arrow}?){{{d}}}'
     result = await db.execute(sql)
     data = _extract_graph_result(result)
 
@@ -328,8 +337,8 @@ async def compute_degree(
   if out_data and isinstance(out_data[0], dict):
     out_degree = out_data[0].get('count', 0)
 
-  # Count incoming edges
-  in_sql = f'SELECT count() FROM <-{edge}<-{record_str} GROUP ALL'
+  # Count incoming edges. v3-safe form anchors the record on the left.
+  in_sql = f'SELECT count() FROM {record_str}<-{edge} GROUP ALL'
   in_result = await db.execute(in_sql)
   in_data = _extract_graph_result(in_result)
   in_degree = 0
@@ -615,7 +624,9 @@ async def get_incoming_edges[T: BaseModel](
 
   logger.info('fetching_incoming_edges', record=record_str, edge_table=edge_table)
 
-  sql = f'SELECT * FROM <-{edge_table}<-{record_str}'
+  # v3-safe form: anchor record on the left (`record<-edge`), not the
+  # v2 `<-edge<-record` which v3 rejects. See Oneiriq/surql-py#33.
+  sql = f'SELECT * FROM {record_str}<-{edge_table}'
 
   db = client or get_db()
   result = await db.execute(sql)
@@ -722,7 +733,8 @@ async def count_related(
   if direction == 'out':
     sql = f'SELECT count() FROM {record_str}->{edge_table}'
   elif direction == 'in':
-    sql = f'SELECT count() FROM <-{edge_table}<-{record_str}'
+    # v3-safe form anchors the record on the left.
+    sql = f'SELECT count() FROM {record_str}<-{edge_table}'
   else:
     raise ValueError(f'Invalid direction: {direction}. Must be "out" or "in"')
 
@@ -773,13 +785,13 @@ async def shortest_path(
 
   logger.info('finding_shortest_path', from_record=from_str, to_record=to_str, max_depth=max_depth)
 
-  # Use iterative depth-first search
-  # This is a simplified implementation
+  # Iterative deepening. v3 rejects `->edge{d}->` trailing-arrow; use
+  # the grouped `(->edge->?){d}` form. See Oneiriq/surql-py#34.
   for depth in range(1, max_depth + 1):
     sql = f"""
-    SELECT * FROM {from_str}
-    ->{edge_table}{depth}->
+    SELECT * FROM {from_str}(->{edge_table}->?){{{depth}}}
     WHERE id = {to_str}
+    LIMIT 1
     """
 
     db = client or get_db()

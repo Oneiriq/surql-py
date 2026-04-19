@@ -58,6 +58,23 @@ def _format_items_array(items: list[dict[str, Any]]) -> str:
   return '[\n  ' + ',\n  '.join(item_strs) + '\n]'
 
 
+def _build_upsert_target(_table: str, raw: str) -> str:
+  """Return an UPSERT target clause valid on SurrealDB v3.
+
+  Callers pass either a table name or a record id like ``user:alice``.
+  Table names are validated as identifiers; record ids are emitted
+  verbatim (SurrealDB parses ``table:id`` natively as a record target).
+  The ``_table`` arg is reserved for callers that might want a fallback
+  to a table-level UPSERT in a future revision — today the function
+  returns ``raw`` verbatim when it contains a colon, and validates it
+  otherwise.
+  """
+  if ':' in raw:
+    return raw
+  _validate_identifier(raw, 'table name')
+  return raw
+
+
 async def upsert_many(
   client: DatabaseClient | None,
   table: str,
@@ -122,20 +139,29 @@ async def upsert_many(
     else:
       item_dicts.append(item)
 
-  # Build UPSERT statement
-  items_array = _format_items_array(item_dicts)
+  # SurrealDB v3 rejects `UPSERT INTO <table> [ {...}, {...} ]` with a
+  # parse error. Emit one `UPSERT <target> CONTENT $data` statement per
+  # record and batch them into a single multi-statement query. Matches
+  # the surql-rs / surql-go ports. See Oneiriq/surql-py#32.
+  statements: list[str] = []
+  params: dict[str, Any] = {}
+  for idx, data in enumerate(item_dicts):
+    payload = {k: v for k, v in data.items() if k != 'id'}
+    target = data.get('id') or table
+    target_clean = _build_upsert_target(table, target)
+    bind = f'item_{idx}'
+    params[bind] = payload
+    if conflict_fields:
+      conditions = ' AND '.join(f'{field} = ${bind}.{field}' for field in conflict_fields)
+      statements.append(f'UPSERT {target_clean} CONTENT ${bind} WHERE {conditions};')
+    else:
+      statements.append(f'UPSERT {target_clean} CONTENT ${bind};')
 
-  # Build the query
-  if conflict_fields:
-    # Use WHERE clause with conflict fields for matching
-    conditions = ' AND '.join(f'{field} = $item.{field}' for field in conflict_fields)
-    query = f'UPSERT INTO {table} {items_array} WHERE {conditions};'
-  else:
-    query = f'UPSERT INTO {table} {items_array};'
+  query = '\n'.join(statements)
 
   logger.debug('upsert_many_query', query=query)
 
-  result = await db.execute(query)
+  result = await db.execute(query, params)
 
   # Extract results from execute response
   records: list[dict[str, Any]] = []
@@ -445,14 +471,22 @@ def build_upsert_query(
     for field in conflict_fields:
       _validate_identifier(field, 'conflict field name')
 
-  # Field names in items are validated by _format_items_array
-  items_array = _format_items_array(items)
+  # SurrealDB v3 rejects `UPSERT INTO <table> [ ... ]`. Emit per-record
+  # statements matching the surql-rs / surql-go ports. Non-id items are
+  # targeted by table (UPSERT will pick the first match or insert).
+  statements: list[str] = []
+  for data in items:
+    payload = {k: v for k, v in data.items() if k != 'id'}
+    target = data.get('id') or table
+    target_clean = _build_upsert_target(table, target)
+    payload_literal = _format_items_array([payload]).strip('[] \n\t,')
+    if conflict_fields:
+      conditions = ' AND '.join(f'{field} = $item.{field}' for field in conflict_fields)
+      statements.append(f'UPSERT {target_clean} CONTENT {payload_literal} WHERE {conditions};')
+    else:
+      statements.append(f'UPSERT {target_clean} CONTENT {payload_literal};')
 
-  if conflict_fields:
-    conditions = ' AND '.join(f'{field} = $item.{field}' for field in conflict_fields)
-    return f'UPSERT INTO {table} {items_array} WHERE {conditions};'
-
-  return f'UPSERT INTO {table} {items_array};'
+  return '\n'.join(statements)
 
 
 # Functional helper for generating batch relate SQL
