@@ -181,6 +181,17 @@ disable = [
 [tool.pylint.basic]
 good-names = ['i', 'j', 'k', 'ex', 'id', 'db', '_']
 
+[tool.pip-audit]
+# Advisories intentionally ignored. Every entry needs a written reason
+# and should be revisited when upstream ships a fix. Populate with
+# specific `PYSEC-`/`GHSA-` IDs (not severities) the same way
+# `surql-rs` tracks `RUSTSEC-2023-0071`.
+ignore-vulns = [
+  # example placeholder -- replace with real IDs as they appear:
+  # "GHSA-xxxx-xxxx-xxxx: <lib> <version>; no fix upstream; transitive
+  #   via <dep>; re-evaluate on <date>.",
+]
+
 [dependency-groups]
 dev = [
   "anyio[trio]>=4.0.0",
