@@ -579,8 +579,8 @@ def _validate_identifier(name: str, context: str = 'identifier') -> str:
 def _quote_value(value: Any) -> str:
   """Quote value for SurrealQL.
 
-  Handles SurrealFn and RecordRef instances by rendering them as raw
-  SurrealQL expressions instead of quoted strings.
+  Handles SurrealFn, RecordRef, and query ``FunctionExpression`` instances
+  by rendering them as raw SurrealQL expressions instead of quoted strings.
 
   Args:
     value: Value to quote
@@ -588,12 +588,13 @@ def _quote_value(value: Any) -> str:
   Returns:
     Quoted string representation
   """
+  from surql.query.expressions import Expression
   from surql.types.record_ref import RecordRef
   from surql.types.surreal_fn import SurrealFn
 
   if value is None:
     return 'NULL'
-  elif isinstance(value, (SurrealFn, RecordRef)):
+  elif isinstance(value, (SurrealFn, RecordRef, Expression)):
     return value.to_surql()
   elif isinstance(value, bool):
     return 'true' if value else 'false'
