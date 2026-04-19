@@ -301,7 +301,7 @@ class DatabaseClient:
     ``db.select`` is interpreted as a table name containing a colon
     (and silently returns nothing). When the target matches the
     record-id pattern we dispatch via raw SurrealQL
-    ``SELECT * FROM type::thing($table, $id)`` so the server treats it
+    ``SELECT * FROM type::record($table, $id)`` so the server treats it
     as a specific record. Mirrors the TS / rs / go ports.
 
     Args:
@@ -324,7 +324,7 @@ class DatabaseClient:
         if _is_record_id_target(target):
           table, id_part = target.split(':', 1)
           raw = await self._client.query(
-            'SELECT * FROM type::thing($table, $id)',
+            'SELECT * FROM type::record($table, $id)',
             {'table': table, 'id': id_part},
           )
           rows = _extract_select_rows(_normalize_sdk_value(raw))

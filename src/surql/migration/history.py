@@ -32,7 +32,7 @@ def _record_id_for(version: str) -> str:
   """Sanitize a migration version into a safe SurrealDB record id.
 
   SurrealDB record ids must be alphanumeric/underscore (or bracketed).
-  Replace anything else with ``_`` so ``type::thing($table, $id)``
+  Replace anything else with ``_`` so ``type::record($table, $id)``
   accepts the value without extra quoting.
 
   Args:
@@ -198,7 +198,7 @@ async def record_migration(
       params['execution_time_ms'] = execution_time_ms
       set_clauses.append('execution_time_ms = $execution_time_ms')
 
-    statement = f'CREATE type::thing($table, $id) SET {", ".join(set_clauses)};'
+    statement = f'CREATE type::record($table, $id) SET {", ".join(set_clauses)};'
     await client.execute(statement, params)
 
     log.info('migration_recorded', version=version)
