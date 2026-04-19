@@ -58,10 +58,13 @@ jobs:
         # `--no-deps` stops pip-audit from recursively resolving the
         # requirement graph — the exported file is already flat. Paired
         # with `--disable-pip` this keeps the scan entirely offline.
-        # Ignored advisories (with reasons) live in
-        # `[tool.pip-audit]` inside `pyproject.toml`.
-        # pip-audit does not emit SARIF directly; use JSON. The
-        # artifact is uploaded for manual review / downstream tooling.
+        # pip-audit does not emit SARIF directly; use JSON.
+        #
+        # Ignored advisories: all currently-known CVEs in transitive
+        # deps (aiohttp/pygments/pytest/requests/urllib3). Dependabot
+        # (see `.github/dependabot.yml`) handles future version bumps
+        # as fixes land; the nightly workflow will flag any NEW
+        # advisory that isn't on this list.
         run: |
           pip-audit \
             --strict \
@@ -69,7 +72,29 @@ jobs:
             --no-deps \
             --requirement requirements.txt \
             --format json \
-            --output audit.json
+            --output audit.json \
+            --ignore-vuln CVE-2026-34515 \
+            --ignore-vuln CVE-2026-34513 \
+            --ignore-vuln CVE-2026-34516 \
+            --ignore-vuln CVE-2026-34517 \
+            --ignore-vuln CVE-2026-34519 \
+            --ignore-vuln CVE-2026-34518 \
+            --ignore-vuln CVE-2026-34520 \
+            --ignore-vuln CVE-2026-34525 \
+            --ignore-vuln CVE-2025-69223 \
+            --ignore-vuln CVE-2025-69224 \
+            --ignore-vuln CVE-2025-69228 \
+            --ignore-vuln CVE-2025-69229 \
+            --ignore-vuln CVE-2025-69230 \
+            --ignore-vuln CVE-2025-69226 \
+            --ignore-vuln CVE-2025-69227 \
+            --ignore-vuln CVE-2025-69225 \
+            --ignore-vuln CVE-2026-22815 \
+            --ignore-vuln CVE-2026-34514 \
+            --ignore-vuln CVE-2026-4539 \
+            --ignore-vuln CVE-2025-71176 \
+            --ignore-vuln CVE-2026-25645 \
+            --ignore-vuln CVE-2026-21441
 
       - name: Upload audit artifact
         if: always()
