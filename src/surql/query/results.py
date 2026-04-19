@@ -513,3 +513,43 @@ def has_results(result: Any) -> bool:
     False
   """
   return len(extract_result(result)) > 0
+
+
+# ---------------------------------------------------------------------------
+# 1.5.0 aliases (issue #47 / #4)
+# ---------------------------------------------------------------------------
+
+
+def extract_many(result: Any) -> list[dict[str, Any]]:
+  """Alias for :func:`extract_result`.
+
+  Provides a name that reads naturally next to :func:`extract_one` and
+  :func:`extract_scalar`. Behaviour is identical to :func:`extract_result`
+  and covers the three response shapes documented in issue #4:
+
+  - Direct records: ``[{"id": "...", ...}, ...]``
+  - Wrapped envelope: ``[{"result": [...], "time": "..."}]``
+  - Scalar aggregates: ``[{"count": 5}]``
+
+  Args:
+    result: Raw SurrealDB query/select response.
+
+  Returns:
+    List of record dictionaries (empty list for empty / unrecognised input).
+  """
+  return extract_result(result)
+
+
+def has_result(result: Any) -> bool:
+  """Alias for :func:`has_results`.
+
+  Mirrors the naming used in the issue description (``has_result`` /
+  singular). Behaviour is identical to :func:`has_results`.
+
+  Args:
+    result: Raw SurrealDB query/select response.
+
+  Returns:
+    ``True`` if the response contains at least one record or scalar row.
+  """
+  return has_results(result)
