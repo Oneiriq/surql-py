@@ -1,0 +1,66 @@
+name: Security Audit
+
+on:
+  pull_request:
+    branches:
+      - main
+      - 'release/**'
+    paths:
+      - 'pyproject.toml'
+      - 'uv.lock'
+      - '.github/workflows/audit.yml'
+  push:
+    branches:
+      - main
+    paths:
+      - 'pyproject.toml'
+      - 'uv.lock'
+      - '.github/workflows/audit.yml'
+  schedule:
+    - cron: '0 4 * * *'
+  workflow_dispatch:
+
+env:
+  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
+
+permissions:
+  contents: read
+
+jobs:
+  audit:
+    name: pip-audit
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@v5
+
+      - name: Install pip-audit
+        run: uv pip install --system pip-audit
+
+      - name: Run pip-audit (SARIF)
+        # `--strict` fails on warnings (e.g. skipped deps).
+        # `--disable-pip` keeps pip-audit off the network resolver and
+        # forces it to read our already-resolved `uv.lock` contents.
+        # Ignored advisories (with reasons) live in
+        # `[tool.pip-audit]` inside `pyproject.toml`.
+        run: |
+          pip-audit \
+            --strict \
+            --disable-pip \
+            --format sarif \
+            --output audit.sarif
+
+      - name: Upload SARIF artifact
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: pip-audit-sarif
+          path: audit.sarif
+          if-no-files-found: warn
