@@ -538,7 +538,7 @@ class TestBuildUpsertQuery:
     # ``id`` should be stripped from the per-record CONTENT payload:
     # v3 rejects a redundant ``id`` field when targeting a specific
     # record.
-    assert "id:" not in query.replace('user:1', '')
+    assert 'id:' not in query.replace('user:1', '')
 
   def test_build_upsert_query_multiple_items(self) -> None:
     """Test building upsert query with multiple items."""
