@@ -45,9 +45,13 @@ jobs:
         run: uv pip install --system pip-audit
 
       - name: Export uv.lock to requirements.txt
-        # pip-audit resolves against our exported requirements; the
-        # export skips hashes because we don't gate on --require-hashes.
-        run: uv export --no-hashes --format requirements-txt --output-file requirements.txt
+        # pip-audit resolves against our exported requirements. Strip:
+        # - hashes (`--no-hashes`) because we don't gate on them here
+        # - editable installs (`-e .` on the project itself, which
+        #   pip-audit can't fetch version metadata for)
+        run: |
+          uv export --no-hashes --format requirements-txt \
+            | grep -v '^-e' > requirements.txt
 
       - name: Run pip-audit (JSON)
         # `--strict` fails on warnings (e.g. skipped deps).
