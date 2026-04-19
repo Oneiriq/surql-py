@@ -483,14 +483,22 @@ class TestTransaction:
 
   @pytest.mark.anyio
   async def test_begin_success(self, mock_db_client: DatabaseClient) -> None:
-    """Test successful transaction begin."""
+    """Test successful transaction begin.
+
+    With the bug #13 buffer strategy, ``begin()`` no longer contacts
+    the server -- it just flips the state machine so statements can
+    be queued.
+    """
     txn = Transaction(mock_db_client)
 
     await txn.begin()
 
     assert txn.state == TransactionState.ACTIVE
     assert txn.is_active is True
-    mock_db_client._client.query.assert_called()
+    # Crucially, `begin` does NOT send a bare "BEGIN TRANSACTION"
+    # RPC. v3 would accept it, but then the matching bare "COMMIT"
+    # would land in a fresh request and be rejected.
+    mock_db_client._client.query.assert_not_called()
 
   @pytest.mark.anyio
   async def test_begin_already_active(self, mock_db_client: DatabaseClient) -> None:
@@ -505,14 +513,25 @@ class TestTransaction:
 
   @pytest.mark.anyio
   async def test_commit_success(self, mock_db_client: DatabaseClient) -> None:
-    """Test successful transaction commit."""
+    """Test successful transaction commit flushes buffered statements."""
     txn = Transaction(mock_db_client)
     await txn.begin()
+    await txn.execute('CREATE user:alice SET name = "Alice"')
+    await txn.execute('CREATE user:bob SET name = "Bob"')
 
     await txn.commit()
 
     assert txn.state == TransactionState.COMMITTED
     assert txn.is_active is False
+
+    # Buffered statements must be flushed as a single batched query
+    # wrapped in BEGIN TRANSACTION ... COMMIT TRANSACTION.
+    mock_db_client._client.query.assert_called_once()
+    batched = mock_db_client._client.query.call_args.args[0]
+    assert batched.startswith('BEGIN TRANSACTION;')
+    assert batched.rstrip().endswith('COMMIT TRANSACTION;')
+    assert 'CREATE user:alice' in batched
+    assert 'CREATE user:bob' in batched
 
   @pytest.mark.anyio
   async def test_commit_not_active(self, mock_db_client: DatabaseClient) -> None:
@@ -529,6 +548,7 @@ class TestTransaction:
     """Test transaction commit failure."""
     txn = Transaction(mock_db_client)
     await txn.begin()
+    await txn.execute('CREATE user:alice')
 
     mock_db_client._client.query = AsyncMock(side_effect=Exception('Commit failed'))
 
@@ -569,14 +589,23 @@ class TestTransaction:
     assert txn.state == TransactionState.COMMITTED
 
   @pytest.mark.anyio
-  async def test_execute_in_transaction(self, mock_db_client: DatabaseClient) -> None:
-    """Test executing query in transaction context."""
+  async def test_execute_queues_without_server_call(self, mock_db_client: DatabaseClient) -> None:
+    """Regression (bug #13): ``execute`` buffers; no RPC until commit.
+
+    Pre-patch, each ``Transaction.execute`` forwarded live to
+    ``client.execute``. SurrealDB v3 treats each RPC as standalone so
+    the matching bare ``COMMIT`` would later be rejected. The new
+    design queues statements and flushes them atomically at commit.
+    """
     txn = Transaction(mock_db_client)
     await txn.begin()
+    mock_db_client._client.query.reset_mock()
 
     result = await txn.execute('CREATE user:alice SET name = "Alice"')
 
-    assert result is not None
+    # No server RPC yet -- purely a buffer append.
+    assert result is None
+    mock_db_client._client.query.assert_not_called()
 
   @pytest.mark.anyio
   async def test_execute_not_active(self, mock_db_client: DatabaseClient) -> None:
@@ -587,6 +616,67 @@ class TestTransaction:
       await txn.execute('SELECT * FROM user')
 
     assert 'Cannot execute query' in str(exc_info.value)
+
+  @pytest.mark.anyio
+  async def test_commit_sends_single_batched_rpc(self, mock_db_client: DatabaseClient) -> None:
+    """Regression (bug #13): commit sends exactly one RPC.
+
+    Pre-patch ``begin``/``commit`` each issued their own ``execute``
+    call. On v3, the standalone ``COMMIT`` in the second RPC fails
+    with 'no transaction is currently open'. The batched
+    ``BEGIN ...; stmts; COMMIT;`` must all land in a single query.
+    """
+    txn = Transaction(mock_db_client)
+    async with txn:
+      await txn.execute('UPDATE user:alice SET x = 1')
+      await txn.execute('UPDATE user:bob   SET x = 2')
+
+    # Exactly one RPC on the wire, wrapped in BEGIN/COMMIT.
+    assert mock_db_client._client.query.call_count == 1
+    batched = mock_db_client._client.query.call_args.args[0]
+    assert batched.count('BEGIN TRANSACTION') == 1
+    assert batched.count('COMMIT TRANSACTION') == 1
+
+  @pytest.mark.anyio
+  async def test_commit_merges_params_across_statements(
+    self, mock_db_client: DatabaseClient
+  ) -> None:
+    """Queued statement params are merged into a single vars dict."""
+    txn = Transaction(mock_db_client)
+    await txn.begin()
+    await txn.execute('UPDATE user:alice SET name = $n1', {'n1': 'Alice'})
+    await txn.execute('UPDATE user:bob   SET name = $n2', {'n2': 'Bob'})
+    await txn.commit()
+
+    params = mock_db_client._client.query.call_args.args[1]
+    assert params == {'n1': 'Alice', 'n2': 'Bob'}
+
+  @pytest.mark.anyio
+  async def test_duplicate_param_keys_rejected(self, mock_db_client: DatabaseClient) -> None:
+    """Duplicate param names across queued statements raise early."""
+    txn = Transaction(mock_db_client)
+    await txn.begin()
+    await txn.execute('UPDATE user:alice SET x = $v', {'v': 1})
+
+    with pytest.raises(TransactionError) as exc_info:
+      await txn.execute('UPDATE user:bob SET x = $v', {'v': 2})
+
+    assert 'Duplicate transaction parameter names' in str(exc_info.value)
+
+  @pytest.mark.anyio
+  async def test_cancel_does_not_contact_server(self, mock_db_client: DatabaseClient) -> None:
+    """``cancel`` drops the buffer; no CANCEL RPC is issued."""
+    txn = Transaction(mock_db_client)
+    await txn.begin()
+    await txn.execute('CREATE user:alice')
+    mock_db_client._client.query.reset_mock()
+
+    await txn.cancel()
+
+    # Nothing was sent to the server, and the buffer is empty.
+    mock_db_client._client.query.assert_not_called()
+    assert txn._statements == []
+    assert txn.state == TransactionState.CANCELLED
 
   @pytest.mark.anyio
   async def test_transaction_context_manager_success(self, mock_db_client: DatabaseClient) -> None:
