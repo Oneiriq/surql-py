@@ -74,6 +74,7 @@ nav:
   - Getting Started:
       - Installation: installation.md
       - Quick Start: quickstart.md
+      - Upgrade Notes: migration.md
   - Guides:
       - Schema Definition: schema.md
       - Migrations: migrations.md
