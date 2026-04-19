@@ -137,11 +137,12 @@ class GraphQuery[T: BaseModel]:
       >>> GraphQuery("user:alice").out("follows")  # Direct follows
       >>> GraphQuery("user:alice").out("follows", depth=2)  # 2 hops
     """
-    # SurrealDB v3 rejects the v2 `->edge{depth}` suffix form. When a
-    # depth is supplied, emit the grouped `(->edge->?){depth}` form
-    # which is v3-valid and v2-compatible. See Oneiriq/surql-py#34.
+    # SurrealDB v3 rejects both the v2 `->edge{depth}` suffix form and
+    # the grouped `(->edge->?){depth}` repetition. Unroll to N literal
+    # `->edge->?` hops — v3-valid and matches the surql-go port. See
+    # Oneiriq/surql-py#34.
     self._path.append(
-      f'(->{edge}->?){{{depth}}}' if depth is not None else f'->{edge}'
+      ''.join(f'->{edge}->?' for _ in range(depth)) if depth is not None else f'->{edge}'
     )
     return self
 
@@ -160,7 +161,7 @@ class GraphQuery[T: BaseModel]:
       >>> GraphQuery("user:alice").in_("follows", depth=2)  # 2 hops back
     """
     self._path.append(
-      f'(<-{edge}<-?){{{depth}}}' if depth is not None else f'<-{edge}'
+      ''.join(f'<-{edge}<-?' for _ in range(depth)) if depth is not None else f'<-{edge}'
     )
     return self
 
@@ -178,7 +179,7 @@ class GraphQuery[T: BaseModel]:
       >>> GraphQuery("user:alice").both("knows")  # All connections
     """
     self._path.append(
-      f'(<->{edge}<->?){{{depth}}}' if depth is not None else f'<->{edge}'
+      ''.join(f'<->{edge}<->?' for _ in range(depth)) if depth is not None else f'<->{edge}'
     )
     return self
 

@@ -812,13 +812,16 @@ class TestGraphQueryTraversalMethods:
   def test_out_with_depth(self):
     """Test out() method with specific depth.
 
-    Post Oneiriq/surql-py#34 a depth suffix emits the grouped
-    ``(->edge->?){depth}`` form rather than the v2-only ``->edge{depth}``
-    trailing-arrow form (rejected by SurrealDB v3).
+    Post Oneiriq/surql-py#34 a depth suffix unrolls into N literal
+    ``->edge->?`` hops rather than the v2-only ``->edge{depth}``
+    trailing-arrow form (rejected by SurrealDB v3). The grouped
+    ``(->edge->?){depth}`` repetition form v3 also rejects, which
+    caught out a first-pass fix — the final v3-safe emission is
+    unrolled.
     """
     query = GraphQuery('user:alice').out('follows', depth=2)
 
-    assert '(->follows->?){2}' in query._path
+    assert '->follows->?->follows->?' in query._path
 
   def test_in_without_depth(self):
     """Test in_() method without specifying depth."""
@@ -830,7 +833,7 @@ class TestGraphQueryTraversalMethods:
     """Test in_() method with specific depth."""
     query = GraphQuery('user:alice').in_('follows', depth=3)
 
-    assert '(<-follows<-?){3}' in query._path
+    assert '<-follows<-?<-follows<-?<-follows<-?' in query._path
 
   def test_both_without_depth(self):
     """Test both() method without specifying depth."""
@@ -842,7 +845,7 @@ class TestGraphQueryTraversalMethods:
     """Test both() method with specific depth."""
     query = GraphQuery('user:alice').both('knows', depth=2)
 
-    assert '(<->knows<->?){2}' in query._path
+    assert '<->knows<->?<->knows<->?' in query._path
 
   def test_method_chaining_traversals(self):
     """Test chaining multiple traversal methods."""
@@ -951,7 +954,7 @@ class TestGraphQueryBuild:
     """Test build() generates correct SurrealQL with depth specifier."""
     query = GraphQuery('user:alice').out('follows', depth=2).build()
 
-    assert query == 'SELECT * FROM user:alice(->follows->?){2}'
+    assert query == 'SELECT * FROM user:alice->follows->?->follows->?'
 
   def test_build_with_target_table(self):
     """Test build() generates correct SurrealQL with target table."""
@@ -1354,7 +1357,7 @@ class TestGetNeighbors:
 
     assert len(neighbors) == 2
     call_args = mock_db_client.execute.call_args[0][0]
-    assert '(->follows->?){1}' in call_args
+    assert '->follows->?' in call_args
 
   @pytest.mark.anyio
   async def test_get_neighbors_direction_in(self, mock_db_client):
@@ -1369,7 +1372,7 @@ class TestGetNeighbors:
 
     assert len(neighbors) == 1
     call_args = mock_db_client.execute.call_args[0][0]
-    assert '(<-follows<-?){1}' in call_args
+    assert '<-follows<-?' in call_args
 
   @pytest.mark.anyio
   async def test_get_neighbors_direction_both(self, mock_db_client):
@@ -1391,7 +1394,7 @@ class TestGetNeighbors:
 
     assert len(neighbors) == 2
     call_args = mock_db_client.execute.call_args[0][0]
-    assert '(<->follows<->?){1}' in call_args
+    assert '<->follows<->?' in call_args
 
   @pytest.mark.anyio
   async def test_get_neighbors_multiple_depths(self, mock_db_client):
