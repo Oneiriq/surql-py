@@ -65,7 +65,6 @@ def _is_table_missing_error(err: Exception) -> bool:
   return 'does not exist' in msg or 'not found' in msg
 
 
-
 async def create_migration_table(client: DatabaseClient) -> None:
   """Create the migration history table if it doesn't exist.
 

@@ -267,9 +267,7 @@ class TestUpsertManyV3:
   """Bug #32: `upsert_many` must emit per-record `UPSERT id CONTENT`."""
 
   @pytest.mark.anyio
-  async def test_upsert_many_round_trips_on_v3(
-    self, integration_client: DatabaseClient
-  ) -> None:
+  async def test_upsert_many_round_trips_on_v3(self, integration_client: DatabaseClient) -> None:
     """Two records upserted; readback returns both."""
     from surql.query.batch import upsert_many
 
@@ -297,9 +295,7 @@ class TestIncomingEdgesV3:
   """Bug #33: incoming-edge queries must anchor the record on the left."""
 
   @pytest.mark.anyio
-  async def test_get_incoming_edges_on_v3(
-    self, integration_client: DatabaseClient
-  ) -> None:
+  async def test_get_incoming_edges_on_v3(self, integration_client: DatabaseClient) -> None:
     """A `follow` edge from alice to bob; `get_incoming_edges(bob, 'follow')` returns one row."""
     from surql.query.graph import get_incoming_edges
 
