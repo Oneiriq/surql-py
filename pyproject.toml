@@ -1,7 +1,7 @@
 [project]
 name = "oneiriq-surql"
 
-version = "1.3.1"
+version = "1.4.0"
 description = "Code-first database toolkit for SurrealDB - schema definitions, migrations, query building, and typed CRUD."
 authors = [
   { name = "Shon Thomas", email = "shon@oneiriq.com" }
@@ -40,7 +40,7 @@ dependencies = [
   "python-dateutil>=2.9.0.post0",
   "python-ulid>=3.1.0,<4.0.0",
   "structlog>=25.5.0,<26",
-  "surrealdb>=1.0.8,<2.0.0",
+  "surrealdb>=2.0.0a1,<3.0.0",
   "tenacity>=9.1.2,<10.0.0",
   "typer>=0.21.1,<1.0.0",
   "watchdog>=4.0.0",
@@ -180,6 +180,17 @@ disable = [
 
 [tool.pylint.basic]
 good-names = ['i', 'j', 'k', 'ex', 'id', 'db', '_']
+
+[tool.pip-audit]
+# Advisories intentionally ignored. Every entry needs a written reason
+# and should be revisited when upstream ships a fix. Populate with
+# specific `PYSEC-`/`GHSA-` IDs (not severities) the same way
+# `surql-rs` tracks `RUSTSEC-2023-0071`.
+ignore-vulns = [
+  # example placeholder -- replace with real IDs as they appear:
+  # "GHSA-xxxx-xxxx-xxxx: <lib> <version>; no fix upstream; transitive
+  #   via <dep>; re-evaluate on <date>.",
+]
 
 [dependency-groups]
 dev = [

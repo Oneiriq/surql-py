@@ -43,8 +43,15 @@ class TestExecuteMigration:
       assert isinstance(result, int)
       assert result >= 0
 
-      # Verify SQL statements were executed (BEGIN + 2 statements + COMMIT = 4)
-      assert mock_db_client._client.query.call_count == 4
+      # Bug #13: whole migration is flushed as a single batched
+      # BEGIN...;stmts;COMMIT RPC, so v3 never sees a bare COMMIT in a
+      # standalone request.
+      assert mock_db_client._client.query.call_count == 1
+      batched = mock_db_client._client.query.call_args.args[0]
+      assert batched.startswith('BEGIN TRANSACTION;')
+      assert batched.rstrip().endswith('COMMIT TRANSACTION;')
+      assert 'CREATE TABLE test;' in batched
+      assert 'CREATE TABLE test2;' in batched
 
       # Verify migration was recorded
       mock_record.assert_called_once()
@@ -165,7 +172,13 @@ class TestExecuteMigration:
 
   @pytest.mark.anyio
   async def test_execute_migration_statement_failure(self, mock_db_client, tmp_path: Path):
-    """Test migration execution with statement failure."""
+    """Test migration execution with statement failure.
+
+    With the bug #13 batched strategy the whole migration lands in a
+    single ``query`` RPC; an error anywhere inside the batch surfaces
+    as a single failure which must be wrapped as
+    ``MigrationExecutionError``.
+    """
     migration = Migration(
       version='20260101_120000',
       description='Test',
@@ -174,22 +187,12 @@ class TestExecuteMigration:
       down=lambda: ['DROP TABLE test;'],
     )
 
-    # Mock query to succeed for BEGIN TRANSACTION then fail on statements
-    call_count = 0
-
-    async def side_effect(query: str, _params: dict | None = None) -> list:
-      nonlocal call_count
-      call_count += 1
-      if 'BEGIN' in query or 'CANCEL' in query:
-        return [{'result': [], 'time': '0ns'}]
-      raise QueryError('Syntax error')
-
-    mock_db_client._client.query = AsyncMock(side_effect=side_effect)
+    mock_db_client._client.query = AsyncMock(side_effect=QueryError('Syntax error'))
 
     with pytest.raises(MigrationExecutionError) as exc_info:
       await execute_migration(mock_db_client, migration, MigrationDirection.UP)
 
-    assert 'Failed to execute statement' in str(exc_info.value)
+    assert 'Failed to execute migration' in str(exc_info.value)
     assert '20260101_120000' in str(exc_info.value)
 
   @pytest.mark.anyio
@@ -658,9 +661,9 @@ class TestExecuteMigrationPlan:
     with patch('surql.migration.executor.record_migration', new=AsyncMock()):
       await execute_migration_plan(mock_db_client, plan)
 
-      # Verify both migrations were executed
-      # 2 migrations x 3 calls each (BEGIN + statement + COMMIT)
-      assert mock_db_client._client.query.call_count == 6
+      # Bug #13: 1 batched RPC per migration (2 migrations -> 2 RPCs),
+      # not one RPC per statement inside each migration.
+      assert mock_db_client._client.query.call_count == 2
 
   @pytest.mark.anyio
   async def test_execute_migration_plan_down(self, mock_db_client, tmp_path: Path):
@@ -687,8 +690,8 @@ class TestExecuteMigrationPlan:
     with patch('surql.migration.executor.remove_migration_record', new=AsyncMock()):
       await execute_migration_plan(mock_db_client, plan)
 
-      # 2 migrations x 3 calls each (BEGIN + statement + COMMIT)
-      assert mock_db_client._client.query.call_count == 6
+      # Bug #13: 1 batched RPC per migration.
+      assert mock_db_client._client.query.call_count == 2
 
   @pytest.mark.anyio
   async def test_execute_migration_plan_empty(self, mock_db_client):

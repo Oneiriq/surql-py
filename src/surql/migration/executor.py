@@ -92,9 +92,16 @@ async def execute_migration(
     # Execute statements within a transaction for atomicity on remote
     # connections. Embedded engines skip the wrapper (see
     # _is_embedded_client note at module top).
+    #
+    # Bug #13 note: SurrealDB v3 treats every `execute()` as a
+    # standalone RPC, so emitting BEGIN/COMMIT/CANCEL as three separate
+    # calls fails with "no transaction is currently open" on the bare
+    # COMMIT. Batch the whole migration into a single
+    # `BEGIN TRANSACTION; <stmts>; COMMIT TRANSACTION;` query so the
+    # transaction lifecycle lives inside one request.
     embedded = _is_embedded_client(client)
 
-    async def _run_statements() -> None:
+    async def _run_statements_individually() -> None:
       for i, statement in enumerate(statements):
         try:
           log.debug('executing_statement', statement_index=i, statement=statement)
@@ -112,18 +119,26 @@ async def execute_migration(
 
     if embedded:
       log.debug('migration_transaction_skipped', reason='embedded_connection')
-      await _run_statements()
+      await _run_statements_individually()
     else:
-      await client.execute('BEGIN TRANSACTION;')
+      batched = 'BEGIN TRANSACTION;\n'
+      for statement in statements:
+        batched += statement.rstrip().rstrip(';') + ';\n'
+      batched += 'COMMIT TRANSACTION;'
       try:
-        await _run_statements()
-        await client.execute('COMMIT TRANSACTION;')
-      except BaseException:
-        try:
-          await client.execute('CANCEL TRANSACTION;')
-        except Exception as cancel_err:
-          log.error('transaction_cancel_failed', error=str(cancel_err))
-        raise
+        log.debug(
+          'executing_batched_migration_transaction',
+          statement_count=len(statements),
+        )
+        await client.execute(batched)
+      except QueryError as e:
+        log.error('batched_migration_failed', error=str(e))
+        # A failed batched transaction is already rolled back server-
+        # side (the query layer aborts on the first failing statement);
+        # no explicit CANCEL is needed.
+        raise MigrationExecutionError(
+          f'Failed to execute migration {migration.version}: {e}'
+        ) from e
 
     # Calculate execution time
     execution_time_ms = int((time.time() - start_time) * 1000)
