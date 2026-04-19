@@ -20,6 +20,7 @@ from surql.query.batch import (  # Batch operations
 )
 from surql.query.builder import Query  # Query builder
 from surql.query.crud import (  # CRUD operations
+  aggregate_records,
   count_records,
   create_record,
   create_records,
@@ -78,6 +79,22 @@ from surql.query.expressions import (  # Query expressions
   upper,
   value,
 )
+from surql.query.functions import (  # SurrealQL function factories (SurrealFn)
+  count_if,
+  math_abs_fn,
+  math_ceil_fn,
+  math_floor_fn,
+  math_max_fn,
+  math_mean_fn,
+  math_min_fn,
+  math_round_fn,
+  math_sum_fn,
+  string_concat,
+  string_len,
+  string_lower,
+  string_upper,
+  time_now_fn,
+)
 from surql.query.graph import (  # Graph operations
   count_related,
   get_incoming_edges,
@@ -132,9 +149,11 @@ from surql.query.results import (  # Result wrappers and utilities
   RecordResult,
   aggregate,
   count_result,
+  extract_many,
   extract_one,
   extract_result,
   extract_scalar,
+  has_result,
   has_results,
   paginated,
   record,
@@ -209,6 +228,21 @@ __all__ = [
   'math_sum',
   'math_max',
   'math_min',
+  # SurrealQL function factories (SurrealFn)
+  'time_now_fn',
+  'math_mean_fn',
+  'math_sum_fn',
+  'math_min_fn',
+  'math_max_fn',
+  'math_ceil_fn',
+  'math_floor_fn',
+  'math_round_fn',
+  'math_abs_fn',
+  'string_len',
+  'string_concat',
+  'string_lower',
+  'string_upper',
+  'count_if',
   # Query executor
   'execute_query',
   'fetch_one',
@@ -230,6 +264,7 @@ __all__ = [
   'query_records_wrapped',
   'upsert_record',
   'count_records',
+  'aggregate_records',
   'exists',
   'first',
   'last',
@@ -268,7 +303,9 @@ __all__ = [
   'extract_result',
   'extract_one',
   'extract_scalar',
+  'extract_many',
   'has_results',
+  'has_result',
   # Typed CRUD operations
   'create_typed',
   'get_typed',

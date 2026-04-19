@@ -40,15 +40,34 @@ class TestCreateMigrationTable:
     # Verify table definition
     assert any('DEFINE TABLE' in call and MIGRATION_TABLE_NAME in call for call in calls)
 
-    # Verify field definitions
-    assert any('DEFINE FIELD version' in call for call in calls)
-    assert any('DEFINE FIELD description' in call for call in calls)
-    assert any('DEFINE FIELD applied_at' in call for call in calls)
-    assert any('DEFINE FIELD checksum' in call for call in calls)
-    assert any('DEFINE FIELD execution_time_ms' in call for call in calls)
+    # Verify field definitions (match on trailing field name, not a
+    # fixed substring, so `IF NOT EXISTS` can sit in the middle).
+    assert any(' version ON TABLE' in call for call in calls)
+    assert any(' description ON TABLE' in call for call in calls)
+    assert any(' applied_at ON TABLE' in call for call in calls)
+    assert any(' checksum ON TABLE' in call for call in calls)
+    assert any(' execution_time_ms ON TABLE' in call for call in calls)
 
     # Verify index definition
-    assert any('DEFINE INDEX version_idx' in call and 'UNIQUE' in call for call in calls)
+    assert any('version_idx ON TABLE' in call and 'UNIQUE' in call for call in calls)
+
+  @pytest.mark.anyio
+  async def test_create_migration_table_uses_if_not_exists(self, mock_db_client):
+    """Regression (bug #16): every DEFINE must be ``IF NOT EXISTS``.
+
+    Without it, repeated calls to ``create_migration_table`` on
+    SurrealDB v3 fail with "table already exists" / "field already
+    exists" / "index already exists". ``ensure_migration_table``
+    invokes this helper on basically every migration call, so
+    idempotency is required.
+    """
+    mock_db_client.execute = AsyncMock(return_value=[])
+
+    await create_migration_table(mock_db_client)
+
+    statements = [call[0][0] for call in mock_db_client.execute.call_args_list]
+    for stmt in statements:
+      assert 'IF NOT EXISTS' in stmt, f'DEFINE statement must be idempotent on v3; got {stmt!r}'
 
   @pytest.mark.anyio
   async def test_create_migration_table_query_error(self, mock_db_client):
@@ -100,23 +119,33 @@ class TestEnsureMigrationTable:
     # Should query first, then create table (multiple DEFINE statements)
     assert mock_db_client.execute.call_count > 1
 
+  @pytest.mark.anyio
+  async def test_ensure_migration_table_propagates_non_missing_errors(self, mock_db_client):
+    """Regression (bug #17): non-table-missing errors must propagate.
+
+    Pre-patch ``ensure_migration_table`` caught any ``QueryError`` and
+    attempted to recreate the table, which masks permissions/auth/
+    syntax/network issues and yields misleading "already exists"
+    errors on the following CREATE.
+    """
+    mock_db_client.execute = AsyncMock(side_effect=QueryError('Insufficient permissions to SELECT'))
+
+    with pytest.raises(QueryError) as exc_info:
+      await ensure_migration_table(mock_db_client)
+
+    assert 'Insufficient permissions' in str(exc_info.value)
+    # Only one call -- the SELECT probe. No CREATE TABLE re-emission.
+    assert mock_db_client.execute.call_count == 1
+
 
 class TestRecordMigration:
   """Test suite for record_migration function."""
 
   @pytest.mark.anyio
   async def test_record_migration_success(self, mock_db_client):
-    """Test successfully recording a migration."""
+    """Test successfully recording a migration via raw SurrealQL."""
     mock_db_client.execute = AsyncMock(return_value=[])
-    mock_db_client.create = AsyncMock(
-      return_value={
-        'id': f'{MIGRATION_TABLE_NAME}:20240101_000000',
-        'version': '20240101_000000',
-        'description': 'test migration',
-        'applied_at': '2024-01-01T00:00:00Z',
-        'checksum': 'abc123',
-      }
-    )
+    mock_db_client.create = AsyncMock()
 
     await record_migration(
       mock_db_client,
@@ -125,24 +154,72 @@ class TestRecordMigration:
       checksum='abc123',
     )
 
-    # Verify ensure_migration_table was called (execute)
-    assert mock_db_client.execute.called
+    # The write must go through `execute`, never `create` (see bug #11):
+    # `client.create` sends a plain ISO string, which v3 rejects on a
+    # `TYPE datetime` field.
+    mock_db_client.create.assert_not_called()
 
-    # Verify create was called with correct data
-    mock_db_client.create.assert_called_once()
-    call_args = mock_db_client.create.call_args
-    assert call_args[0][0] == MIGRATION_TABLE_NAME
-    data = call_args[0][1]
-    assert data['version'] == '20240101_000000'
-    assert data['description'] == 'test migration'
-    assert data['checksum'] == 'abc123'
-    assert 'applied_at' in data
+    # Last execute call is the CREATE ... SET with <datetime> cast.
+    assert mock_db_client.execute.call_count >= 1
+    statement, params = mock_db_client.execute.call_args[0]
+    assert 'CREATE type::record($table, $id)' in statement
+    assert '<datetime> $applied_at' in statement
+    assert params['table'] == MIGRATION_TABLE_NAME
+    assert params['version'] == '20240101_000000'
+    assert params['description'] == 'test migration'
+    assert params['checksum'] == 'abc123'
+    assert params['id'] == '20240101_000000'
+    assert 'applied_at' in params
+
+  @pytest.mark.anyio
+  async def test_record_migration_uses_datetime_cast_for_v3_compat(self, mock_db_client):
+    """Regression: v3 rejects bare ISO strings against TYPE datetime.
+
+    Prior to bug #11 the function dispatched the write via
+    ``client.create(table, data)`` with ``applied_at`` set to an ISO
+    string, which SurrealDB v3 rejects with
+    "Found '...' for field `applied_at` ... but expected a datetime".
+    The fix emits ``applied_at = <datetime> $applied_at`` so the cast is
+    explicit. This test guards against a regression to
+    ``client.create``.
+    """
+    mock_db_client.execute = AsyncMock(return_value=[])
+    mock_db_client.create = AsyncMock()
+
+    await record_migration(mock_db_client, version='v1', description='x', checksum='c')
+
+    # Never dispatch via create(); the cast only works through execute()
+    # with raw SurrealQL.
+    mock_db_client.create.assert_not_called()
+
+    # Explicit cast must appear in the emitted statement.
+    statements = [call[0][0] for call in mock_db_client.execute.call_args_list]
+    assert any('<datetime> $applied_at' in stmt for stmt in statements), (
+      'record_migration must emit `applied_at = <datetime> $applied_at` '
+      'for SurrealDB v3 compatibility'
+    )
+
+  @pytest.mark.anyio
+  async def test_record_migration_sanitizes_record_id(self, mock_db_client):
+    """Record id is derived from version with non-alphanumerics replaced."""
+    mock_db_client.execute = AsyncMock(return_value=[])
+
+    await record_migration(
+      mock_db_client,
+      version='2026-01-02T12:00:00',
+      description='x',
+      checksum='c',
+    )
+
+    _, params = mock_db_client.execute.call_args[0]
+    # Dashes, colons must become underscores so `type::record($table, $id)`
+    # accepts the value without bracket quoting.
+    assert params['id'] == '2026_01_02T12_00_00'
 
   @pytest.mark.anyio
   async def test_record_migration_with_execution_time(self, mock_db_client):
     """Test recording migration with execution time."""
     mock_db_client.execute = AsyncMock(return_value=[])
-    mock_db_client.create = AsyncMock(return_value={})
 
     await record_migration(
       mock_db_client,
@@ -152,14 +229,15 @@ class TestRecordMigration:
       execution_time_ms=150,
     )
 
-    data = mock_db_client.create.call_args[0][1]
-    assert data['execution_time_ms'] == 150
+    statement, params = mock_db_client.execute.call_args[0]
+    assert 'execution_time_ms = $execution_time_ms' in statement
+    assert params['execution_time_ms'] == 150
 
   @pytest.mark.anyio
   async def test_record_migration_query_error(self, mock_db_client):
     """Test record_migration handles QueryError."""
-    mock_db_client.execute = AsyncMock(return_value=[])
-    mock_db_client.create = AsyncMock(side_effect=QueryError('Duplicate version'))
+    # First call (ensure_migration_table probe) succeeds, second raises
+    mock_db_client.execute = AsyncMock(side_effect=[[], QueryError('Duplicate version')])
 
     with pytest.raises(MigrationHistoryError) as exc_info:
       await record_migration(
@@ -171,8 +249,7 @@ class TestRecordMigration:
   @pytest.mark.anyio
   async def test_record_migration_unexpected_error(self, mock_db_client):
     """Test record_migration handles unexpected errors."""
-    mock_db_client.execute = AsyncMock(return_value=[])
-    mock_db_client.create = AsyncMock(side_effect=RuntimeError('Unexpected'))
+    mock_db_client.execute = AsyncMock(side_effect=[[], RuntimeError('Unexpected')])
 
     with pytest.raises(MigrationHistoryError) as exc_info:
       await record_migration(
@@ -349,14 +426,20 @@ class TestGetAppliedMigrations:
 
   @pytest.mark.anyio
   async def test_get_applied_migrations_query_error(self, mock_db_client):
-    """Test get_applied_migrations handles QueryError from ensure_migration_table."""
+    """Test get_applied_migrations handles QueryError from ensure_migration_table.
+
+    Post bug #17, a non-missing-table QueryError propagates as-is out
+    of ``ensure_migration_table`` and is caught by the outer
+    ``except QueryError`` in ``get_applied_migrations`` -- producing
+    the 'Failed to fetch applied migrations' wrapper rather than the
+    generic 'Unexpected error' branch.
+    """
     mock_db_client.execute = AsyncMock(side_effect=QueryError('Database error'))
 
     with pytest.raises(MigrationHistoryError) as exc_info:
       await get_applied_migrations(mock_db_client)
 
-    # Error is wrapped by ensure_migration_table, then caught as unexpected error
-    assert 'Unexpected error fetching applied migrations' in str(exc_info.value)
+    assert 'Failed to fetch applied migrations' in str(exc_info.value)
 
   @pytest.mark.anyio
   async def test_get_applied_migrations_unexpected_error(self, mock_db_client):
@@ -449,6 +532,54 @@ class TestIsMigrationApplied:
 
     assert result is False
 
+  @pytest.mark.anyio
+  async def test_is_migration_applied_uses_targeted_query(self, mock_db_client):
+    """Regression (bug #12): must issue a targeted WHERE query, not
+    fetch the whole table.
+
+    Pre-patch the function delegated to ``get_applied_versions`` which
+    pulled every row from ``_migration_history`` on every call. Mirror
+    the rs/go pattern and issue a single
+    ``SELECT * FROM _migration_history WHERE version = $version LIMIT 1``.
+    """
+    mock_db_client.execute = AsyncMock(return_value=[{'result': []}])
+
+    await is_migration_applied(mock_db_client, '20240101_000000')
+
+    # At least one execute call must be the targeted WHERE query with
+    # a bound `version` parameter. No full-table scan should appear.
+    targeted_calls = [
+      call
+      for call in mock_db_client.execute.call_args_list
+      if 'WHERE version = $version' in call.args[0]
+      and 'LIMIT 1' in call.args[0]
+      and len(call.args) > 1
+      and call.args[1].get('version') == '20240101_000000'
+    ]
+    assert targeted_calls, (
+      'is_migration_applied must issue a bound WHERE version query; '
+      'pre-bug#12 implementation scanned the full table via '
+      'get_applied_versions()'
+    )
+
+    # And critically, `SELECT *` -- not `SELECT version` -- so the row
+    # carries `applied_at` for downstream extract helpers.
+    for call in targeted_calls:
+      assert 'SELECT *' in call.args[0], (
+        'is_migration_applied must `SELECT *` so rows round-trip '
+        'through _extract_records with applied_at present'
+      )
+
+  @pytest.mark.anyio
+  async def test_is_migration_applied_wraps_query_error(self, mock_db_client):
+    """Query failures surface as MigrationHistoryError, not QueryError."""
+    mock_db_client.execute = AsyncMock(side_effect=[[], QueryError('network gone')])
+
+    with pytest.raises(MigrationHistoryError) as exc_info:
+      await is_migration_applied(mock_db_client, 'v1')
+
+    assert 'Failed to check migration v1' in str(exc_info.value)
+
 
 class TestGetMigrationHistory:
   """Test suite for get_migration_history function."""
@@ -492,14 +623,17 @@ class TestGetMigrationHistory:
 
   @pytest.mark.anyio
   async def test_get_migration_history_query_error(self, mock_db_client):
-    """Test get_migration_history handles QueryError from ensure_migration_table."""
+    """Test get_migration_history handles QueryError from ensure_migration_table.
+
+    Post bug #17: non-missing QueryErrors propagate into the outer
+    `except QueryError` wrapper rather than the `Exception` fallback.
+    """
     mock_db_client.execute = AsyncMock(side_effect=QueryError('Database error'))
 
     with pytest.raises(MigrationHistoryError) as exc_info:
       await get_migration_history(mock_db_client, '20240101_000000')
 
-    # Error is wrapped by ensure_migration_table, then caught as unexpected error
-    assert 'Unexpected error getting migration history' in str(exc_info.value)
+    assert 'Failed to get migration history' in str(exc_info.value)
 
   @pytest.mark.anyio
   async def test_get_migration_history_unexpected_error(self, mock_db_client):

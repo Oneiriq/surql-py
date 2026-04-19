@@ -1,0 +1,145 @@
+name: Nightly
+
+on:
+  schedule:
+    # Daily Linux unit + integration runs at 03:00 UTC
+    - cron: '0 3 * * *'
+    # Weekly macOS unit run on Sunday at 06:00 UTC (cost containment)
+    - cron: '0 6 * * 0'
+  workflow_dispatch:
+
+env:
+  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
+
+jobs:
+  unit-linux:
+    name: Nightly unit linux (Python ${{ matrix.python-version }})
+    # Linux runs daily (03:00 cron), weekly (06:00 cron), and on manual dispatch.
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        python-version: ['3.12', '3.13']
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          ref: main
+
+      - name: Set up Python ${{ matrix.python-version }}
+        uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python-version }}
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@v5
+
+      - name: Install dependencies
+        run: uv sync
+
+      - name: Run ruff linter
+        run: uv run ruff check src tests
+
+      - name: Check formatting with ruff
+        run: uv run ruff format --check src tests
+
+      - name: Run mypy type checker
+        run: uv run mypy src
+
+      - name: Run unit tests
+        run: uv run pytest --ignore=tests/integration -q
+
+  unit-macos:
+    name: Nightly unit macOS (Python ${{ matrix.python-version }})
+    # macOS only runs weekly (Sunday 06:00 UTC cron) or on manual dispatch
+    # to contain runner costs (macOS minutes are 10x Linux).
+    if: github.event_name == 'workflow_dispatch' || github.event.schedule == '0 6 * * 0'
+    runs-on: macos-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        python-version: ['3.12', '3.13']
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          ref: main
+
+      - name: Set up Python ${{ matrix.python-version }}
+        uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python-version }}
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@v5
+
+      - name: Install dependencies
+        run: uv sync
+
+      - name: Run ruff linter
+        run: uv run ruff check src tests
+
+      - name: Check formatting with ruff
+        run: uv run ruff format --check src tests
+
+      - name: Run mypy type checker
+        run: uv run mypy src
+
+      - name: Run unit tests
+        run: uv run pytest --ignore=tests/integration -q
+
+  integration:
+    name: Nightly integration (Python ${{ matrix.python-version }}, SurrealDB ${{ matrix.surreal-tag }})
+    # Only the SurrealDB Docker image is Linux-only, so we pin
+    # `ubuntu-latest` and fan out on Python + server tag.
+    # Skip on the weekly macOS cron — integration already ran on the prior day's Linux cron.
+    if: github.event_name == 'workflow_dispatch' || github.event.schedule == '0 3 * * *'
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        python-version: ['3.12', '3.13']
+        surreal-tag: ['v3.0.5', 'latest']
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          ref: main
+
+      - name: Set up Python ${{ matrix.python-version }}
+        uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python-version }}
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@v5
+
+      - name: Install dependencies
+        run: uv sync
+
+      - name: Start SurrealDB (${{ matrix.surreal-tag }})
+        run: |
+          docker run -d \
+            --name surrealdb \
+            -p 8000:8000 \
+            surrealdb/surrealdb:${{ matrix.surreal-tag }} \
+            start --user root --pass root memory
+          for i in $(seq 1 30); do
+            if curl -sf http://localhost:8000/health; then
+              echo "SurrealDB ready"
+              break
+            fi
+            echo "Waiting for SurrealDB... attempt $i"
+            sleep 2
+          done
+          curl -sf http://localhost:8000/health
+
+      - name: Run integration tests
+        run: uv run pytest tests/integration -v
+        env:
+          SURREAL_URL: ws://localhost:8000/rpc
+          SURREAL_USER: root
+          SURREAL_PASS: root
+          SURREAL_NS: test
+          SURREAL_DB: test
+
+      - name: Stop SurrealDB
+        if: always()
+        run: docker stop surrealdb || true

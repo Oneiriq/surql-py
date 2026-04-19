@@ -9,17 +9,27 @@ Complete reference for the surql command-line interface.
 - [Migration Commands](#migration-commands)
 - [Schema Commands](#schema-commands)
 - [Database Commands](#database-commands)
+- [Orchestrate Commands](#orchestrate-commands)
 - [Common Workflows](#common-workflows)
 - [Configuration](#configuration)
 - [Environment Variables](#environment-variables)
 
 ## Overview
 
-The surql CLI provides commands for managing database schemas, migrations, and inspecting your database.
+The surql CLI provides commands for managing database schemas, migrations, multi-environment orchestration, and database inspection.
 
 ```shell
 surql [OPTIONS] COMMAND [ARGS]
 ```
+
+### Command Groups
+
+| Group | Purpose |
+| --- | --- |
+| `surql migrate` | Generate, apply, validate, squash, and roll back migrations. |
+| `surql schema` | Inspect, diff, export, and visualise the database schema. |
+| `surql db` | Initialise, ping, query, and reset the database. |
+| `surql orchestrate` | Deploy migrations across multiple environments with rollout strategies. |
 
 ### Getting Help
 
@@ -481,6 +491,92 @@ Connection:
 
 Tables: 5
 Migrations Applied: 3
+```
+
+## Orchestrate Commands
+
+Deploy migrations across multiple database environments with sequential, parallel, rolling, or canary rollout strategies.
+
+```shell
+surql orchestrate [COMMAND] [OPTIONS]
+```
+
+Every subcommand reads its environment list from `environments.json` in the current directory (override with `--config`). Each entry in the config maps a name (e.g. `staging`, `prod1`) to a full `ConnectionConfig` block.
+
+### `orchestrate deploy`
+
+Roll a batch of migrations out to one or more environments.
+
+```shell
+surql orchestrate deploy --environments <names> [OPTIONS]
+```
+
+**Options:**
+
+- `--environments, -e TEXT` - Comma-separated environment names (required)
+- `--strategy TEXT` - `sequential` | `parallel` | `rolling` | `canary` (default: `sequential`)
+- `--batch-size INTEGER` - Batch size for `rolling` strategy (default: `1`)
+- `--canary-percent FLOAT` - Canary percentage for `canary` strategy (default: `10.0`)
+- `--max-concurrent INTEGER` - Max concurrent deployments for `parallel` strategy (default: `5`)
+- `--dry-run` - Simulate the deployment without executing
+- `--skip-health-check` - Skip post-deploy health verification
+- `--no-rollback` - Disable auto-rollback on failure
+- `--config PATH` - Environment configuration file (default: `environments.json`)
+- `--migrations-dir, -m PATH` - Migrations directory (default: `migrations`)
+
+**Examples:**
+
+```shell
+# Deploy sequentially to staging then production
+surql orchestrate deploy -e staging,production
+
+# Rolling deploy in batches of 2
+surql orchestrate deploy -e prod1,prod2,prod3,prod4 \
+  --strategy rolling --batch-size 2
+
+# Canary to 20% of instances first
+surql orchestrate deploy -e prod1,prod2,prod3,prod4,prod5 \
+  --strategy canary --canary-percent 20
+
+# Dry run against production
+surql orchestrate deploy -e production --dry-run
+```
+
+### `orchestrate status`
+
+Report the current applied-migration state across environments.
+
+```shell
+surql orchestrate status --environments <names> [OPTIONS]
+```
+
+**Options:**
+
+- `--environments, -e TEXT` - Comma-separated environment names (required)
+- `--config PATH` - Environment configuration file (default: `environments.json`)
+
+**Example:**
+
+```shell
+surql orchestrate status -e prod1,prod2,prod3
+```
+
+### `orchestrate validate`
+
+Validate the environment configuration file and confirm connectivity to each environment.
+
+```shell
+surql orchestrate validate [OPTIONS]
+```
+
+**Options:**
+
+- `--config PATH` - Environment configuration file (default: `environments.json`)
+
+**Example:**
+
+```shell
+surql orchestrate validate --config prod-environments.json
 ```
 
 ## Common Workflows

@@ -1,0 +1,105 @@
+name: Security Audit
+
+on:
+  pull_request:
+    branches:
+      - main
+      - 'release/**'
+    paths:
+      - 'pyproject.toml'
+      - 'uv.lock'
+      - '.github/workflows/audit.yml'
+  push:
+    branches:
+      - main
+    paths:
+      - 'pyproject.toml'
+      - 'uv.lock'
+      - '.github/workflows/audit.yml'
+  schedule:
+    - cron: '0 4 * * *'
+  workflow_dispatch:
+
+env:
+  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
+
+permissions:
+  contents: read
+
+jobs:
+  audit:
+    name: pip-audit
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@v5
+
+      - name: Install pip-audit
+        run: uv pip install --system pip-audit
+
+      - name: Export uv.lock to requirements.txt
+        # pip-audit resolves against our exported requirements. Strip:
+        # - hashes (`--no-hashes`) because we don't gate on them here
+        # - editable installs (`-e .` on the project itself, which
+        #   pip-audit can't fetch version metadata for)
+        run: |
+          uv export --no-hashes --format requirements-txt \
+            | grep -v '^-e' > requirements.txt
+
+      - name: Run pip-audit (JSON)
+        # `--strict` fails on warnings (e.g. skipped deps).
+        # `--no-deps` stops pip-audit from recursively resolving the
+        # requirement graph — the exported file is already flat. Paired
+        # with `--disable-pip` this keeps the scan entirely offline.
+        # pip-audit does not emit SARIF directly; use JSON.
+        #
+        # Ignored advisories: all currently-known CVEs in transitive
+        # deps (aiohttp/pygments/pytest/requests/urllib3). Dependabot
+        # (see `.github/dependabot.yml`) handles future version bumps
+        # as fixes land; the nightly workflow will flag any NEW
+        # advisory that isn't on this list.
+        run: |
+          pip-audit \
+            --strict \
+            --disable-pip \
+            --no-deps \
+            --requirement requirements.txt \
+            --format json \
+            --output audit.json \
+            --ignore-vuln CVE-2026-34515 \
+            --ignore-vuln CVE-2026-34513 \
+            --ignore-vuln CVE-2026-34516 \
+            --ignore-vuln CVE-2026-34517 \
+            --ignore-vuln CVE-2026-34519 \
+            --ignore-vuln CVE-2026-34518 \
+            --ignore-vuln CVE-2026-34520 \
+            --ignore-vuln CVE-2026-34525 \
+            --ignore-vuln CVE-2025-69223 \
+            --ignore-vuln CVE-2025-69224 \
+            --ignore-vuln CVE-2025-69228 \
+            --ignore-vuln CVE-2025-69229 \
+            --ignore-vuln CVE-2025-69230 \
+            --ignore-vuln CVE-2025-69226 \
+            --ignore-vuln CVE-2025-69227 \
+            --ignore-vuln CVE-2025-69225 \
+            --ignore-vuln CVE-2026-22815 \
+            --ignore-vuln CVE-2026-34514 \
+            --ignore-vuln CVE-2026-4539 \
+            --ignore-vuln CVE-2025-71176 \
+            --ignore-vuln CVE-2026-25645 \
+            --ignore-vuln CVE-2026-21441
+
+      - name: Upload audit artifact
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: pip-audit-json
+          path: audit.json
+          if-no-files-found: warn

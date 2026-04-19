@@ -28,6 +28,43 @@ class MigrationHistoryError(Exception):
 MIGRATION_TABLE_NAME = '_migration_history'
 
 
+def _record_id_for(version: str) -> str:
+  """Sanitize a migration version into a safe SurrealDB record id.
+
+  SurrealDB record ids must be alphanumeric/underscore (or bracketed).
+  Replace anything else with ``_`` so ``type::record($table, $id)``
+  accepts the value without extra quoting.
+
+  Args:
+    version: Migration version string (may contain dashes, dots, etc.)
+
+  Returns:
+    Sanitized id using only alphanumeric characters and underscores.
+  """
+  return ''.join(c if c.isalnum() else '_' for c in version)
+
+
+def _is_table_missing_error(err: Exception) -> bool:
+  """Return True if the given error looks like SurrealDB's
+  'table does not exist' response.
+
+  SurrealDB v2.x treated a missing table as an empty result;
+  v3+ surfaces 'The table X does not exist' (or similar
+  'not found'/'does not exist' wording depending on server
+  version). Case-insensitive substring check mirrors go's
+  ``isTableMissingError``.
+
+  Args:
+    err: The raised exception, typically a ``QueryError``.
+
+  Returns:
+    True when the message looks like a missing-table response; False
+    for permissions/auth/syntax errors, which must propagate.
+  """
+  msg = str(err).lower()
+  return 'does not exist' in msg or 'not found' in msg
+
+
 async def create_migration_table(client: DatabaseClient) -> None:
   """Create the migration history table if it doesn't exist.
 
@@ -48,15 +85,20 @@ async def create_migration_table(client: DatabaseClient) -> None:
   try:
     log.info('creating_migration_history_table')
 
-    # Define the migration history table
+    # Define the migration history table. `IF NOT EXISTS` makes every
+    # DEFINE idempotent so repeated calls against an already-initialised
+    # SurrealDB v3 database do not fail with "table/field/index already
+    # exists". Matches the rs/go ports.
     statements = [
-      f'DEFINE TABLE {MIGRATION_TABLE_NAME} SCHEMAFULL;',
-      f'DEFINE FIELD version ON TABLE {MIGRATION_TABLE_NAME} TYPE string;',
-      f'DEFINE FIELD description ON TABLE {MIGRATION_TABLE_NAME} TYPE string;',
-      f'DEFINE FIELD applied_at ON TABLE {MIGRATION_TABLE_NAME} TYPE datetime;',
-      f'DEFINE FIELD checksum ON TABLE {MIGRATION_TABLE_NAME} TYPE string;',
-      f'DEFINE FIELD execution_time_ms ON TABLE {MIGRATION_TABLE_NAME} TYPE int;',
-      f'DEFINE INDEX version_idx ON TABLE {MIGRATION_TABLE_NAME} COLUMNS version UNIQUE;',
+      f'DEFINE TABLE IF NOT EXISTS {MIGRATION_TABLE_NAME} SCHEMAFULL;',
+      f'DEFINE FIELD IF NOT EXISTS version ON TABLE {MIGRATION_TABLE_NAME} TYPE string;',
+      f'DEFINE FIELD IF NOT EXISTS description ON TABLE {MIGRATION_TABLE_NAME} TYPE string;',
+      f'DEFINE FIELD IF NOT EXISTS applied_at ON TABLE {MIGRATION_TABLE_NAME} TYPE datetime;',
+      f'DEFINE FIELD IF NOT EXISTS checksum ON TABLE {MIGRATION_TABLE_NAME} TYPE string;',
+      f'DEFINE FIELD IF NOT EXISTS execution_time_ms ON TABLE {MIGRATION_TABLE_NAME} '
+      'TYPE option<int>;',
+      f'DEFINE INDEX IF NOT EXISTS version_idx ON TABLE {MIGRATION_TABLE_NAME} '
+      'COLUMNS version UNIQUE;',
     ]
 
     for statement in statements:
@@ -84,8 +126,14 @@ async def ensure_migration_table(client: DatabaseClient) -> None:
   try:
     # Try to query the table to see if it exists
     await client.execute(f'SELECT * FROM {MIGRATION_TABLE_NAME} LIMIT 1')
-  except QueryError:
-    # Table doesn't exist, create it
+  except QueryError as err:
+    # Narrow the catch: only a table-missing error should trigger
+    # table creation. Permissions/auth/syntax/network errors must
+    # propagate, otherwise we mask the real problem and produce
+    # misleading "table already exists" errors afterwards.
+    # Mirrors go's ``isTableMissingError`` heuristic.
+    if not _is_table_missing_error(err):
+      raise
     await create_migration_table(client)
 
 
@@ -125,18 +173,32 @@ async def record_migration(
     # Ensure table exists
     await ensure_migration_table(client)
 
-    # Create migration history record
-    data: dict[str, Any] = {
+    # SurrealDB v3 rejects bare ISO-8601 strings against `TYPE datetime`
+    # fields. Emit the write as raw SurrealQL with an explicit
+    # `<datetime>` cast so the SDK ships an already-typed value and the
+    # server does not have to coerce. Mirrors the rs/go ports.
+    params: dict[str, Any] = {
+      'table': MIGRATION_TABLE_NAME,
+      'id': _record_id_for(version),
       'version': version,
       'description': description,
       'applied_at': datetime.now(UTC).isoformat(),
       'checksum': checksum,
     }
 
-    if execution_time_ms is not None:
-      data['execution_time_ms'] = execution_time_ms
+    set_clauses = [
+      'version = $version',
+      'description = $description',
+      'applied_at = <datetime> $applied_at',
+      'checksum = $checksum',
+    ]
 
-    await client.create(MIGRATION_TABLE_NAME, data)
+    if execution_time_ms is not None:
+      params['execution_time_ms'] = execution_time_ms
+      set_clauses.append('execution_time_ms = $execution_time_ms')
+
+    statement = f'CREATE type::record($table, $id) SET {", ".join(set_clauses)};'
+    await client.execute(statement, params)
 
     log.info('migration_recorded', version=version)
 
@@ -293,8 +355,25 @@ async def is_migration_applied(
     >>> await is_migration_applied(client, '20260102_120000')
     True
   """
-  versions = await get_applied_versions(client)
-  return version in versions
+  log = logger.bind(version=version)
+
+  try:
+    await ensure_migration_table(client)
+
+    # Targeted query to avoid O(n) full-table scans on every check.
+    # `SELECT *` (not `SELECT version`) is required so the row carries
+    # `applied_at` and round-trips through `_extract_records` without
+    # the v3 server complaining about missing fields. Mirrors the
+    # rs/go ports.
+    query = f'SELECT * FROM {MIGRATION_TABLE_NAME} WHERE version = $version LIMIT 1'
+    result = await client.execute(query, {'version': version})
+
+    records = _extract_records(result)
+    return bool(records)
+
+  except QueryError as e:
+    log.error('failed_to_check_migration_applied', error=str(e))
+    raise MigrationHistoryError(f'Failed to check migration {version}: {e}') from e
 
 
 async def get_migration_history(

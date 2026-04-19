@@ -47,7 +47,7 @@ from surql.types.operators import (
 from surql.types.record_id import RecordID
 from surql.types.record_ref import RecordRef, record_ref
 from surql.types.reserved import SURREAL_RESERVED_WORDS, check_reserved_word
-from surql.types.surreal_fn import SurrealFn, surql_fn
+from surql.types.surreal_fn import SurrealFn, surql_fn, type_record, type_thing
 
 __all__ = [
   # RecordID
@@ -58,6 +58,8 @@ __all__ = [
   # SurrealFn
   'SurrealFn',
   'surql_fn',
+  'type_record',
+  'type_thing',
   # Operator base
   'Operator',
   # Comparison operator classes

@@ -65,11 +65,13 @@ async def find_mutual_connections[T: BaseModel](
 
   logger.info('finding_mutual_connections', record=record_str, edge=edge)
 
-  # Query: Find records that I follow AND that follow me back
-  # This uses set intersection via SurrealDB's graph traversal
+  # Query: Find records that I follow AND that follow me back.
+  # SurrealDB v3 rejects `FROM <-edge<-record` (no left anchor). Use
+  # `FROM record<-edge` form, which is v2- and v3-valid. See
+  # Oneiriq/surql-py#33.
   sql = f"""
     SELECT * FROM {record_str}->{edge}
-    WHERE id IN (SELECT VALUE id FROM <-{edge}<-{record_str})
+    WHERE id IN (SELECT VALUE id FROM {record_str}<-{edge})
   """
 
   db = client or get_db()
@@ -129,12 +131,16 @@ async def find_shortest_path(
     result = await db.execute(sql)
     return _extract_graph_result(result)
 
-  # Iterative deepening search
+  # Iterative deepening search.
+  # SurrealDB v3 rejects both the v2 `->edge{depth}->` suffix form AND
+  # the grouped `(->edge->?){depth}` repetition form (the latter parses
+  # until `{` which v3 flags as `Unexpected token, expected Eof`).
+  # The v3-safe path — matches the surql-go port — is to unroll the
+  # depth into N literal `->edge->?` segments. See Oneiriq/surql-py#34.
   for depth in range(1, max_depth + 1):
-    # Build path query for current depth
-    # Use depth notation: ->edge{depth}->
+    hops = ''.join(f'->{edge}->?' for _ in range(depth))
     sql = f"""
-      SELECT * FROM {from_str}->{edge}{depth}->
+      SELECT * FROM {from_str}{hops}
       WHERE id = {to_str}
       LIMIT 1
     """
@@ -192,12 +198,15 @@ async def _reconstruct_path(
 
   current = from_str
   for _ in range(depth):
-    # Find next node in path towards target
+    # Find next node in path towards target. v3 rejects both the v2
+    # suffix and the grouped-repetition forms; unroll to literal
+    # `<-edge<-?` hops. See Oneiriq/surql-py#34.
+    in_hops = ''.join(f'<-{edge}<-?' for _ in range(depth))
     sql = f"""
       SELECT * FROM {current}->{edge}
       WHERE id = {to_str} OR id IN (
         SELECT VALUE id FROM {current}->{edge}
-        WHERE id IN (SELECT VALUE id FROM <-{edge}{depth}<-{to_str})
+        WHERE id IN (SELECT VALUE id FROM {to_str}{in_hops})
       )
       LIMIT 1
     """
@@ -271,8 +280,13 @@ async def get_neighbors(
 
   db = client or get_db()
 
+  # SurrealDB v3 rejects both the v2 `{arrow}{edge}{d}` suffix form and
+  # the grouped `({arrow}edge{arrow}?){d}` repetition. Unroll to N
+  # literal `{arrow}edge{arrow}?` hops — matches surql-go. See
+  # Oneiriq/surql-py#34.
   for d in range(1, depth + 1):
-    sql = f'SELECT * FROM {record_str}{arrow}{edge}{d}'
+    hops = ''.join(f'{arrow}{edge}{arrow}?' for _ in range(d))
+    sql = f'SELECT * FROM {record_str}{hops}'
     result = await db.execute(sql)
     data = _extract_graph_result(result)
 
@@ -328,8 +342,8 @@ async def compute_degree(
   if out_data and isinstance(out_data[0], dict):
     out_degree = out_data[0].get('count', 0)
 
-  # Count incoming edges
-  in_sql = f'SELECT count() FROM <-{edge}<-{record_str} GROUP ALL'
+  # Count incoming edges. v3-safe form anchors the record on the left.
+  in_sql = f'SELECT count() FROM {record_str}<-{edge} GROUP ALL'
   in_result = await db.execute(in_sql)
   in_data = _extract_graph_result(in_result)
   in_degree = 0
@@ -615,7 +629,9 @@ async def get_incoming_edges[T: BaseModel](
 
   logger.info('fetching_incoming_edges', record=record_str, edge_table=edge_table)
 
-  sql = f'SELECT * FROM <-{edge_table}<-{record_str}'
+  # v3-safe form: anchor record on the left (`record<-edge`), not the
+  # v2 `<-edge<-record` which v3 rejects. See Oneiriq/surql-py#33.
+  sql = f'SELECT * FROM {record_str}<-{edge_table}'
 
   db = client or get_db()
   result = await db.execute(sql)
@@ -722,7 +738,8 @@ async def count_related(
   if direction == 'out':
     sql = f'SELECT count() FROM {record_str}->{edge_table}'
   elif direction == 'in':
-    sql = f'SELECT count() FROM <-{edge_table}<-{record_str}'
+    # v3-safe form anchors the record on the left.
+    sql = f'SELECT count() FROM {record_str}<-{edge_table}'
   else:
     raise ValueError(f'Invalid direction: {direction}. Must be "out" or "in"')
 
@@ -773,13 +790,15 @@ async def shortest_path(
 
   logger.info('finding_shortest_path', from_record=from_str, to_record=to_str, max_depth=max_depth)
 
-  # Use iterative depth-first search
-  # This is a simplified implementation
+  # Iterative deepening. v3 rejects both the v2 trailing-arrow form and
+  # the grouped `{depth}` repetition; unroll to N literal `->edge->?`
+  # hops. See Oneiriq/surql-py#34.
   for depth in range(1, max_depth + 1):
+    hops = ''.join(f'->{edge_table}->?' for _ in range(depth))
     sql = f"""
-    SELECT * FROM {from_str}
-    ->{edge_table}{depth}->
+    SELECT * FROM {from_str}{hops}
     WHERE id = {to_str}
+    LIMIT 1
     """
 
     db = client or get_db()

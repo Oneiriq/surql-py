@@ -1,0 +1,81 @@
+name: Integration
+
+on:
+  pull_request:
+    branches:
+      - main
+      - 'release/**'
+    paths-ignore:
+      - '**/*.md'
+      - 'docs/**'
+      - 'LICENSE'
+      - '.gitignore'
+      - 'CODEOWNERS'
+  push:
+    branches:
+      - main
+      - 'release/**'
+    paths-ignore:
+      - '**/*.md'
+      - 'docs/**'
+      - 'LICENSE'
+      - '.gitignore'
+      - 'CODEOWNERS'
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+env:
+  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
+
+jobs:
+  integration:
+    name: SurrealDB v3 integration tests
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v5
+
+      - name: Start SurrealDB v3
+        run: |
+          docker run -d \
+            --name surrealdb \
+            -p 8000:8000 \
+            surrealdb/surrealdb:v3.0.5 \
+            start --user root --pass root memory
+          for i in $(seq 1 30); do
+            if curl -sf http://localhost:8000/health; then
+              echo "SurrealDB ready"
+              break
+            fi
+            echo "Waiting for SurrealDB... attempt $i"
+            sleep 2
+          done
+          # Final check -- fail the job if the server never came up.
+          curl -sf http://localhost:8000/health
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@v5
+
+      - name: Install dependencies
+        run: uv sync
+
+      - name: Run integration tests
+        run: uv run pytest tests/integration/ -v
+        env:
+          SURREAL_URL: ws://localhost:8000/rpc
+          SURREAL_USER: root
+          SURREAL_PASS: root
+          SURREAL_NS: test
+          SURREAL_DB: test
+
+      - name: Stop SurrealDB
+        if: always()
+        run: docker stop surrealdb || true

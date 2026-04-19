@@ -147,8 +147,13 @@ class TestSelectSingleRecordUnwrap:
 
   @pytest.mark.anyio
   async def test_select_record_id_unwraps_list(self, mock_db_client: DatabaseClient) -> None:
-    """Selecting a record ID unwraps the single-element list to a dict."""
-    mock_db_client._client.select = AsyncMock(return_value=[{'id': 'user:alice', 'name': 'Alice'}])
+    """Selecting a record ID unwraps the single-element list to a dict.
+
+    Bug #15: record-id targets now route through raw
+    ``SELECT * FROM type::record($table, $id)`` rather than the SDK's
+    bare-string ``select``, so the mock is placed on ``query``.
+    """
+    mock_db_client._client.query = AsyncMock(return_value=[{'id': 'user:alice', 'name': 'Alice'}])
 
     result = await mock_db_client.select('user:alice')
 
@@ -161,7 +166,7 @@ class TestSelectSingleRecordUnwrap:
     self, mock_db_client: DatabaseClient
   ) -> None:
     """Selecting a non-existent record ID returns None."""
-    mock_db_client._client.select = AsyncMock(return_value=[])
+    mock_db_client._client.query = AsyncMock(return_value=[])
 
     result = await mock_db_client.select('user:nonexistent')
 
@@ -169,7 +174,7 @@ class TestSelectSingleRecordUnwrap:
 
   @pytest.mark.anyio
   async def test_select_table_returns_list(self, mock_db_client: DatabaseClient) -> None:
-    """Selecting a table returns the full list."""
+    """Selecting a table returns the full list (still via SDK select())."""
     mock_db_client._client.select = AsyncMock(
       return_value=[
         {'id': 'user:alice', 'name': 'Alice'},
@@ -188,7 +193,7 @@ class TestSelectSingleRecordUnwrap:
   ) -> None:
     """Selecting a record ID normalizes SDK RecordID in the response."""
     sdk_rid = SdkRecordID('user', 'alice')
-    mock_db_client._client.select = AsyncMock(return_value=[{'id': sdk_rid, 'name': 'Alice'}])
+    mock_db_client._client.query = AsyncMock(return_value=[{'id': sdk_rid, 'name': 'Alice'}])
 
     result = await mock_db_client.select('user:alice')
 

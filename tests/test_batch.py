@@ -93,11 +93,14 @@ class TestUpsertMany:
     assert len(results) == 2
     mock_db_client.execute.assert_called_once()
 
-    # Verify Pydantic models were serialized in the query
-    query = mock_db_client.execute.call_args[0][0]
-    assert 'Alice' in query
-    assert 'alice@example.com' in query
-    assert 'Bob' in query
+    # After the v3 refactor (Oneiriq/surql-py#32) payloads flow through
+    # the params dict, not the inlined SQL string. Verify both paths.
+    query, params = mock_db_client.execute.call_args[0]
+    assert 'UPSERT' in query and 'CONTENT' in query
+    payloads = [params[k] for k in sorted(params) if k.startswith('item_')]
+    assert any(p.get('name') == 'Alice' for p in payloads)
+    assert any(p.get('email') == 'alice@example.com' for p in payloads)
+    assert any(p.get('name') == 'Bob' for p in payloads)
 
   @pytest.mark.anyio
   async def test_upsert_many_empty_list(self, mock_db_client: DatabaseClient) -> None:
@@ -119,11 +122,13 @@ class TestUpsertMany:
     items = [{'email': 'alice@example.com', 'name': 'Alice'}]
     await upsert_many(mock_db_client, 'users', items, conflict_fields=['email'])
 
-    # Verify the query contains WHERE clause with conflict fields
+    # After the v3 refactor each record is upserted individually; the
+    # conflict WHERE clause still appears on each emitted statement but
+    # it references the per-record bind `$item_<idx>.<field>`.
     call_args = mock_db_client.execute.call_args
     query = call_args[0][0]
     assert 'WHERE' in query
-    assert 'email = $item.email' in query
+    assert 'email = $item_0.email' in query
 
   @pytest.mark.anyio
   async def test_upsert_many_with_context_client(self, mock_db_client: DatabaseClient) -> None:
@@ -162,11 +167,12 @@ class TestUpsertMany:
 
     assert len(results) == 1
 
-    # Verify nested data structures are in the query
-    query = mock_db_client.execute.call_args[0][0]
-    assert 'metadata' in query
-    assert 'admin' in query
-    assert 'tags' in query
+    # After the v3 refactor, nested structures flow through the params
+    # dict rather than being inlined. Check the bound payload instead.
+    _, params = mock_db_client.execute.call_args[0]
+    payload = params['item_0']
+    assert payload['metadata']['role'] == 'admin'
+    assert payload['metadata']['tags'] == ['active']
 
   @pytest.mark.anyio
   async def test_upsert_many_handles_empty_result(self, mock_db_client: DatabaseClient) -> None:
@@ -518,13 +524,21 @@ class TestBuildUpsertQuery:
   """Test suite for build_upsert_query function."""
 
   def test_build_upsert_query_basic(self) -> None:
-    """Test building basic upsert query."""
+    """Test building basic upsert query.
+
+    Post Oneiriq/surql-py#32 the builder emits one ``UPSERT <target>
+    CONTENT {...}`` per record rather than the v2 ``UPSERT INTO table
+    [...]`` array form (rejected by v3).
+    """
     items = [{'id': 'user:1', 'name': 'Alice'}]
     query = build_upsert_query('users', items)
 
-    assert 'UPSERT INTO users' in query
-    assert 'user:1' in query
+    assert query.startswith('UPSERT user:1 CONTENT')
     assert 'Alice' in query
+    # ``id`` should be stripped from the per-record CONTENT payload:
+    # v3 rejects a redundant ``id`` field when targeting a specific
+    # record.
+    assert 'id:' not in query.replace('user:1', '')
 
   def test_build_upsert_query_multiple_items(self) -> None:
     """Test building upsert query with multiple items."""
@@ -534,7 +548,8 @@ class TestBuildUpsertQuery:
     ]
     query = build_upsert_query('users', items)
 
-    assert 'UPSERT INTO users' in query
+    assert 'UPSERT user:1 CONTENT' in query
+    assert 'UPSERT user:2 CONTENT' in query
     assert 'Alice' in query
     assert 'Bob' in query
 

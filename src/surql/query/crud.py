@@ -15,8 +15,8 @@ from surql.connection.client import DatabaseClient
 from surql.connection.context import get_db
 from surql.query.builder import Query
 from surql.query.executor import fetch_all
-from surql.query.results import ListResult, records
-from surql.types.operators import Operator
+from surql.query.results import ListResult, extract_result, records
+from surql.types.operators import Operator, _validate_identifier
 from surql.types.record_id import RecordID
 
 logger = structlog.get_logger(__name__)
@@ -416,7 +416,12 @@ async def count_records(
   """
   db = client or get_db()
 
-  query: Query[Any] = Query().select(['count()']).from_table(table)
+  # SurrealDB v3 returns one result row per matched record for a bare
+  # `SELECT count() FROM <table>`, e.g. 42 records -> 42 rows of
+  # `{count: 1}`. Our downstream extractor reads only `data[0]`, which
+  # would silently collapse the count to `1`. Append `GROUP ALL` so the
+  # server returns a single aggregated row `[{count: N}]`.
+  query: Query[Any] = Query().select(['count()']).from_table(table).group_all()
 
   if condition:
     query = query.where(condition)
@@ -425,16 +430,24 @@ async def count_records(
 
   result = await db.execute(query.to_surql())
 
-  # Extract count from result
-  if (
-    isinstance(result, list)
-    and len(result) > 0
-    and isinstance(result[0], dict)
-    and 'result' in result[0]
-  ):
-    data = result[0]['result']
-    if isinstance(data, list) and len(data) > 0:
-      return data[0].get('count', 0)  # type: ignore[no-any-return]
+  # The SDK's ``query`` method returns two possible shapes depending on
+  # the server version / statement count:
+  #
+  #   - ``[{'status': 'OK', 'result': [{'count': N}], ...}]`` — classic
+  #     response envelope.
+  #   - ``[{'count': N}]`` — SDK 2.x unwraps single-statement queries.
+  #
+  # Accept both so an SDK upgrade does not silently collapse the count
+  # to zero. (Prior to this, bug #30, the bare-list shape fell through
+  # to ``return 0`` on v3.)
+  if not isinstance(result, list) or not result:
+    return 0
+
+  first = result[0]
+  rows = first['result'] if isinstance(first, dict) and 'result' in first else result
+
+  if isinstance(rows, list) and rows and isinstance(rows[0], dict):
+    return int(rows[0].get('count', 0))
 
   return 0
 
@@ -580,3 +593,157 @@ async def last[T: BaseModel](
   )
 
   return results[0] if results else None
+
+
+# ---------------------------------------------------------------------------
+# Aggregation (issue #47 / #1)
+# ---------------------------------------------------------------------------
+
+
+def _render_aggregate_value(value: Any) -> str:
+  """Render an ``aggregate_records`` projection value as SurrealQL."""
+  if hasattr(value, 'to_surql'):
+    return value.to_surql()  # type: ignore[no-any-return]
+  if isinstance(value, str):
+    return value
+  return str(value)
+
+
+def _build_aggregate_query(
+  table: str,
+  select: dict[str, Any],
+  group_by: list[str] | None,
+  group_all: bool,
+  where: str | Operator | None = None,
+) -> str:
+  """Build the SurrealQL for :func:`aggregate_records`.
+
+  Kept separate from the async entry point so it is trivially unit-testable
+  without a live database.
+
+  Args:
+    table: Source table name.
+    select: Mapping of output alias -> SurrealQL expression (or factory /
+      ``FunctionExpression`` / ``SurrealFn``).
+    group_by: Optional list of group-by fields.
+    group_all: When ``True`` aggregates the entire table into a single row.
+    where: Optional WHERE clause (string or ``Operator``).
+
+  Returns:
+    Fully-rendered SurrealQL query string.
+
+  Raises:
+    ValueError: If ``select`` is empty or neither ``group_by`` nor
+      ``group_all`` is provided.
+  """
+  if not select:
+    raise ValueError('aggregate_records requires a non-empty select mapping')
+  if not group_all and not group_by:
+    raise ValueError('aggregate_records requires either group_all=True or group_by=[...].')
+
+  _validate_identifier(table, 'table name')
+
+  for alias in select:
+    _validate_identifier(alias, 'select alias')
+
+  if group_by:
+    for group_field in group_by:
+      # Allow dotted field paths by validating only the head identifier.
+      head = group_field.split('.')[0]
+      _validate_identifier(head, 'group by field')
+
+  projection_parts: list[str] = []
+  if group_by:
+    projection_parts.extend(group_by)
+  for alias, expr in select.items():
+    rendered = _render_aggregate_value(expr)
+    projection_parts.append(f'{rendered} AS {alias}')
+
+  projection = ', '.join(projection_parts)
+  sql_parts = [f'SELECT {projection} FROM {table}']
+
+  if where is not None:
+    condition_str = where.to_surql() if isinstance(where, Operator) else where
+    sql_parts.append(f'WHERE ({condition_str})')
+
+  if group_all:
+    sql_parts.append('GROUP ALL')
+  elif group_by:
+    sql_parts.append(f'GROUP BY {", ".join(group_by)}')
+
+  return ' '.join(sql_parts)
+
+
+async def aggregate_records(
+  table: str,
+  select: dict[str, Any],
+  group_by: list[str] | None = None,
+  group_all: bool = False,
+  where: str | Operator | None = None,
+  client: DatabaseClient | None = None,
+) -> list[dict[str, Any]]:
+  """Run a GROUP BY / GROUP ALL aggregation against ``table``.
+
+  Produces a SurrealQL query of the form::
+
+    SELECT <group_by>, <expr1> AS <alias1>, <expr2> AS <alias2>
+    FROM <table>
+    [WHERE ...]
+    (GROUP BY ... | GROUP ALL)
+
+  and returns the resulting rows as dictionaries via
+  :func:`~surql.query.results.extract_result`, so callers don't have to
+  manually unwrap the SurrealDB response envelope.
+
+  Args:
+    table: Source table name.
+    select: Mapping of output alias -> projection expression. Values may be
+      ``SurrealFn`` instances (e.g. ``math_sum_fn('strength')``),
+      ``FunctionExpression`` objects, or raw SurrealQL strings.
+    group_by: List of fields to group by. When supplied, ``group_all`` must
+      be ``False``.
+    group_all: If ``True``, aggregate the entire table into a single row.
+      Mutually exclusive with ``group_by``.
+    where: Optional WHERE condition (string or :class:`Operator`).
+    client: Database client. When ``None``, the context client is used.
+
+  Returns:
+    List of aggregated rows, one dict per group (or a single dict when
+    ``group_all=True``).
+
+  Raises:
+    ValueError: If ``select`` is empty or neither ``group_by`` nor
+      ``group_all`` is provided.
+
+  Examples:
+    >>> from surql.query.functions import count_if, math_sum_fn
+    >>> counts = await aggregate_records(
+    ...   table='memory_entry',
+    ...   select={'count': count_if(), 'total_strength': math_sum_fn('strength')},
+    ...   group_by=['network'],
+    ... )
+  """
+  if group_all and group_by:
+    raise ValueError('aggregate_records: pass group_all=True OR group_by=[...], not both.')
+
+  db = client or get_db()
+  sql = _build_aggregate_query(
+    table=table,
+    select=select,
+    group_by=group_by,
+    group_all=group_all,
+    where=where,
+  )
+
+  logger.info(
+    'aggregating_records',
+    table=table,
+    group_by=group_by,
+    group_all=group_all,
+  )
+  logger.debug('aggregate_sql', sql=sql)
+
+  result = await db.execute(sql)
+  rows = extract_result(result)
+  logger.info('aggregate_completed', table=table, row_count=len(rows))
+  return rows

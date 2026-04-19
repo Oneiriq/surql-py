@@ -109,11 +109,19 @@ class Query[T: BaseModel](BaseModel):
 
   model_config = ConfigDict(frozen=True, arbitrary_types_allowed=True)
 
-  def select(self, fields: list[str] | None = None) -> Query[T]:
+  def select(self, fields: list[Any] | None = None) -> Query[T]:
     """Start a SELECT query.
 
     Args:
-      fields: List of field names to select. Defaults to ['*'] if None.
+      fields: List of projection items. Each item can be:
+
+        - a raw field name (``str``),
+        - a pre-rendered SurrealQL fragment (``str``, e.g. ``'count()'``),
+        - a :class:`~surql.query.expressions.Expression` (rendered via
+          :meth:`to_surql`), or
+        - a :class:`~surql.types.surreal_fn.SurrealFn` (rendered verbatim).
+
+        Defaults to ``['*']`` when ``None``.
 
     Returns:
       New Query instance with SELECT operation
@@ -121,11 +129,25 @@ class Query[T: BaseModel](BaseModel):
     Examples:
       >>> Query().select(['name', 'email'])
       >>> Query().select()  # SELECT *
+      >>> from surql.query.functions import math_mean_fn, count_if
+      >>> Query().select([count_if(), math_mean_fn('score')])
     """
+    rendered: list[str] = []
+    if not fields:
+      rendered = ['*']
+    else:
+      for item in fields:
+        if isinstance(item, str):
+          rendered.append(item)
+        elif hasattr(item, 'to_surql'):
+          rendered.append(item.to_surql())
+        else:
+          rendered.append(str(item))
+
     return self.model_copy(
       update={
         'operation': 'SELECT',
-        'fields': fields or ['*'],
+        'fields': rendered,
       }
     )
 
@@ -279,12 +301,13 @@ class Query[T: BaseModel](BaseModel):
       }
     )
 
-  def update(self, target: str, data: dict[str, Any]) -> Query[T]:
+  def update(self, target: str, data: dict[str, Any] | None = None) -> Query[T]:
     """Create an UPDATE query.
 
     Args:
       target: Table name or record ID to update
-      data: Data to update
+      data: Optional data to update. When ``None`` (or omitted) the builder
+        defers the SET payload so callers can populate it with :meth:`set`.
 
     Returns:
       New Query instance with UPDATE operation
@@ -294,21 +317,64 @@ class Query[T: BaseModel](BaseModel):
 
     Examples:
       >>> Query().update('user:alice', {'status': 'active'})
+      >>> Query().update('user:alice').set(status='active')
       >>> Query().update('user', {'status': 'inactive'}).where('last_login < "2024-01-01"')
     """
     # Validate table name (extract from record ID if present) and field names
     table_part = target.split(':')[0] if ':' in target else target
     _validate_identifier(table_part, 'table name')
-    for field_name in data:
+    payload = data or {}
+    for field_name in payload:
       _validate_identifier(field_name, 'field name')
 
     return self.model_copy(
       update={
         'operation': 'UPDATE',
         'table_name': target,
-        'update_data': data,
+        'update_data': payload,
       }
     )
+
+  def set(self, **fields: Any) -> Query[T]:
+    """Populate the SET clause of an UPDATE / UPSERT / INSERT query.
+
+    Keyword arguments are merged into the existing payload for UPDATE,
+    UPSERT, or INSERT operations, preserving any values that were supplied
+    earlier (later ``.set()`` calls override earlier ones).
+
+    Args:
+      **fields: Field name / value pairs. Values may be any type supported
+        by :func:`~surql.types.operators._quote_value`, including
+        :class:`~surql.types.surreal_fn.SurrealFn` and
+        :class:`~surql.query.expressions.Expression` instances for raw
+        SurrealQL rendering.
+
+    Returns:
+      New Query instance with the updated SET payload.
+
+    Raises:
+      ValueError: If :meth:`set` is called before an UPDATE / UPSERT /
+        INSERT operation has been started.
+
+    Examples:
+      >>> from surql.query.functions import time_now_fn
+      >>> Query().update('user:alice').set(updated_at=time_now_fn(), active=True)
+    """
+    if self.operation not in {'UPDATE', 'UPSERT', 'INSERT'}:
+      raise ValueError(
+        'set() requires an UPDATE, UPSERT, or INSERT query; '
+        f'got operation={self.operation!r}. Call .update(), .upsert(), '
+        'or .insert() first.'
+      )
+    for field_name in fields:
+      _validate_identifier(field_name, 'field name')
+
+    if self.operation == 'INSERT':
+      merged = {**(self.insert_data or {}), **fields}
+      return self.model_copy(update={'insert_data': merged})
+
+    merged = {**(self.update_data or {}), **fields}
+    return self.model_copy(update={'update_data': merged})
 
   def delete(self, target: str) -> Query[T]:
     """Create a DELETE query.
