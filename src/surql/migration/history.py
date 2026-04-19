@@ -323,8 +323,25 @@ async def is_migration_applied(
     >>> await is_migration_applied(client, '20260102_120000')
     True
   """
-  versions = await get_applied_versions(client)
-  return version in versions
+  log = logger.bind(version=version)
+
+  try:
+    await ensure_migration_table(client)
+
+    # Targeted query to avoid O(n) full-table scans on every check.
+    # `SELECT *` (not `SELECT version`) is required so the row carries
+    # `applied_at` and round-trips through `_extract_records` without
+    # the v3 server complaining about missing fields. Mirrors the
+    # rs/go ports.
+    query = f'SELECT * FROM {MIGRATION_TABLE_NAME} WHERE version = $version LIMIT 1'
+    result = await client.execute(query, {'version': version})
+
+    records = _extract_records(result)
+    return bool(records)
+
+  except QueryError as e:
+    log.error('failed_to_check_migration_applied', error=str(e))
+    raise MigrationHistoryError(f'Failed to check migration {version}: {e}') from e
 
 
 async def get_migration_history(
