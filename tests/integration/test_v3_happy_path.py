@@ -256,3 +256,88 @@ async def test_migration_history_table_name_matches(
   result = await integration_client.execute(f'SELECT * FROM {MIGRATION_TABLE_NAME} LIMIT 1')
   # Result type depends on SDK shape, but the call must not raise.
   assert result is not None or result == [] or result == {}
+
+
+# ---------------------------------------------------------------------------
+# Bug #32: UPSERT INTO [...] array form rejected by v3
+# ---------------------------------------------------------------------------
+
+
+class TestUpsertManyV3:
+  """Bug #32: `upsert_many` must emit per-record `UPSERT id CONTENT`."""
+
+  @pytest.mark.anyio
+  async def test_upsert_many_round_trips_on_v3(
+    self, integration_client: DatabaseClient
+  ) -> None:
+    """Two records upserted; readback returns both."""
+    from surql.query.batch import upsert_many
+
+    await integration_client.execute('DEFINE TABLE person SCHEMALESS;')
+    items = [
+      {'id': 'person:alice', 'name': 'Alice', 'age': 30},
+      {'id': 'person:bob', 'name': 'Bob', 'age': 25},
+    ]
+    await upsert_many(integration_client, 'person', items)
+
+    rows = await integration_client.execute('SELECT * FROM person ORDER BY name')
+    # Envelope shape varies by SDK; unwrap either `[row, ...]` or
+    # `[{result:[row, ...]}]`.
+    if isinstance(rows, list) and rows and isinstance(rows[0], dict) and 'result' in rows[0]:
+      rows = rows[0]['result']
+    assert len(rows) == 2
+
+
+# ---------------------------------------------------------------------------
+# Bug #33: `FROM <-edge<-record` form rejected by v3
+# ---------------------------------------------------------------------------
+
+
+class TestIncomingEdgesV3:
+  """Bug #33: incoming-edge queries must anchor the record on the left."""
+
+  @pytest.mark.anyio
+  async def test_get_incoming_edges_on_v3(
+    self, integration_client: DatabaseClient
+  ) -> None:
+    """A `follow` edge from alice to bob; `get_incoming_edges(bob, 'follow')` returns one row."""
+    from surql.query.graph import get_incoming_edges
+
+    await integration_client.execute('DEFINE TABLE user SCHEMALESS;')
+    await integration_client.execute('DEFINE TABLE follow TYPE RELATION SCHEMALESS;')
+    await integration_client.execute("CREATE user:alice SET name = 'Alice'")
+    await integration_client.execute("CREATE user:bob SET name = 'Bob'")
+    await integration_client.execute('RELATE user:alice->follow->user:bob')
+
+    edges = await get_incoming_edges('user:bob', 'follow', client=integration_client)
+    assert len(edges) == 1
+
+
+# ---------------------------------------------------------------------------
+# Bug #34: `->edge{depth}->` trailing-arrow form rejected by v3
+# ---------------------------------------------------------------------------
+
+
+class TestShortestPathV3:
+  """Bug #34: `shortest_path` must emit the grouped `(->edge->?){d}` form."""
+
+  @pytest.mark.anyio
+  async def test_shortest_path_on_v3(self, integration_client: DatabaseClient) -> None:
+    """Alice -> Bob -> Charlie; shortest_path finds a 2-hop path."""
+    from surql.query.graph import find_shortest_path
+
+    await integration_client.execute('DEFINE TABLE user SCHEMALESS;')
+    await integration_client.execute('DEFINE TABLE follows TYPE RELATION SCHEMALESS;')
+    await integration_client.execute("CREATE user:alice SET name = 'Alice'")
+    await integration_client.execute("CREATE user:bob SET name = 'Bob'")
+    await integration_client.execute("CREATE user:charlie SET name = 'Charlie'")
+    await integration_client.execute('RELATE user:alice->follows->user:bob')
+    await integration_client.execute('RELATE user:bob->follows->user:charlie')
+
+    # The helper returns the reconstructed path, but here we only need
+    # to prove the server accepts the emitted SurrealQL (v2 trailing
+    # arrow would parse-error before returning).
+    path = await find_shortest_path(
+      'user:alice', 'user:charlie', 'follows', max_depth=3, client=integration_client
+    )
+    assert isinstance(path, list)
