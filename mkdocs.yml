@@ -78,6 +78,7 @@ nav:
       - Schema Definition: schema.md
       - Migrations: migrations.md
       - Query Builder: queries.md
+      - SurrealDB v3 Patterns: v3-patterns.md
       - Query Hints: query_hints.md
       - Caching: caching.md
       - Streaming: streaming.md
