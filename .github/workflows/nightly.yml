@@ -15,7 +15,7 @@ jobs:
   unit-linux:
     name: Nightly unit linux (Python ${{ matrix.python-version }})
     # Linux runs daily (03:00 cron), weekly (06:00 cron), and on manual dispatch.
-    runs-on: ubuntu-latest
+    runs-on: [self-hosted, Linux, X64]
     strategy:
       fail-fast: false
       matrix:
@@ -92,7 +92,7 @@ jobs:
     # `ubuntu-latest` and fan out on Python + server tag.
     # Skip on the weekly macOS cron — integration already ran on the prior day's Linux cron.
     if: github.event_name == 'workflow_dispatch' || github.event.schedule == '0 3 * * *'
-    runs-on: ubuntu-latest
+    runs-on: [self-hosted, Linux, X64]
     strategy:
       fail-fast: false
       matrix:

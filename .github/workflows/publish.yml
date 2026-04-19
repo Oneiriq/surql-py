@@ -19,7 +19,7 @@ env:
 
 jobs:
   test:
-    runs-on: ubuntu-latest
+    runs-on: [self-hosted, Linux, X64]
     steps:
       - uses: actions/checkout@v5
 
@@ -45,7 +45,7 @@ jobs:
         run: uv run pytest --cov=src --cov-report=term-missing
 
   build:
-    runs-on: ubuntu-latest
+    runs-on: [self-hosted, Linux, X64]
     needs: test
     steps:
       - uses: actions/checkout@v5
@@ -63,7 +63,7 @@ jobs:
           path: dist/
 
   publish-testpypi:
-    runs-on: ubuntu-latest
+    runs-on: [self-hosted, Linux, X64]
     needs: build
     if: >-
       (github.event_name == 'workflow_dispatch' && github.event.inputs.target == 'testpypi') ||
@@ -84,7 +84,7 @@ jobs:
           repository-url: https://test.pypi.org/legacy/
 
   publish-pypi:
-    runs-on: ubuntu-latest
+    runs-on: [self-hosted, Linux, X64]
     needs: build
     if: >-
       (github.event_name == 'workflow_dispatch' && github.event.inputs.target == 'pypi') ||
