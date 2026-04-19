@@ -162,7 +162,7 @@ class TestRecordMigration:
     # Last execute call is the CREATE ... SET with <datetime> cast.
     assert mock_db_client.execute.call_count >= 1
     statement, params = mock_db_client.execute.call_args[0]
-    assert 'CREATE type::thing($table, $id)' in statement
+    assert 'CREATE type::record($table, $id)' in statement
     assert '<datetime> $applied_at' in statement
     assert params['table'] == MIGRATION_TABLE_NAME
     assert params['version'] == '20240101_000000'
@@ -212,7 +212,7 @@ class TestRecordMigration:
     )
 
     _, params = mock_db_client.execute.call_args[0]
-    # Dashes, colons must become underscores so `type::thing($table, $id)`
+    # Dashes, colons must become underscores so `type::record($table, $id)`
     # accepts the value without bracket quoting.
     assert params['id'] == '2026_01_02T12_00_00'
 

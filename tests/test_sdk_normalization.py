@@ -150,7 +150,7 @@ class TestSelectSingleRecordUnwrap:
     """Selecting a record ID unwraps the single-element list to a dict.
 
     Bug #15: record-id targets now route through raw
-    ``SELECT * FROM type::thing($table, $id)`` rather than the SDK's
+    ``SELECT * FROM type::record($table, $id)`` rather than the SDK's
     bare-string ``select``, so the mock is placed on ``query``.
     """
     mock_db_client._client.query = AsyncMock(return_value=[{'id': 'user:alice', 'name': 'Alice'}])
