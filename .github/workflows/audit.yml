@@ -44,23 +44,25 @@ jobs:
       - name: Install pip-audit
         run: uv pip install --system pip-audit
 
-      - name: Run pip-audit (SARIF)
+      - name: Run pip-audit (JSON)
         # `--strict` fails on warnings (e.g. skipped deps).
         # `--disable-pip` keeps pip-audit off the network resolver and
         # forces it to read our already-resolved `uv.lock` contents.
         # Ignored advisories (with reasons) live in
         # `[tool.pip-audit]` inside `pyproject.toml`.
+        # pip-audit does not emit SARIF directly; use JSON. The
+        # artifact is uploaded for manual review / downstream tooling.
         run: |
           pip-audit \
             --strict \
             --disable-pip \
-            --format sarif \
-            --output audit.sarif
+            --format json \
+            --output audit.json
 
-      - name: Upload SARIF artifact
+      - name: Upload audit artifact
         if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: pip-audit-sarif
-          path: audit.sarif
+          name: pip-audit-json
+          path: audit.json
           if-no-files-found: warn
