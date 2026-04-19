@@ -430,16 +430,24 @@ async def count_records(
 
   result = await db.execute(query.to_surql())
 
-  # Extract count from result
-  if (
-    isinstance(result, list)
-    and len(result) > 0
-    and isinstance(result[0], dict)
-    and 'result' in result[0]
-  ):
-    data = result[0]['result']
-    if isinstance(data, list) and len(data) > 0:
-      return data[0].get('count', 0)  # type: ignore[no-any-return]
+  # The SDK's ``query`` method returns two possible shapes depending on
+  # the server version / statement count:
+  #
+  #   - ``[{'status': 'OK', 'result': [{'count': N}], ...}]`` — classic
+  #     response envelope.
+  #   - ``[{'count': N}]`` — SDK 2.x unwraps single-statement queries.
+  #
+  # Accept both so an SDK upgrade does not silently collapse the count
+  # to zero. (Prior to this, bug #30, the bare-list shape fell through
+  # to ``return 0`` on v3.)
+  if not isinstance(result, list) or not result:
+    return 0
+
+  first = result[0]
+  rows = first['result'] if isinstance(first, dict) and 'result' in first else result
+
+  if isinstance(rows, list) and rows and isinstance(rows[0], dict):
+    return int(rows[0].get('count', 0))
 
   return 0
 
