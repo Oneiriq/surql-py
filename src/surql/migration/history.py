@@ -64,15 +64,20 @@ async def create_migration_table(client: DatabaseClient) -> None:
   try:
     log.info('creating_migration_history_table')
 
-    # Define the migration history table
+    # Define the migration history table. `IF NOT EXISTS` makes every
+    # DEFINE idempotent so repeated calls against an already-initialised
+    # SurrealDB v3 database do not fail with "table/field/index already
+    # exists". Matches the rs/go ports.
     statements = [
-      f'DEFINE TABLE {MIGRATION_TABLE_NAME} SCHEMAFULL;',
-      f'DEFINE FIELD version ON TABLE {MIGRATION_TABLE_NAME} TYPE string;',
-      f'DEFINE FIELD description ON TABLE {MIGRATION_TABLE_NAME} TYPE string;',
-      f'DEFINE FIELD applied_at ON TABLE {MIGRATION_TABLE_NAME} TYPE datetime;',
-      f'DEFINE FIELD checksum ON TABLE {MIGRATION_TABLE_NAME} TYPE string;',
-      f'DEFINE FIELD execution_time_ms ON TABLE {MIGRATION_TABLE_NAME} TYPE int;',
-      f'DEFINE INDEX version_idx ON TABLE {MIGRATION_TABLE_NAME} COLUMNS version UNIQUE;',
+      f'DEFINE TABLE IF NOT EXISTS {MIGRATION_TABLE_NAME} SCHEMAFULL;',
+      f'DEFINE FIELD IF NOT EXISTS version ON TABLE {MIGRATION_TABLE_NAME} TYPE string;',
+      f'DEFINE FIELD IF NOT EXISTS description ON TABLE {MIGRATION_TABLE_NAME} TYPE string;',
+      f'DEFINE FIELD IF NOT EXISTS applied_at ON TABLE {MIGRATION_TABLE_NAME} TYPE datetime;',
+      f'DEFINE FIELD IF NOT EXISTS checksum ON TABLE {MIGRATION_TABLE_NAME} TYPE string;',
+      f'DEFINE FIELD IF NOT EXISTS execution_time_ms ON TABLE {MIGRATION_TABLE_NAME} '
+      'TYPE option<int>;',
+      f'DEFINE INDEX IF NOT EXISTS version_idx ON TABLE {MIGRATION_TABLE_NAME} '
+      'COLUMNS version UNIQUE;',
     ]
 
     for statement in statements:

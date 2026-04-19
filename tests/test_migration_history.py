@@ -40,15 +40,34 @@ class TestCreateMigrationTable:
     # Verify table definition
     assert any('DEFINE TABLE' in call and MIGRATION_TABLE_NAME in call for call in calls)
 
-    # Verify field definitions
-    assert any('DEFINE FIELD version' in call for call in calls)
-    assert any('DEFINE FIELD description' in call for call in calls)
-    assert any('DEFINE FIELD applied_at' in call for call in calls)
-    assert any('DEFINE FIELD checksum' in call for call in calls)
-    assert any('DEFINE FIELD execution_time_ms' in call for call in calls)
+    # Verify field definitions (match on trailing field name, not a
+    # fixed substring, so `IF NOT EXISTS` can sit in the middle).
+    assert any(' version ON TABLE' in call for call in calls)
+    assert any(' description ON TABLE' in call for call in calls)
+    assert any(' applied_at ON TABLE' in call for call in calls)
+    assert any(' checksum ON TABLE' in call for call in calls)
+    assert any(' execution_time_ms ON TABLE' in call for call in calls)
 
     # Verify index definition
-    assert any('DEFINE INDEX version_idx' in call and 'UNIQUE' in call for call in calls)
+    assert any('version_idx ON TABLE' in call and 'UNIQUE' in call for call in calls)
+
+  @pytest.mark.anyio
+  async def test_create_migration_table_uses_if_not_exists(self, mock_db_client):
+    """Regression (bug #16): every DEFINE must be ``IF NOT EXISTS``.
+
+    Without it, repeated calls to ``create_migration_table`` on
+    SurrealDB v3 fail with "table already exists" / "field already
+    exists" / "index already exists". ``ensure_migration_table``
+    invokes this helper on basically every migration call, so
+    idempotency is required.
+    """
+    mock_db_client.execute = AsyncMock(return_value=[])
+
+    await create_migration_table(mock_db_client)
+
+    statements = [call[0][0] for call in mock_db_client.execute.call_args_list]
+    for stmt in statements:
+      assert 'IF NOT EXISTS' in stmt, f'DEFINE statement must be idempotent on v3; got {stmt!r}'
 
   @pytest.mark.anyio
   async def test_create_migration_table_query_error(self, mock_db_client):
