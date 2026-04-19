@@ -5,6 +5,94 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.5.1] - 2026-04-18
+
+### Documentation
+
+- **v3 patterns page** (`docs/v3-patterns.md`): datetime cast, `count() GROUP ALL`,
+  `type::record` vs `type::thing`, buffered `BEGIN`/`COMMIT`, idempotent DDL, graph
+  depth unrolling, and v3 integration CI setup.
+- **Query UX helpers page** (`docs/query-ux.md`): before/after examples for every
+  1.5.0 helper -- `type_record`/`type_thing`, function factories
+  (`time_now_fn`, `math_*_fn`, `string_*`, `count_if`), result aliases
+  (`extract_many`, `has_result`), `aggregate_records`, and the `Query.set(...)` /
+  deferred-`update()` / expression-aware `select(...)` builder extensions.
+- **Upgrade notes page** (`docs/migration.md`): 1.3.1 -> 1.4.0 -> 1.5.0 -> 1.5.1
+  call-site migration guide.
+- **CLI reference**: documented the `surql orchestrate deploy | status | validate`
+  subcommands and added a command-group matrix to the overview.
+- **README**: refreshed top-level examples to use the 1.5.0 first-class helpers.
+- **Navigation**: new pages added to `mkdocs.yml` under `Getting Started` and
+  `Guides`.
+
+### Fixed
+
+- Aligned `surql.__version__` with `pyproject.toml`.
+
+## [1.5.0] - 2026-04-16
+
+### Added
+
+- **Record-ID helpers** (#47 / #2): `type_record(table, id)` and
+  `type_thing(table, id)` return `SurrealFn` wrappers. Prefer `type_record` on
+  v3; `type_thing` remains supported for v2 targets.
+- **SurrealFn function factories** (#47 / #3): `time_now_fn`, `math_mean_fn`,
+  `math_sum_fn`, `math_min_fn`, `math_max_fn`, `math_ceil_fn`, `math_floor_fn`,
+  `math_round_fn`, `math_abs_fn`, `string_len`, `string_concat`, `string_lower`,
+  `string_upper`, `count_if`. Each composes with `Query.set(...)`,
+  `Query.select([...])`, and `aggregate_records(select={...})` without raw
+  SurrealQL strings.
+- **Result extraction aliases** (#47 / #4): `extract_many` (alias for
+  `extract_result`) and `has_result` (alias for `has_results`) for naming that
+  reads naturally next to `extract_one` / `extract_scalar`.
+- **`aggregate_records`** (#47 / #1): typed `SELECT ... GROUP BY | GROUP ALL`
+  helper that returns a list of dicts, hiding the SurrealDB response envelope.
+- **Builder API**: `Query.set(**fields)` for fluent `SET` clauses, optional
+  `data` argument on `Query.update(target, data=None)`, and projection items in
+  `Query.select(...)` may now be `SurrealFn` / `Expression` instances (anything
+  with `.to_surql()`).
+- **Pre-push hook**: shipped `.githooks/pre-push` mirroring CI checks (ruff,
+  mypy, pytest) with optional v3 integration opt-in. See `CONTRIBUTING.md` for
+  setup.
+
+## [1.4.0] - 2026-04-15
+
+### Added
+
+- **SurrealDB v3 support**: library now emits SurrealQL accepted by both v2 and
+  v3 servers. No public Python API changes.
+- **Datetime cast on `_migration_history`**: `record_migration()` emits
+  `applied_at = <datetime> $applied_at` so v3 accepts the bootstrap insert.
+- **Buffered `BEGIN`/`COMMIT`**: `DatabaseClient.execute()` now batches
+  transaction-scoped statements into a single RPC frame so v3 honours the
+  commit.
+- **`GROUP ALL` on `count_records`**: `count_records()` appends `GROUP ALL` and
+  accepts both envelope and bare-list response shapes.
+- **`type::record`**: select record-ID targets route through `type::record(...)`
+  on v3 (with `type::thing` still accepted for backwards compatibility).
+- **Idempotent DDL**: `DEFINE TABLE _migration_history IF NOT EXISTS` and the
+  `if_not_exists` flag across the schema generator so `surql migrate up` is safe
+  to re-run.
+- **Graph depth unrolling**: `traverse(...)` unrolls `{min..max}` graph-depth
+  ranges into literal hop unions that v3 accepts.
+- **SDK pin**: minimum `surrealdb` SDK bumped to v2.0.0a1 (speaks v3's RPC
+  protocol).
+- **CI**:
+  - `v3-integration.yml` runs the integration suite against
+    `surrealdb/surrealdb:v3.0.5` on every push.
+  - Nightly matrix runs against `surrealdb/surrealdb:latest`.
+  - Dependabot for pip + github-actions.
+  - Conventional-commit PR title lint.
+  - Dependency-review workflow.
+  - Scheduled `pip-audit` security workflow.
+
+### Fixed
+
+- Narrow `is_migration_applied` probe to a targeted query (avoids false
+  negatives on fresh databases).
+- Narrow migration-table-missing probe to `does not exist` errors (other errors
+  now propagate).
+
 ## [1.3.1] - 2026-04-13
 
 ### Fixed
@@ -300,6 +388,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+[1.5.1]: https://github.com/Oneiriq/surql-py/releases/tag/v1.5.1
+[1.5.0]: https://github.com/Oneiriq/surql-py/releases/tag/v1.5.0
+[1.4.0]: https://github.com/Oneiriq/surql-py/releases/tag/v1.4.0
+[1.3.1]: https://github.com/Oneiriq/surql-py/releases/tag/v1.3.1
 [1.2.1]: https://github.com/Oneiriq/surql-py/releases/tag/v1.2.1
 [1.2.0]: https://github.com/Oneiriq/surql-py/releases/tag/v1.2.0
 [1.1.0]: https://github.com/Oneiriq/surql-py/releases/tag/v1.1.0

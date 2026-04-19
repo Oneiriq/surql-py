@@ -74,10 +74,13 @@ nav:
   - Getting Started:
       - Installation: installation.md
       - Quick Start: quickstart.md
+      - Upgrade Notes: migration.md
   - Guides:
       - Schema Definition: schema.md
       - Migrations: migrations.md
       - Query Builder: queries.md
+      - Query UX Helpers: query-ux.md
+      - SurrealDB v3 Patterns: v3-patterns.md
       - Query Hints: query_hints.md
       - Caching: caching.md
       - Streaming: streaming.md
