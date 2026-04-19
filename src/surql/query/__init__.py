@@ -20,6 +20,7 @@ from surql.query.batch import (  # Batch operations
 )
 from surql.query.builder import Query  # Query builder
 from surql.query.crud import (  # CRUD operations
+  aggregate_records,
   count_records,
   create_record,
   create_records,
@@ -263,6 +264,7 @@ __all__ = [
   'query_records_wrapped',
   'upsert_record',
   'count_records',
+  'aggregate_records',
   'exists',
   'first',
   'last',
