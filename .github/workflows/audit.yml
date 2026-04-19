@@ -44,10 +44,16 @@ jobs:
       - name: Install pip-audit
         run: uv pip install --system pip-audit
 
+      - name: Export uv.lock to requirements.txt
+        # `pip-audit --disable-pip` only works with `--requirement`, so
+        # generate a pinned requirements file from our uv.lock for the
+        # offline scan.
+        run: uv export --no-hashes --format requirements-txt --output-file requirements.txt
+
       - name: Run pip-audit (JSON)
         # `--strict` fails on warnings (e.g. skipped deps).
         # `--disable-pip` keeps pip-audit off the network resolver and
-        # forces it to read our already-resolved `uv.lock` contents.
+        # forces it to read our already-resolved lockfile contents.
         # Ignored advisories (with reasons) live in
         # `[tool.pip-audit]` inside `pyproject.toml`.
         # pip-audit does not emit SARIF directly; use JSON. The
@@ -56,6 +62,7 @@ jobs:
           pip-audit \
             --strict \
             --disable-pip \
+            --requirement requirements.txt \
             --format json \
             --output audit.json
 
