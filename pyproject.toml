@@ -1,7 +1,7 @@
 [project]
 name = "oneiriq-surql"
 
-version = "1.5.2"
+version = "1.5.3"
 description = "Code-first database toolkit for SurrealDB - schema definitions, migrations, query building, and typed CRUD."
 authors = [
   { name = "Shon Thomas", email = "shon@oneiriq.com" }
@@ -44,6 +44,14 @@ dependencies = [
   "tenacity>=9.1.2,<10.0.0",
   "typer>=0.21.1,<1.0.0",
   "watchdog>=4.0.0",
+  # Security floors for transitive dependencies. These are not directly
+  # imported by surql but are pulled in via surrealdb / typer / mkdocs.
+  # Bumping here forces uv to resolve patched versions and clears the
+  # corresponding Dependabot advisories.
+  "aiohttp>=3.13.4",      # GHSA: header injection, multipart bypass, SSRF, DNS DoS
+  "pygments>=2.20.0",     # GHSA: ReDoS in lexer
+  "requests>=2.33.0",     # GHSA: .netrc credential leak / parser
+  "urllib3>=2.6.3",       # GHSA: redirect / proxy handling
 ]
 
 [project.optional-dependencies]
@@ -196,7 +204,7 @@ ignore-vulns = [
 dev = [
   "anyio[trio]>=4.0.0",
   "mypy>=1.19.1",
-  "pytest>=9.0.2",
+  "pytest>=9.0.3",
   "pytest-cov>=7.0.0",
   "pytest-watch>=4.2.0",
   "ruff>=0.14.13",
