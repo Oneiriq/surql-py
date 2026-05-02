@@ -19,7 +19,7 @@ env:
 jobs:
   integration:
     name: SurrealDB v3 integration tests
-    runs-on: ubuntu-latest
+    runs-on: [self-hosted, aur0]
 
     steps:
       - name: Checkout code
