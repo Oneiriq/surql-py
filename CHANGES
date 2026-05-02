@@ -5,6 +5,23 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.5.3] - 2026-05-02
+
+### Security
+
+- **Transitive dependency floors for Dependabot advisories.** Added explicit
+  minimum-version constraints to `[project.dependencies]` so uv resolves
+  patched versions of packages that surql does not import directly but
+  pulls in via `surrealdb`, `typer`, and the docs extra:
+  - `aiohttp >= 3.13.4` (header injection, multipart bypass, SSRF, DNS DoS;
+    one high + multiple medium / low advisories)
+  - `pygments >= 2.20.0` (ReDoS in lexer)
+  - `requests >= 2.33.0` (.netrc credential handling)
+  - `urllib3 >= 2.6.3` (redirect / proxy handling; high severity)
+  - `pytest >= 9.0.3` in the dev group (medium advisory)
+
+  No public API or runtime behavior changes; lockfile-only impact.
+
 ## [1.5.2] - 2026-05-02
 
 ### Fixed
