@@ -266,7 +266,7 @@ class RedisCache(CacheBackend):
     if self._client is None:
       import redis.asyncio as redis
 
-      self._client = redis.from_url(self._url, decode_responses=True)
+      self._client = redis.from_url(self._url, decode_responses=True)  # type: ignore[no-untyped-call]
     return self._client
 
   def _make_key(self, key: str) -> str:
