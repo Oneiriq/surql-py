@@ -5,6 +5,22 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.5.2] - 2026-05-02
+
+### Fixed
+
+- **`_denormalize_params` URL false positive (silent CREATE/UPDATE failures).**
+  The record-ID detection regex `^[a-zA-Z_][a-zA-Z0-9_]*:.+$` matched URL
+  schemes like `http://`, `https://`, `ws://`, `wss://`, `file://`, and
+  silently coerced URL strings into `RecordID` objects. SurrealDB returned a
+  coerce error in the result text of an otherwise OK-status query response,
+  which the wrapper swallowed -- writes that included URL params reported
+  success but never persisted. Added a negative lookahead `(?!//)` after
+  the colon so URL strings round-trip unchanged. Discovered while debugging
+  per-workspace embedder configuration in a downstream consumer
+  (`base_url='http://10.0.0.51:11434'` was being rewritten to
+  `RecordID('http', '//10.0.0.51:11434')`).
+
 ## [1.5.1] - 2026-04-18
 
 ### Documentation

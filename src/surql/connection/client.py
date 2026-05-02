@@ -22,7 +22,17 @@ from surql.connection.config import ConnectionConfig
 logger = structlog.get_logger(__name__)
 
 # Pattern matching SurrealDB record ID targets: "table:id" or "table:<complex_id>"
-_RECORD_ID_PATTERN = re.compile(r'^[a-zA-Z_][a-zA-Z0-9_]*:.+$')
+#
+# The negative lookahead ``(?!//)`` after the colon excludes URL schemes
+# (``http://``, ``https://``, ``ws://``, ``wss://``, ``file://``, ...) which
+# share the ``<word>:<rest>`` shape with record-id literals but must NOT be
+# coerced to ``RecordID`` objects. Without this guard, any caller passing a
+# URL parameter (e.g. ``base_url='http://10.0.0.51:11434'``) would have it
+# silently rewritten to ``RecordID('http', '//10.0.0.51:11434')``, which
+# SurrealDB returns a coerce error for in the result text of an otherwise
+# OK-status query response -- the kind of bug that's hard to spot because
+# the Python wrapper sees ``status: 'OK'`` and reports success.
+_RECORD_ID_PATTERN = re.compile(r'^[a-zA-Z_][a-zA-Z0-9_]*:(?!//).+$')
 
 
 def _is_record_id_target(target: str) -> bool:

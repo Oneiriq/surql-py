@@ -58,6 +58,54 @@ class TestIsRecordIdTarget:
     """Detects ULID-style record IDs."""
     assert _is_record_id_target('file:01JQXYZ1234ABCDEF5678') is True
 
+  def test_http_url_not_record_id(self) -> None:
+    """URL strings must not be detected as record IDs.
+
+    Regression: ``http://10.0.0.51:11434`` was being silently coerced
+    into ``RecordID('http', '//10.0.0.51:11434')`` because the original
+    pattern accepted any ``<word>:<rest>`` shape.
+    """
+    assert _is_record_id_target('http://10.0.0.51:11434') is False
+
+  def test_https_url_not_record_id(self) -> None:
+    """HTTPS URLs are not record IDs."""
+    assert _is_record_id_target('https://example.com/path') is False
+
+  def test_ws_url_not_record_id(self) -> None:
+    """WebSocket URLs are not record IDs."""
+    assert _is_record_id_target('ws://surrealdb:8000/rpc') is False
+
+  def test_wss_url_not_record_id(self) -> None:
+    """Secure WebSocket URLs are not record IDs."""
+    assert _is_record_id_target('wss://db.example.com/rpc') is False
+
+  def test_file_url_not_record_id(self) -> None:
+    """``file://`` URLs are not record IDs."""
+    assert _is_record_id_target('file:///tmp/foo.json') is False
+
+  def test_url_in_denormalize_params_passthrough(self) -> None:
+    """Param values that look like URLs round-trip unchanged.
+
+    Verifies the regression at the call-site level: ``_denormalize_params``
+    must not touch URL strings, even when they're nested inside dicts.
+    """
+    payload = {
+      'workspace_id': 'workspace:abc',
+      'base_url': 'http://10.0.0.51:11434',
+      'mqtt_url': 'mqtt://10.0.0.100:1883',
+      'nested': {
+        'gateway': 'ws://surrealdb:8000/rpc',
+      },
+    }
+    result = _denormalize_params(payload)
+    assert isinstance(result, dict)
+    # The record-id string still gets coerced
+    assert not isinstance(result['workspace_id'], str)
+    # URLs stay as strings
+    assert result['base_url'] == 'http://10.0.0.51:11434'
+    assert result['mqtt_url'] == 'mqtt://10.0.0.100:1883'
+    assert result['nested']['gateway'] == 'ws://surrealdb:8000/rpc'
+
 
 # ============================================================================
 # _normalize_sdk_value
