@@ -5,7 +5,8 @@ from unittest.mock import AsyncMock
 
 import pytest
 
-from surql.connection.client import QueryError
+from surql.connection.client import DatabaseClient, QueryError
+from surql.connection.config import ConnectionConfig
 from surql.migration.history import (
   MIGRATION_TABLE_NAME,
   MigrationHistoryError,
@@ -162,7 +163,10 @@ class TestRecordMigration:
     # Last execute call is the CREATE ... SET with <datetime> cast.
     assert mock_db_client.execute.call_count >= 1
     statement, params = mock_db_client.execute.call_args[0]
-    assert 'CREATE type::record($table, $id)' in statement
+    # NOTE: must be `type::thing(table, id)`, not `type::record(table, id)`.
+    # In SurrealDB v3 the two-arg form of `type::record(value, type)` is a
+    # type coercion ("cast value into record<type>"), not a constructor.
+    assert 'CREATE type::thing($table, $id)' in statement
     assert '<datetime> $applied_at' in statement
     assert params['table'] == MIGRATION_TABLE_NAME
     assert params['version'] == '20240101_000000'
@@ -212,7 +216,7 @@ class TestRecordMigration:
     )
 
     _, params = mock_db_client.execute.call_args[0]
-    # Dashes, colons must become underscores so `type::record($table, $id)`
+    # Dashes, colons must become underscores so `type::thing($table, $id)`
     # accepts the value without bracket quoting.
     assert params['id'] == '2026_01_02T12_00_00'
 
@@ -769,3 +773,91 @@ class TestMigrationHistoryError:
     except MigrationHistoryError as error:
       assert str(error) == 'Wrapped error'
       assert error.__cause__ == cause
+
+
+class TestRecordMigrationAgainstEmbeddedDb:
+  """Regression: ``record_migration`` must succeed against a real SurrealDB.
+
+  Pre-1.5.6 the function emitted ``CREATE type::record($table, $id) ...``
+  which crashes on SurrealDB v3 with::
+
+    Expected a record<{id}> but cannot convert '{table}' into a record<{id}>
+
+  because the two-arg form of ``type::record(value, type)`` is a *type
+  coercion* (cast ``value`` into ``record<type>``), not a table+id
+  constructor. The fix replaces it with ``type::thing($table, $id)``,
+  which is the actual constructor.
+
+  The mock-based tests above check that ``record_migration`` *emits*
+  ``type::thing(...)`` -- this test additionally runs the SurrealQL
+  through the embedded ``mem://`` engine to guard against future
+  regressions where someone "fixes" the SurrealQL string but breaks the
+  semantics again. The embedded engine has the same query parser as the
+  remote server, so this catches the bug locally without a Docker
+  container.
+  """
+
+  @pytest.fixture
+  def anyio_backend(self) -> str:
+    """Embedded SurrealDB engine requires asyncio (uses
+    ``asyncio.get_running_loop()`` in its constructor)."""
+    return 'asyncio'
+
+  @pytest.mark.anyio
+  async def test_record_migration_writes_to_embedded_mem_db(self):
+    """Round-trip: insert, then read back via SELECT."""
+    config = ConnectionConfig(
+      _env_file=None,
+      url='mem://',
+      namespace='test',
+      database='test',
+      enable_live_queries=False,
+    )
+    client = DatabaseClient(config)
+    await client.connect()
+    try:
+      await record_migration(
+        client,
+        version='0001_init',
+        description='create users table',
+        checksum='abc123',
+        execution_time_ms=42,
+      )
+      # If we reach here, the CREATE succeeded -- this is the regression
+      # check. Now confirm the row is readable.
+      raw = await client.execute(f'SELECT * FROM {MIGRATION_TABLE_NAME}')
+      records = _extract_records(raw)
+      assert len(records) == 1
+      assert records[0]['version'] == '0001_init'
+      assert records[0]['description'] == 'create users table'
+      assert records[0]['checksum'] == 'abc123'
+      assert records[0]['execution_time_ms'] == 42
+    finally:
+      await client.disconnect()
+
+  @pytest.mark.anyio
+  async def test_record_migration_sanitized_id_round_trips(self):
+    """Versions with dashes/colons must sanitise to a valid record id and
+    still round-trip through ``type::thing``."""
+    config = ConnectionConfig(
+      _env_file=None,
+      url='mem://',
+      namespace='test',
+      database='test',
+      enable_live_queries=False,
+    )
+    client = DatabaseClient(config)
+    await client.connect()
+    try:
+      await record_migration(
+        client,
+        version='2026-05-02T12:00:00',
+        description='dashed and colon version',
+        checksum='c2',
+      )
+      raw = await client.execute(f'SELECT * FROM {MIGRATION_TABLE_NAME}')
+      records = _extract_records(raw)
+      assert len(records) == 1
+      assert records[0]['version'] == '2026-05-02T12:00:00'
+    finally:
+      await client.disconnect()

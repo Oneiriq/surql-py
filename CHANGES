@@ -5,6 +5,35 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.5.6] - 2026-05-02
+
+### Fixed
+
+- **Migration runner / record-id construction (`type::record` vs
+  `type::thing`).** `record_migration` and `DatabaseClient.select('table:id')`
+  were emitting `type::record($table, $id)` to construct a record id, but
+  in SurrealDB v3 the two-arg form of `type::record(value, type)` is a
+  *type coercion* (cast `value` into `record<type>`), NOT a table+id
+  constructor. Calling `type::record('_migration_history', '0001_init')`
+  is interpreted as "coerce `'_migration_history'` into
+  `record<0001_init>`" and fails with `Expected a record<0001_init> but
+  cannot convert '_migration_history' into a record<0001_init>`. Replaced
+  both call sites with `type::thing($table, $id)`, which is the actual
+  record-id constructor. This blocked any downstream consumer from running
+  migrations with surql-py 1.5.0--1.5.5.
+- The `RecordRef` / `record_ref()` and `type_record()` Python helpers also
+  rendered `type::record('table', id)` -- they now emit
+  `type::thing('table', id)`. The Python function names are preserved for
+  source compatibility (`type_record` is now an alias for `type_thing`).
+- Updated `docs/v3-patterns.md`, `docs/migration.md`, `docs/query-ux.md`,
+  `docs/api/index.md`, and `README.md` to reflect that `type::thing` is
+  the constructor on both v2 and v3 (correcting the earlier claim that
+  v3 renamed `type::thing` to `type::record`).
+- Added `tests/test_migration_history.py::TestRecordMigrationAgainstEmbeddedDb`
+  which round-trips `record_migration` through an embedded `mem://`
+  SurrealDB so future regressions of this kind are caught locally without
+  a Docker container.
+
 ## [1.5.5] - 2026-05-02
 
 ### Added

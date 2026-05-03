@@ -383,17 +383,21 @@ class TestDatabaseClient:
     mock_db_client._client.select.assert_called_once_with('user')
 
   @pytest.mark.anyio
-  async def test_select_record_id_uses_type_record_query(
+  async def test_select_record_id_uses_type_thing_query(
     self, mock_db_client: DatabaseClient
   ) -> None:
     """Regression (bug #15): `"table:id"` targets must route through
-    `SELECT * FROM type::record($table, $id)`.
+    `SELECT * FROM type::thing($table, $id)`.
 
     On SurrealDB v3, passing a bare ``"user:alice"`` string to
     ``db.select`` is interpreted as a table name containing a colon
     and returns nothing. The client must detect record-id-shaped
     targets and dispatch via raw SurrealQL so the server treats them
     as record ids. TS / rs / go ports all do this.
+
+    Must use ``type::thing(table, id)`` (not ``type::record(table, id)``):
+    in v3 the two-arg form of ``type::record`` is a type coercion, not a
+    constructor.
     """
     mock_db_client._client.query = AsyncMock(return_value=[{'id': 'user:alice', 'name': 'Alice'}])
 
@@ -402,10 +406,10 @@ class TestDatabaseClient:
     # Must NOT go through the SDK's bare string `select` path.
     mock_db_client._client.select.assert_not_called()
 
-    # Must hit `query` with `type::record($table, $id)` and bound params.
+    # Must hit `query` with `type::thing($table, $id)` and bound params.
     mock_db_client._client.query.assert_called_once()
     sql, params = mock_db_client._client.query.call_args.args
-    assert 'type::record($table, $id)' in sql
+    assert 'type::thing($table, $id)' in sql
     assert params == {'table': 'user', 'id': 'alice'}
 
     # Single-record unwrap still yields a dict (not a list).

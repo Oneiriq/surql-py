@@ -501,8 +501,8 @@ Raw SurrealQL function-call wrapper that renders verbatim when used as a value.
 **Key Functions:**
 
 - `surql_fn(name, *args)` - Build a `SurrealFn` from a function name and arguments
-- `type_record(table, id)` - Build `type::record('table', id)` (v3-preferred form)
-- `type_thing(table, id)` - Build `type::thing('table', id)` (v2-compatible alias)
+- `type_record(table, id)` - Build a `type::thing('table', id)` record-id (the helper is named `type_record` for source compatibility but emits `type::thing`)
+- `type_thing(table, id)` - Build `type::thing('table', id)` (canonical name)
 
 See [Query UX Helpers](../query-ux.md#type_record-type_thing) for composition examples.
 

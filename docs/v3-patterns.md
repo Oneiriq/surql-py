@@ -69,20 +69,23 @@ await count_records('user')  # -> SELECT count() AS count FROM user GROUP ALL
 
 `count_if(predicate)` renders `count(<predicate>)` for conditional counts (see [Query UX helpers](query-ux.md#count_if)).
 
-## Record-ID construction: `type::record`, not `type::thing`
+## Record-ID construction: `type::thing(table, id)`
 
-`type::thing('table', 'id')` was renamed to `type::record('table', 'id')` in v3. The `type::thing` name still resolves for backwards compatibility but new code should use `type::record` directly.
+The constructor for a record id from a separate table name and id value is `type::thing(table, id)` on both SurrealDB v2 and v3.
+
+> [!WARNING]
+> Earlier versions of this guide claimed `type::thing` was renamed to `type::record` in v3. That was wrong. In v3 the **two-arg** form of `type::record(value, type)` is a *type coercion* -- it casts `value` into `record<type>`, and `type::record('user', 'alice')` is interpreted as "coerce 'user' into `record<alice>`" (which fails). The single-arg form `type::record('user:alice')` parses a full record-id string. For table+id construction, use `type::thing(table, id)`.
 
 **Prefer:**
 
 ```python
-from surql import type_record
+from surql import type_record  # alias kept for source compatibility
 
 ref = type_record('user', 'alice').to_surql()
-# -> type::record('user', 'alice')
+# -> type::thing('user', 'alice')
 ```
 
-`type_thing()` is still exported for code that must target older servers, and generates the exact v2 form:
+`type_thing()` is the canonical name and is identical:
 
 ```python
 from surql import type_thing

@@ -10,7 +10,7 @@ A code-first database toolkit for [SurrealDB](https://surrealdb.com/). Define sc
 
 - **Code-First Migrations** - Schema changes defined in code with automatic migration generation
 - **Type-Safe Query Builder** - Composable queries with Pydantic model integration
-- **SurrealDB v3 Ready** - Emits v3-correct SurrealQL (datetime casts, `count() GROUP ALL`, `type::record`, buffered transactions, idempotent DDL)
+- **SurrealDB v3 Ready** - Emits v3-correct SurrealQL (datetime casts, `count() GROUP ALL`, `type::thing(table, id)` record-id construction, buffered transactions, idempotent DDL)
 - **Query UX Helpers** - First-class wrappers for `time::now`, `math::*`, `string::*`, `count_if`, `type_record`, and typed aggregations -- no raw SurrealQL required
 - **Vector Search** - HNSW and MTREE index support with 8 distance metrics and EFC/M tuning
 - **Graph Traversal** - Native SurrealDB graph features with edge relationships
@@ -93,7 +93,7 @@ rows = await aggregate_records(
 
 # Record-ID construction without string concatenation
 ref = type_record('user', 'alice').to_surql()
-# -> type::record('user', 'alice')
+# -> type::thing('user', 'alice')
 ```
 
 ### Deploy across environments
