@@ -8,7 +8,7 @@ Exercises every v3-correctness fix from the release/1.4.0 campaign:
 - #13: transactions flush as a single batched RPC
 - #14: ``count_records`` aggregates via ``GROUP ALL``
 - #15: ``get_record`` / ``db.select('table:id')`` resolves the
-       record via ``type::record``
+       record via ``type::thing``
 - #16: ``DEFINE TABLE`` / ``DEFINE FIELD`` / ``DEFINE INDEX`` are
        idempotent on re-run
 - #17: table-missing probe does not swallow unrelated errors
@@ -173,12 +173,12 @@ class TestCountRecordsV3:
 
 
 # ---------------------------------------------------------------------------
-# db.select("table:id") via type::record (#15)
+# db.select("table:id") via type::thing (#15)
 # ---------------------------------------------------------------------------
 
 
 class TestRecordIdSelectV3:
-  """Bug #15: bare `table:id` string -> raw type::record SQL."""
+  """Bug #15: bare `table:id` string -> raw type::thing SQL."""
 
   @pytest.mark.anyio
   async def test_get_record_resolves_record_id(self, integration_client: DatabaseClient) -> None:

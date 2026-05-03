@@ -81,7 +81,7 @@ def surql_fn(name: str, *args: Any) -> SurrealFn:
 
 
 def _render_record_id_arg(record_id: Any) -> str:
-  """Render a record_id argument for type::record / type::thing calls.
+  """Render a record_id argument for ``type::thing`` calls.
 
   - ``RecordID`` instances render via their ``to_surql()`` form.
   - ``SurrealFn`` values render verbatim (so nested function calls compose).
@@ -112,7 +112,17 @@ def _render_record_id_arg(record_id: Any) -> str:
 
 
 def type_record(table: str, record_id: Any) -> SurrealFn:
-  """Build a ``type::record('table', id)`` SurrealDB function call.
+  """Build a ``type::thing('table', id)`` SurrealDB function call.
+
+  Note: previously this emitted ``type::record('table', id)``, but in
+  SurrealDB v3 the two-arg form of ``type::record(value, type)`` is a *type
+  coercion* (cast ``value`` into ``record<type>``), NOT a table+id
+  constructor. Calling ``type::record('task', 'abc')`` is interpreted as
+  "coerce 'task' into ``record<abc>``" and fails. The correct constructor
+  is ``type::thing(table, id)``, which is what we emit now. The Python
+  helper is still named ``type_record`` for source compatibility, but the
+  SurrealQL it produces is ``type::thing(...)`` -- :func:`type_thing` is
+  a thin alias that produces the same output.
 
   Produces a :class:`SurrealFn` that renders as raw SurrealQL, so it
   composes with query builders and raw queries just like :func:`surql_fn`.
@@ -124,26 +134,25 @@ def type_record(table: str, record_id: Any) -> SurrealFn:
       :class:`SurrealFn` values render verbatim.
 
   Returns:
-    ``SurrealFn`` wrapping a ``type::record('table', id)`` expression.
+    ``SurrealFn`` wrapping a ``type::thing('table', id)`` expression.
 
   Examples:
     >>> type_record('task', 'abc').to_surql()
-    "type::record('task', 'abc')"
+    "type::thing('task', 'abc')"
 
     >>> type_record('post', 42).to_surql()
-    "type::record('post', 42)"
+    "type::thing('post', 42)"
   """
   arg = _render_record_id_arg(record_id)
-  return SurrealFn(expression=f"type::record('{table}', {arg})")
+  return SurrealFn(expression=f"type::thing('{table}', {arg})")
 
 
 def type_thing(table: str, record_id: Any) -> SurrealFn:
-  """Build a ``type::thing('table', id)`` SurrealDB function call (v2 form).
+  """Build a ``type::thing('table', id)`` SurrealDB function call.
 
-  ``type::thing`` is the legacy/alternate form for constructing record IDs
-  in SurrealDB v2; it behaves the same as :func:`type_record` at the API
-  level but renders the ``type::thing`` function name, which is still
-  accepted by SurrealDB v3 for backwards compatibility.
+  ``type::thing(table, id)`` is the SurrealQL constructor for record IDs
+  in both v2 and v3. This is now an alias for :func:`type_record`, which
+  also emits ``type::thing(...)``.
 
   Args:
     table: Target table name.

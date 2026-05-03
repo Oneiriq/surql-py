@@ -92,7 +92,7 @@ Additive at the Python API level. The SurrealQL emitted by the library changed t
 - **Datetime cast on `_migration_history`**: `record_migration()` now writes `applied_at = <datetime> $applied_at`.
 - **Buffered `BEGIN`/`COMMIT`**: `DatabaseClient.execute()` batches transaction-scoped statements into a single RPC frame so v3 honours the commit.
 - **`GROUP ALL` on `count_records`**: `count_records()` now appends `GROUP ALL` so v3 accepts the aggregate. The helper still accepts both the envelope shape and a bare scalar list from the SDK.
-- **`type::record` over `type::thing`**: select record-ID targets route through `type::record(...)` on v3. `type_record` is now preferred over `type_thing` in new code.
+- **`type::thing` constructor**: select record-ID targets and the migration history writer route through `type::thing(table, id)` on v3. (1.5.0--1.5.5 mistakenly emitted `type::record(table, id)`, but that's a type coercion in v3, not a constructor.) The Python helper `type_record(...)` is kept as an alias and now produces `type::thing(...)`.
 - **Idempotent DDL**: `DEFINE TABLE _migration_history IF NOT EXISTS` (and the `if_not_exists` flag across the schema generator) so `surql migrate up` is safe to re-run.
 - **Graph depth unrolling**: `traverse(...)` unrolls `{min..max}` depth ranges into literal hop unions that v3 accepts.
 - **SDK pin**: minimum `surrealdb` SDK bumped to v2.0.0a1, which speaks v3's RPC protocol.
@@ -104,7 +104,7 @@ Nothing is required to keep 1.3.x code running. If you hand-write SurrealQL anyw
 
 - Replace `count(*)` with `count()` and add `GROUP ALL` to any full-table aggregate. See [v3 patterns: count() aggregates](v3-patterns.md#count-aggregates-require-group-all).
 - Cast datetime literals explicitly: `<datetime> $value` or `<datetime> '2026-...'`. See [v3 patterns: datetime cast](v3-patterns.md#datetime-cast-on-insert).
-- Prefer `type::record('table', id)` over `type::thing('table', id)` for new expressions. See [v3 patterns: record-ID construction](v3-patterns.md#record-id-construction-typerecord-not-typething).
+- Use `type::thing('table', id)` for record-id construction (and prefer `type_thing(...)` / `type_record(...)` helpers). See [v3 patterns: record-ID construction](v3-patterns.md#record-id-construction-typething-table-id).
 - Ensure `BEGIN TRANSACTION; ...; COMMIT TRANSACTION;` is issued in a single `client.execute(...)` call, or use the `transaction()` context manager which already does so.
 
 ## 1.3.1 -- embedded migration fix

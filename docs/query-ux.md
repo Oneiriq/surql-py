@@ -6,38 +6,38 @@ Every example below shows the raw SurrealQL you used to have to write and the ty
 
 ## Why bother?
 
-- **Correctness under v3** — `type::record` vs `type::thing`, `count()` vs `count(*)`, explicit `<datetime>` casts, and `GROUP ALL` are all easy to forget. The helpers emit the correct form by default.
+- **Correctness under v3** — `type::thing` (constructor) vs `type::record` (type coercion), `count()` vs `count(*)`, explicit `<datetime>` casts, and `GROUP ALL` are all easy to forget. The helpers emit the correct form by default.
 - **Composability** — helpers return `SurrealFn` instances, so they slot into `Query.select([...])`, `Query.set(**kwargs)`, `aggregate_records(select={...})`, and `client.execute(params=...)` without double-escaping.
 - **Refactorability** — renaming a field no longer means a grep across string-concatenated SurrealQL; the helpers take parameters, not literals.
 
 ## `type_record` / `type_thing`
 
-Build `type::record('table', id)` / `type::thing('table', id)` expressions without string concatenation.
+Build `type::thing('table', id)` record-id expressions without string concatenation. Both `type_record` and `type_thing` Python helpers emit `type::thing(...)`; `type_record` is kept as a source-compat alias because earlier versions of this library mistakenly emitted `type::record(table, id)` -- which in SurrealDB v3 is a type-coercion call (`cast 'table' into record<id>`), not a constructor, and fails at runtime.
 
 ```python
 from surql import type_record, type_thing, RecordID
 
 # Before
-raw = "type::record('user', 'alice')"
+raw = "type::thing('user', 'alice')"
 
 # After
 type_record('user', 'alice').to_surql()
-# -> "type::record('user', 'alice')"
+# -> "type::thing('user', 'alice')"
 
 # Integers render unquoted
 type_record('post', 42).to_surql()
-# -> "type::record('post', 42)"
+# -> "type::thing('post', 42)"
 
 # RecordID and SurrealFn arguments render verbatim (no double-quoting)
 type_record('edge', RecordID(table='user', id='alice')).to_surql()
-# -> "type::record('edge', user:alice)"
+# -> "type::thing('edge', user:alice)"
 
-# Legacy v2 form, still accepted by v3
+# Canonical name; identical output
 type_thing('user', 'alice').to_surql()
 # -> "type::thing('user', 'alice')"
 ```
 
-Prefer `type_record` for new code (see [v3 patterns](v3-patterns.md#record-id-construction-typerecord-not-typething)); `type_thing` exists for callers that still target v2 servers.
+Both forms emit the same SurrealQL; pick whichever name reads better in your code (see [v3 patterns](v3-patterns.md#record-id-construction-typething-table-id)).
 
 ## Function factories (`SurrealFn`)
 

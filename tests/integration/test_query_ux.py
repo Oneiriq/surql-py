@@ -3,7 +3,7 @@
 Exercises behavior that only matters against a live ``surrealdb:v3.0.5``
 container:
 
-- ``type::record(...)`` rendered through the builder still round-trips
+- ``type::thing(...)`` rendered through the builder still round-trips
   against v3 (sub-feature #1).
 - ``aggregate_records`` executes GROUP BY / GROUP ALL queries and unwraps
   the response envelope (sub-feature #4).
@@ -24,13 +24,15 @@ from surql.types.surreal_fn import type_record
 
 
 class TestTypeRecordV3:
-  """type::record(...) must still round-trip through the builder on v3."""
+  """``type_record`` (which emits ``type::thing(...)``) must still
+  round-trip through the builder on v3."""
 
   @pytest.mark.anyio
   async def test_insert_with_type_record_reference(
     self, integration_client: DatabaseClient
   ) -> None:
-    """Insert a comment that references a user via ``type::record()``."""
+    """Insert a comment that references a user via ``type_record`` (which
+    emits ``type::thing(...)`` underneath)."""
     await integration_client.execute('DEFINE TABLE ux_user SCHEMALESS;')
     await integration_client.execute('DEFINE TABLE ux_comment SCHEMALESS;')
     await integration_client.execute("CREATE ux_user:alice SET name = 'Alice'")
