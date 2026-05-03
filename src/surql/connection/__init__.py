@@ -37,7 +37,13 @@ from surql.connection.context import (
   set_db,
 )
 from surql.connection.registry import ConnectionRegistry, RegistryError, get_registry
-from surql.connection.streaming import LiveQuery, StreamingError, StreamingManager
+from surql.connection.streaming import (
+  EmbeddedPollingStreamingManager,
+  LiveQuery,
+  StreamingError,
+  StreamingManager,
+  is_embedded_url,
+)
 from surql.connection.transaction import (
   Transaction,
   TransactionError,
@@ -84,5 +90,7 @@ __all__ = [
   'TokenAuth',
   # Streaming
   'StreamingManager',
+  'EmbeddedPollingStreamingManager',
   'LiveQuery',
+  'is_embedded_url',
 ]
