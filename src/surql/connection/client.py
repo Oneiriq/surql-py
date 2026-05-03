@@ -4,9 +4,12 @@ import asyncio
 import re
 from collections.abc import AsyncIterator
 from contextlib import asynccontextmanager
-from typing import Any
+from typing import TYPE_CHECKING, Any
 
 import structlog
+
+if TYPE_CHECKING:
+  from surql.connection.streaming import LiveQuery, StreamingManager
 from surrealdb import AsyncSurreal
 from surrealdb import RecordID as SdkRecordID
 from tenacity import (
@@ -181,6 +184,68 @@ class DatabaseClient:
   def is_connected(self) -> bool:
     """Check if client is currently connected."""
     return self._connected and self._client is not None
+
+  @property
+  def streaming(self) -> 'StreamingManager':
+    """Public accessor for the live-query streaming manager.
+
+    Returns:
+      The connection's :class:`StreamingManager`. Use this to start LIVE
+      SELECTs, subscribe to notifications, and kill queries.
+
+    Raises:
+      ConnectionError: If the client is not connected.
+      StreamingError: If live queries are disabled on this connection
+        (set ``enable_live_queries=True`` on :class:`ConnectionConfig`,
+        which requires a WebSocket or embedded engine URL).
+
+    Example:
+      ```python
+      query = await client.streaming.live('reading')
+      async for notification in client.streaming.subscribe(query):
+        ...
+      ```
+    """
+    if not self.is_connected:
+      raise ConnectionError('Client is not connected to database')
+    if self._streaming is None:
+      from surql.connection.streaming import StreamingError
+
+      raise StreamingError(
+        'Live queries are disabled. Set enable_live_queries=True on '
+        'ConnectionConfig and use a WebSocket or embedded engine URL.'
+      )
+    return self._streaming
+
+  async def live(self, table: str, diff: bool = False) -> 'LiveQuery':
+    """Start a LIVE SELECT on a table.
+
+    Convenience wrapper around ``client.streaming.live(table, diff=diff)``
+    so callers can subscribe to live changes without reaching into the
+    streaming manager directly.
+
+    Args:
+      table: Table name to watch.
+      diff: If True, notifications carry JSON-Patch diffs instead of full
+        records.
+
+    Returns:
+      A :class:`LiveQuery` handle. Pass it to ``client.streaming.subscribe``
+      to consume notifications, or ``client.streaming.kill`` to stop it.
+
+    Raises:
+      ConnectionError: If the client is not connected.
+      StreamingError: If live queries are disabled or the underlying
+        ``LIVE`` call fails.
+
+    Example:
+      ```python
+      query = await client.live('reading')
+      async for notification in client.streaming.subscribe(query):
+        ...
+      ```
+    """
+    return await self.streaming.live(table, diff=diff)
 
   async def connect(self) -> None:
     """Establish connection to the database with retry logic.

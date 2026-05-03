@@ -1,10 +1,12 @@
 """Tests for streaming module."""
 
-from unittest.mock import AsyncMock, MagicMock
+from unittest.mock import AsyncMock, MagicMock, Mock
 from uuid import uuid4
 
 import pytest
 
+from surql.connection.client import ConnectionError, DatabaseClient
+from surql.connection.config import ConnectionConfig
 from surql.connection.streaming import LiveQuery, StreamingError, StreamingManager
 
 
@@ -399,3 +401,51 @@ class TestStreamingManager:
     assert query1.diff is False
     assert query2.diff is True
     assert len(streaming_manager.get_active_queries()) == 2
+
+
+class TestDatabaseClientStreamingPublicAPI:
+  """Tests for the public ``streaming`` property and ``live`` method on DatabaseClient."""
+
+  @pytest.fixture
+  def _config(self) -> ConnectionConfig:
+    return ConnectionConfig(_env_file=None, enable_live_queries=True)
+
+  @pytest.fixture
+  def _connected_client(self, _config: ConnectionConfig) -> DatabaseClient:
+    client = DatabaseClient(_config)
+    sdk = Mock()
+    sdk.live = AsyncMock(return_value=uuid4())
+    client._client = sdk
+    client._connected = True
+    client._streaming = StreamingManager(sdk)
+    return client
+
+  def test_streaming_property_raises_when_not_connected(self, _config: ConnectionConfig) -> None:
+    client = DatabaseClient(_config)
+    with pytest.raises(ConnectionError):
+      _ = client.streaming
+
+  def test_streaming_property_raises_when_disabled(self) -> None:
+    config = ConnectionConfig(_env_file=None, enable_live_queries=False)
+    client = DatabaseClient(config)
+    client._client = Mock()
+    client._connected = True
+    client._streaming = None
+    with pytest.raises(StreamingError, match='disabled'):
+      _ = client.streaming
+
+  def test_streaming_property_returns_manager(self, _connected_client: DatabaseClient) -> None:
+    assert isinstance(_connected_client.streaming, StreamingManager)
+
+  @pytest.mark.anyio
+  async def test_live_convenience_method(self, _connected_client: DatabaseClient) -> None:
+    query = await _connected_client.live('reading')
+    assert isinstance(query, LiveQuery)
+    assert query.table == 'reading'
+    _connected_client._client.live.assert_called_once_with('reading', diff=False)
+
+  @pytest.mark.anyio
+  async def test_live_convenience_method_diff(self, _connected_client: DatabaseClient) -> None:
+    query = await _connected_client.live('reading', diff=True)
+    assert query.diff is True
+    _connected_client._client.live.assert_called_once_with('reading', diff=True)
