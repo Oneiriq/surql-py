@@ -9,7 +9,11 @@ from typing import TYPE_CHECKING, Any
 import structlog
 
 if TYPE_CHECKING:
-  from surql.connection.streaming import LiveQuery, StreamingManager
+  from surql.connection.streaming import (
+    EmbeddedPollingStreamingManager,
+    LiveQuery,
+    StreamingManager,
+  )
 from surrealdb import AsyncSurreal
 from surrealdb import RecordID as SdkRecordID
 from tenacity import (
@@ -175,10 +179,13 @@ class DatabaseClient:
 
     # Import here to avoid circular imports
     from surql.connection.auth import AuthManager
-    from surql.connection.streaming import StreamingManager
+    from surql.connection.streaming import (
+      EmbeddedPollingStreamingManager,
+      StreamingManager,
+    )
 
     self._auth = AuthManager()
-    self._streaming: StreamingManager | None = None
+    self._streaming: StreamingManager | EmbeddedPollingStreamingManager | None = None
 
   @property
   def is_connected(self) -> bool:
@@ -186,12 +193,19 @@ class DatabaseClient:
     return self._connected and self._client is not None
 
   @property
-  def streaming(self) -> 'StreamingManager':
+  def streaming(self) -> 'StreamingManager | EmbeddedPollingStreamingManager':
     """Public accessor for the live-query streaming manager.
 
     Returns:
-      The connection's :class:`StreamingManager`. Use this to start LIVE
-      SELECTs, subscribe to notifications, and kill queries.
+      The connection's :class:`StreamingManager` (for ``ws://`` / ``wss://``
+      URLs) or :class:`EmbeddedPollingStreamingManager` (for embedded engine
+      URLs such as ``surrealkv://``, ``mem://``, ``file://``). Both expose
+      the same surface (``live`` / ``subscribe`` / ``kill`` / ``kill_all`` /
+      ``get_active_queries``); the polling variant emits CREATE-only
+      notifications at ``ConnectionConfig.live_poll_interval_s`` cadence and
+      cannot observe UPDATE / DELETE -- it exists because the upstream
+      ``surrealdb`` Python SDK ships an embedded connection that is missing
+      the live-notification dispatcher.
 
     Raises:
       ConnectionError: If the client is not connected.
@@ -286,11 +300,32 @@ class DatabaseClient:
           await self._client.use(self._config.namespace, self._config.database)
           self._connected = True
 
-          # Initialize streaming if WebSocket and enabled
+          # Initialize streaming if enabled. WebSocket URLs use the native
+          # notification dispatcher; embedded URLs (surrealkv://, mem://,
+          # file://) use a polling fallback because the upstream SDK's
+          # ``AsyncEmbeddedSurrealConnection`` does not implement live-query
+          # notifications.
           if self._config.enable_live_queries:
-            from surql.connection.streaming import StreamingManager
+            from surql.connection.streaming import (
+              EmbeddedPollingStreamingManager,
+              StreamingManager,
+              is_embedded_url,
+            )
 
-            self._streaming = StreamingManager(self._client)
+            if is_embedded_url(self._config.url):
+              self._streaming = EmbeddedPollingStreamingManager(
+                self,
+                interval_s=self._config.live_poll_interval_s,
+                max_seen_ids=self._config.live_poll_max_seen_ids,
+              )
+              self._log.info(
+                'embedded_polling_streaming_enabled',
+                interval_s=self._config.live_poll_interval_s,
+                max_seen_ids=self._config.live_poll_max_seen_ids,
+                note='LIVE notifications via polling fallback (CREATE only)',
+              )
+            else:
+              self._streaming = StreamingManager(self._client)
 
           self._log.info('connected_to_database')
 

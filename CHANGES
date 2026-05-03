@@ -5,6 +5,42 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.5.5] - 2026-05-02
+
+### Added
+
+- **Polling LIVE-query fallback for the embedded SurrealDB engine.** The
+  upstream `surrealdb` Python SDK's `AsyncEmbeddedSurrealConnection`
+  inherits `live()` / `subscribe_live()` from the WebSocket connection but
+  never initialises the `live_queues` attribute and the underlying Rust
+  extension (`_surrealdb_ext.AsyncEmbeddedDB`) only exposes a one-shot
+  `execute(cbor) -> bytes` call -- so calling `client.live(...)` on a
+  `surrealkv://` / `mem://` / `file://` URL crashes with
+  `AttributeError: 'AsyncEmbeddedSurrealConnection' object has no attribute
+  'live_queues'`.
+
+  `DatabaseClient.connect()` now detects embedded URLs (any of `mem://`,
+  `memory://`, `file://`, `surrealkv://`, `rocksdb://`, `tikv://`) and
+  installs a new `EmbeddedPollingStreamingManager` instead of the WS-native
+  `StreamingManager`. The polling manager exposes the same surface
+  (`live` / `subscribe` / `subscribe_with_callback` / `kill` / `kill_all` /
+  `get_active_queries`) so existing call sites do not branch on engine
+  type. It re-runs `SELECT * FROM <table>` on a configurable cadence
+  (default 0.25s / 4 Hz) and emits `{'action': 'CREATE', 'result': <row>}`
+  notifications for record ids that haven't been seen before, primed on
+  the first tick so historical rows do not flood the consumer. Two new
+  `ConnectionConfig` knobs control the fallback: `live_poll_interval_s`
+  (default `0.25`) and `live_poll_max_seen_ids` (default `10_000`,
+  bounded LRU).
+
+  This is a degraded mode -- only CREATE events are produced; UPDATE and
+  DELETE are not observable; latency is bounded by the poll interval --
+  but it lets downstream consumers (e.g. tinytropolis's LIVE-channels
+  dashboard pipeline) keep their embedded-database design constraint
+  instead of having to spin up a sidecar `ws://` SurrealDB. Public
+  re-exports: `EmbeddedPollingStreamingManager` and `is_embedded_url` from
+  `surql.connection`.
+
 ## [1.5.4] - 2026-05-02
 
 ### Added

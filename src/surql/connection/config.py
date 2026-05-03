@@ -93,6 +93,27 @@ class ConnectionConfig(BaseSettings):
     default=True,
     description='Enable live query support (requires WebSocket)',
   )
+  live_poll_interval_s: float = Field(
+    default=0.25,
+    gt=0.0,
+    description=(
+      'Poll interval for the embedded-engine LIVE fallback. Only used when '
+      'connecting via an embedded URL (mem://, memory://, file://, '
+      'surrealkv://, rocksdb://, tikv://) because the upstream Python SDK '
+      'does not implement live-query notifications for the embedded engine. '
+      'Lower values reduce notification latency at the cost of more queries.'
+    ),
+  )
+  live_poll_max_seen_ids: int = Field(
+    default=10_000,
+    ge=1,
+    description=(
+      'Bounded LRU cap on the per-table seen-id set used by the embedded-'
+      'engine LIVE fallback. Tune to your retention window: ids evicted '
+      'from this cache will be re-emitted as CREATE if they reappear in a '
+      'subsequent poll.'
+    ),
+  )
 
   @field_validator('db_ns', 'db')
   @classmethod
