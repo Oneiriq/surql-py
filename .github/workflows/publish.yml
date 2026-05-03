@@ -66,7 +66,15 @@ jobs:
           path: dist/
 
   publish-testpypi:
-    runs-on: [self-hosted, aur0]
+    # Trusted publishing requires a GH-hosted runner. The
+    # `pypa/gh-action-pypi-publish` action runs as a Docker container that
+    # bind-mounts RUNNER_TEMP subpaths under `/_work/.../_temp/...`. On the
+    # aur0 self-hosted runner those paths (`_runner_file_commands` etc.)
+    # don't exist, so docker fails with `Bind mount failed`. OIDC token
+    # minting for trusted publishing is also only reliably issued for
+    # GH-hosted ubuntu-latest runners. Keep build/test on aur0; publish on
+    # ubuntu-latest.
+    runs-on: ubuntu-latest
     needs: build
     if: >-
       (github.event_name == 'workflow_dispatch' && github.event.inputs.target == 'testpypi') ||
@@ -87,7 +95,9 @@ jobs:
           repository-url: https://test.pypi.org/legacy/
 
   publish-pypi:
-    runs-on: [self-hosted, aur0]
+    # See note on `publish-testpypi` above: trusted publishing must run on a
+    # GH-hosted runner, not aur0.
+    runs-on: ubuntu-latest
     needs: build
     if: >-
       (github.event_name == 'workflow_dispatch' && github.event.inputs.target == 'pypi') ||
