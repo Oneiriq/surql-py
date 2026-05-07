@@ -83,6 +83,34 @@ class TestIsRecordIdTarget:
     """``file://`` URLs are not record IDs."""
     assert _is_record_id_target('file:///tmp/foo.json') is False
 
+  def test_prose_with_leading_word_colon_not_record_id(self) -> None:
+    """Prose starting with ``<word>:`` must not be detected as a record ID.
+
+    Regression: a ``memory_entry.content`` string starting with ``Pattern:``
+    (or ``TODO:``, ``Note:``, etc.) was being silently coerced into
+    ``RecordID('Pattern', ' when a freshly-added module ...')`` because the
+    original pattern accepted any ``<word>:<rest>`` shape. SurrealDB then
+    rejected the write at the schema layer because the field is typed
+    ``string``: ``Couldn't coerce value for field `content`... Expected
+    `string` but found `Pattern: ...`.``
+    """
+    assert _is_record_id_target('Pattern: when a freshly-added module') is False
+    assert _is_record_id_target('TODO: implement the dispatch loop') is False
+    assert _is_record_id_target('Note: see also adjacent module') is False
+    assert _is_record_id_target('Reason: cache miss on the warm path') is False
+    assert _is_record_id_target('Why: the schema requires it') is False
+
+  def test_record_id_with_trailing_whitespace_not_record_id(self) -> None:
+    """Record-ID-shaped strings with trailing whitespace are rejected.
+
+    Real SurrealDB record IDs don't carry whitespace; if a caller has
+    ``"user:alice "`` they're probably mishandling input. Reject so the
+    coerce-on-write contract stays predictable.
+    """
+    assert _is_record_id_target('user:alice ') is False
+    assert _is_record_id_target('user:alice\n') is False
+    assert _is_record_id_target('user: alice') is False
+
   def test_url_in_denormalize_params_passthrough(self) -> None:
     """Param values that look like URLs round-trip unchanged.
 
@@ -105,6 +133,30 @@ class TestIsRecordIdTarget:
     assert result['base_url'] == 'http://10.0.0.51:11434'
     assert result['mqtt_url'] == 'mqtt://10.0.0.100:1883'
     assert result['nested']['gateway'] == 'ws://surrealdb:8000/rpc'
+
+  def test_prose_in_denormalize_params_passthrough(self) -> None:
+    """Memory-entry-style prose round-trips as plain strings.
+
+    Verifies the prose regression at the call-site level: a payload mixing
+    a real record-id reference with prose content (the ``store_memory``
+    shape) must coerce only the record-id and leave the content untouched.
+    """
+    payload = {
+      'workspace': 'workspace:7a1unfu8ed4wvezbie58',
+      'content': 'Pattern: when a freshly-added module triggers dead-code',
+      'note': 'TODO: implement scheduler loop',
+      'nested': {
+        'reason': 'Why: schema rejects strings in record fields',
+      },
+    }
+    result = _denormalize_params(payload)
+    assert isinstance(result, dict)
+    # Real record-id still gets coerced
+    assert not isinstance(result['workspace'], str)
+    # Prose stays as strings, untouched
+    assert result['content'] == payload['content']
+    assert result['note'] == payload['note']
+    assert result['nested']['reason'] == payload['nested']['reason']
 
 
 # ============================================================================
