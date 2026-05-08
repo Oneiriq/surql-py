@@ -5,6 +5,23 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.5.7] - 2026-05-05
+
+### Fixed
+
+- **`DatabaseClient` survives upstream SurrealDB recreate.** When the
+  SurrealDB server is restarted mid-flight (docker `compose up -d
+  surrealdb`, k8s pod restart, etc.), the SDK's WebSocket throws
+  `'no close frame received or sent'` on every queued query and the
+  pre-fix client never recovered until the host process restarted —
+  consumers had to bounce every dependent service after a DB recycle.
+  `execute` / `select` / `create` / `update` / `merge` / `delete` /
+  `insert_relation` now classify transport-level disconnects via
+  `_is_disconnect_error`, redial under a per-client `asyncio.Lock`
+  (so concurrent failed callers coalesce on a single reconnect), and
+  retry the call exactly once. Non-transport errors (bad SQL, schema
+  violations, timeouts) still raise `QueryError` immediately.
+
 ## [1.5.6] - 2026-05-02
 
 ### Fixed

@@ -2,7 +2,7 @@
 
 import asyncio
 import re
-from collections.abc import AsyncIterator
+from collections.abc import AsyncIterator, Awaitable, Callable
 from contextlib import asynccontextmanager
 from typing import TYPE_CHECKING, Any
 
@@ -40,6 +40,47 @@ logger = structlog.get_logger(__name__)
 # OK-status query response -- the kind of bug that's hard to spot because
 # the Python wrapper sees ``status: 'OK'`` and reports success.
 _RECORD_ID_PATTERN = re.compile(r'^[a-zA-Z_][a-zA-Z0-9_]*:(?!//).+$')
+
+
+# Substrings that indicate the underlying WebSocket / transport went away
+# mid-flight. When the upstream SurrealDB process is recreated (docker
+# `compose up -d surrealdb`, k8s pod restart, etc.) every queued query
+# raises one of these messages instead of triggering a clean reconnect,
+# which permanently breaks the long-running client until process restart.
+# Detecting them lets us reconnect once and retry the call, so consumers
+# survive a DB recycle without manual intervention.
+_DISCONNECT_ERROR_SUBSTRINGS: tuple[str, ...] = (
+  'no close frame received or sent',
+  'connection is closed',
+  'received 1011',
+  'received 1012',
+  'received 1013',
+  'WebSocket is not connected',
+  'cannot send while sending',
+  'connection lost',
+  'connection reset',
+  'broken pipe',
+)
+
+
+def _is_disconnect_error(exc: BaseException, _depth: int = 0) -> bool:
+  """Return True when the exception indicates a transport-level disconnect.
+
+  Walks the cause/context chain so wrapper exceptions (e.g. SDK's own
+  ``SurrealDBError`` wrapping a ``websockets.ConnectionClosed``) are still
+  classified correctly.
+  """
+  if _depth > 5:
+    return False
+  if 'ConnectionClosed' in type(exc).__name__:
+    return True
+  msg = str(exc)
+  if any(s in msg for s in _DISCONNECT_ERROR_SUBSTRINGS):
+    return True
+  for nested in (getattr(exc, '__cause__', None), getattr(exc, '__context__', None)):
+    if nested is not None and nested is not exc and _is_disconnect_error(nested, _depth + 1):
+      return True
+  return False
 
 
 def _is_record_id_target(target: str) -> bool:
@@ -171,6 +212,10 @@ class DatabaseClient:
     self._client: Any = None
     self._connected = False
     self._semaphore = asyncio.Semaphore(config.max_connections)
+    # Coalesces concurrent reconnect attempts: if N queries all observe
+    # a dead WebSocket simultaneously, only the first reconnects and the
+    # rest wait + retry on its newly-established connection.
+    self._reconnect_lock = asyncio.Lock()
     self._log = logger.bind(
       namespace=config.namespace,
       database=config.database,
@@ -359,6 +404,114 @@ class DatabaseClient:
       self._client = None
       self._connected = False
 
+  async def _ensure_reconnected(self) -> None:
+    """Ensure the client has a live connection, reconnecting if needed.
+
+    Multiple concurrent callers coalesce on ``_reconnect_lock``: the first
+    one observes the dead socket and reconnects, the rest find
+    ``is_connected`` true on entry and return immediately. ``connect()``
+    is the single source of truth for the dial / signin / use sequence.
+    """
+    async with self._reconnect_lock:
+      if self.is_connected:
+        return
+      # Force the disconnect path inside connect() to be a no-op since
+      # the underlying socket is already dead.
+      self._connected = False
+      self._client = None
+      await self.connect()
+
+  async def _invoke(
+    self,
+    op: str,
+    fn: Callable[[Any], Awaitable[Any]],
+    *,
+    log_kwargs: dict[str, Any] | None = None,
+    error_message: str | None = None,
+  ) -> Any:
+    """Run an SDK call with auto-reconnect on transport-level disconnects.
+
+    The first call follows the original fast path: acquire the semaphore,
+    invoke ``fn(self._client)``, normalize the result. If the SDK raises
+    something matching ``_is_disconnect_error`` (a recreated SurrealDB
+    container is the canonical case — every queued query raises
+    ``"no close frame received or sent"`` until the client redials), this
+    method releases the semaphore, reconnects under the reconnect lock,
+    then retries the call exactly once on the fresh connection. Any other
+    exception, or a second failure post-reconnect, is wrapped in
+    :class:`QueryError` with the original chained as ``__cause__`` so
+    callers keep the same surface they had before.
+    """
+    log_kwargs = log_kwargs or {}
+    label = error_message or f'{op.upper()} operation failed'
+
+    if self._client is None:
+      # Caller never invoked connect(). Preserve the historical surface
+      # — telling them to redial once is a behavior change we don't want
+      # since it would mask "forgot to connect" bugs.
+      raise ConnectionError('Client is not connected to database')
+
+    if not self._connected:
+      # A previous call's reconnect failed (typical when SurrealDB is
+      # mid-recreate and not accepting connections yet). Retry the
+      # reconnect now so transient outages self-heal as soon as the
+      # server is back, rather than leaving the client permanently
+      # broken until the host process restarts.
+      try:
+        await self._ensure_reconnected()
+      except Exception as err:
+        raise ConnectionError(f'Client is not connected to database: {err}') from err
+
+    async def _run_once() -> Any:
+      async with self._semaphore:
+        return _normalize_sdk_value(await fn(self._client))
+
+    try:
+      return await _run_once()
+    except Exception as first_err:
+      if not _is_disconnect_error(first_err):
+        self._log.error(f'{op}_failed', error=str(first_err), **log_kwargs)
+        raise QueryError(f'{label}: {first_err}') from first_err
+
+      self._log.warning(
+        f'{op}_disconnect_detected_reconnecting',
+        error=str(first_err),
+        error_type=type(first_err).__name__,
+        **log_kwargs,
+      )
+      # Mark the local flag dead before grabbing the lock. Without this,
+      # _ensure_reconnected's short-circuit (`if self.is_connected:`)
+      # would see the still-True flag and skip the actual redial. The
+      # only signal we've had that the socket is dead is the exception
+      # — flip the flag so the lock-holder follows the reconnect path.
+      self._connected = False
+      try:
+        await self._ensure_reconnected()
+      except Exception as reconnect_err:
+        self._log.error(
+          f'{op}_reconnect_failed',
+          error=str(reconnect_err),
+          error_type=type(reconnect_err).__name__,
+          **log_kwargs,
+        )
+        raise QueryError(
+          f'{label}: reconnect failed after disconnect: {reconnect_err}'
+        ) from reconnect_err
+
+      try:
+        result = await _run_once()
+      except Exception as retry_err:
+        self._log.error(
+          f'{op}_failed_post_reconnect',
+          error=str(retry_err),
+          error_type=type(retry_err).__name__,
+          **log_kwargs,
+        )
+        raise QueryError(f'{label}: {retry_err}') from retry_err
+
+      self._log.info(f'{op}_recovered_after_reconnect', **log_kwargs)
+      return result
+
   async def execute(
     self,
     query: str,
@@ -377,27 +530,18 @@ class DatabaseClient:
       ConnectionError: If client is not connected
       QueryError: If query execution fails
     """
-    if not self.is_connected or self._client is None:
-      raise ConnectionError('Client is not connected to database')
+    self._log.debug('executing_query', query=query, params=params)
+    resolved_params = _denormalize_params(params) if params else {}
 
-    async with self._semaphore:
-      try:
-        self._log.debug('executing_query', query=query, params=params)
+    async def _do(client: Any) -> Any:
+      return await client.query(query, resolved_params)
 
-        resolved_params = _denormalize_params(params) if params else {}
-        result = await self._client.query(query, resolved_params)
-
-        self._log.debug('query_executed_successfully', result_type=type(result).__name__)
-        return _normalize_sdk_value(result)
-
-      except Exception as e:
-        self._log.error(
-          'query_execution_failed',
-          error=str(e),
-          error_type=type(e).__name__,
-          query=query,
-        )
-        raise QueryError(f'Query execution failed: {e}') from e
+    return await self._invoke(
+      'query',
+      _do,
+      log_kwargs={'query': query},
+      error_message='Query execution failed',
+    )
 
   async def select(self, target: str) -> Any:
     """Execute SELECT operation.
@@ -429,27 +573,37 @@ class DatabaseClient:
       ConnectionError: If client is not connected
       QueryError: If operation fails
     """
-    if not self.is_connected or self._client is None:
-      raise ConnectionError('Client is not connected to database')
+    self._log.debug('executing_select', target=target)
 
-    async with self._semaphore:
-      try:
-        self._log.debug('executing_select', target=target)
+    if _is_record_id_target(target):
+      table, id_part = target.split(':', 1)
 
-        if _is_record_id_target(target):
-          table, id_part = target.split(':', 1)
-          raw = await self._client.query(
-            'SELECT * FROM type::thing($table, $id)',
-            {'table': table, 'id': id_part},
-          )
-          rows = _extract_select_rows(_normalize_sdk_value(raw))
-          return rows[0] if rows else None
+      async def _do_record(client: Any) -> Any:
+        raw = await client.query(
+          'SELECT * FROM type::thing($table, $id)',
+          {'table': table, 'id': id_part},
+        )
+        rows = _extract_select_rows(_normalize_sdk_value(raw))
+        return rows[0] if rows else None
 
-        result = await self._client.select(target)
-        return _normalize_sdk_value(result)
-      except Exception as e:
-        self._log.error('select_failed', error=str(e), target=target)
-        raise QueryError(f'SELECT operation failed: {e}') from e
+      # `_do_record` already returns plain Python (None or dict); skip
+      # the outer normalize by short-circuiting through _invoke's fn.
+      return await self._invoke(
+        'select',
+        _do_record,
+        log_kwargs={'target': target},
+        error_message='SELECT operation failed',
+      )
+
+    async def _do_table(client: Any) -> Any:
+      return await client.select(target)
+
+    return await self._invoke(
+      'select',
+      _do_table,
+      log_kwargs={'target': target},
+      error_message='SELECT operation failed',
+    )
 
   async def create(self, table: str, data: dict[str, Any]) -> Any:
     """Execute CREATE operation.
@@ -469,17 +623,18 @@ class DatabaseClient:
       ConnectionError: If client is not connected
       QueryError: If operation fails
     """
-    if not self.is_connected or self._client is None:
-      raise ConnectionError('Client is not connected to database')
+    self._log.debug('executing_create', table=table, data=data)
+    payload = _denormalize_params(data)
 
-    async with self._semaphore:
-      try:
-        self._log.debug('executing_create', table=table, data=data)
-        result = await self._client.create(table, _denormalize_params(data))
-        return _normalize_sdk_value(result)
-      except Exception as e:
-        self._log.error('create_failed', error=str(e), table=table)
-        raise QueryError(f'CREATE operation failed: {e}') from e
+    async def _do(client: Any) -> Any:
+      return await client.create(table, payload)
+
+    return await self._invoke(
+      'create',
+      _do,
+      log_kwargs={'table': table},
+      error_message='CREATE operation failed',
+    )
 
   async def update(self, target: str, data: dict[str, Any]) -> Any:
     """Execute UPDATE operation.
@@ -495,17 +650,18 @@ class DatabaseClient:
       ConnectionError: If client is not connected
       QueryError: If operation fails
     """
-    if not self.is_connected or self._client is None:
-      raise ConnectionError('Client is not connected to database')
+    self._log.debug('executing_update', target=target, data=data)
+    payload = _denormalize_params(data)
 
-    async with self._semaphore:
-      try:
-        self._log.debug('executing_update', target=target, data=data)
-        result = await self._client.update(target, _denormalize_params(data))
-        return _normalize_sdk_value(result)
-      except Exception as e:
-        self._log.error('update_failed', error=str(e), target=target)
-        raise QueryError(f'UPDATE operation failed: {e}') from e
+    async def _do(client: Any) -> Any:
+      return await client.update(target, payload)
+
+    return await self._invoke(
+      'update',
+      _do,
+      log_kwargs={'target': target},
+      error_message='UPDATE operation failed',
+    )
 
   async def merge(self, target: str, data: dict[str, Any]) -> Any:
     """Execute MERGE operation.
@@ -521,17 +677,18 @@ class DatabaseClient:
       ConnectionError: If client is not connected
       QueryError: If operation fails
     """
-    if not self.is_connected or self._client is None:
-      raise ConnectionError('Client is not connected to database')
+    self._log.debug('executing_merge', target=target, data=data)
+    payload = _denormalize_params(data)
 
-    async with self._semaphore:
-      try:
-        self._log.debug('executing_merge', target=target, data=data)
-        result = await self._client.merge(target, _denormalize_params(data))
-        return _normalize_sdk_value(result)
-      except Exception as e:
-        self._log.error('merge_failed', error=str(e), target=target)
-        raise QueryError(f'MERGE operation failed: {e}') from e
+    async def _do(client: Any) -> Any:
+      return await client.merge(target, payload)
+
+    return await self._invoke(
+      'merge',
+      _do,
+      log_kwargs={'target': target},
+      error_message='MERGE operation failed',
+    )
 
   async def delete(self, target: str) -> Any:
     """Execute DELETE operation.
@@ -546,17 +703,17 @@ class DatabaseClient:
       ConnectionError: If client is not connected
       QueryError: If operation fails
     """
-    if not self.is_connected or self._client is None:
-      raise ConnectionError('Client is not connected to database')
+    self._log.debug('executing_delete', target=target)
 
-    async with self._semaphore:
-      try:
-        self._log.debug('executing_delete', target=target)
-        result = await self._client.delete(target)
-        return _normalize_sdk_value(result)
-      except Exception as e:
-        self._log.error('delete_failed', error=str(e), target=target)
-        raise QueryError(f'DELETE operation failed: {e}') from e
+    async def _do(client: Any) -> Any:
+      return await client.delete(target)
+
+    return await self._invoke(
+      'delete',
+      _do,
+      log_kwargs={'target': target},
+      error_message='DELETE operation failed',
+    )
 
   async def insert_relation(self, table: str, data: dict[str, Any]) -> Any:
     """Execute INSERT RELATION operation for edges.
@@ -572,17 +729,18 @@ class DatabaseClient:
       ConnectionError: If client is not connected
       QueryError: If operation fails
     """
-    if not self.is_connected or self._client is None:
-      raise ConnectionError('Client is not connected to database')
+    self._log.debug('executing_insert_relation', table=table, data=data)
+    payload = _denormalize_params(data)
 
-    async with self._semaphore:
-      try:
-        self._log.debug('executing_insert_relation', table=table, data=data)
-        result = await self._client.insert_relation(table, _denormalize_params(data))
-        return _normalize_sdk_value(result)
-      except Exception as e:
-        self._log.error('insert_relation_failed', error=str(e), table=table)
-        raise QueryError(f'INSERT RELATION operation failed: {e}') from e
+    async def _do(client: Any) -> Any:
+      return await client.insert_relation(table, payload)
+
+    return await self._invoke(
+      'insert_relation',
+      _do,
+      log_kwargs={'table': table},
+      error_message='INSERT RELATION operation failed',
+    )
 
   async def __aenter__(self) -> 'DatabaseClient':
     """Async context manager entry."""
