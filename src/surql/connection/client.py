@@ -30,16 +30,29 @@ logger = structlog.get_logger(__name__)
 
 # Pattern matching SurrealDB record ID targets: "table:id" or "table:<complex_id>"
 #
-# The negative lookahead ``(?!//)`` after the colon excludes URL schemes
-# (``http://``, ``https://``, ``ws://``, ``wss://``, ``file://``, ...) which
-# share the ``<word>:<rest>`` shape with record-id literals but must NOT be
-# coerced to ``RecordID`` objects. Without this guard, any caller passing a
-# URL parameter (e.g. ``base_url='http://10.0.0.51:11434'``) would have it
-# silently rewritten to ``RecordID('http', '//10.0.0.51:11434')``, which
-# SurrealDB returns a coerce error for in the result text of an otherwise
-# OK-status query response -- the kind of bug that's hard to spot because
-# the Python wrapper sees ``status: 'OK'`` and reports success.
-_RECORD_ID_PATTERN = re.compile(r'^[a-zA-Z_][a-zA-Z0-9_]*:(?!//).+$')
+# Two guards keep this from over-matching:
+#
+# 1. Negative lookahead ``(?!//)`` after the colon excludes URL schemes
+#    (``http://``, ``https://``, ``ws://``, ``wss://``, ``file://``, ...) which
+#    share the ``<word>:<rest>`` shape with record-id literals. Without this
+#    guard, ``base_url='http://10.0.0.51:11434'`` was silently rewritten to
+#    ``RecordID('http', '//10.0.0.51:11434')`` and SurrealDB returned a coerce
+#    error in the result text of an otherwise OK-status query response.
+#
+# 2. ``\S+$`` (non-whitespace, end-anchored) rejects prose. Real record IDs
+#    never contain whitespace; English content fields starting with a word
+#    plus colon (``Pattern: when ...``, ``TODO: implement``, ``Note: see``)
+#    were being coerced to ``RecordID('Pattern', ' when ...')`` and rejected
+#    at the schema layer with "Couldn't coerce value for field `content`...
+#    Expected `string` but found `Pattern:`...". Pattern-matching string
+#    values to detect record IDs is best-effort -- callers can always pass
+#    ``RecordID(table, id)`` explicitly when the target really is a record
+#    that happens to contain unusual characters.
+# ``\Z`` (absolute end-of-string) is used instead of ``$`` so a trailing
+# newline doesn't slip past the anchor -- ``$`` matches at end-of-string OR
+# just before a final ``\n`` by default, which would let ``"user:alice\n"``
+# coerce.
+_RECORD_ID_PATTERN = re.compile(r'^[a-zA-Z_][a-zA-Z0-9_]*:(?!//)\S+\Z')
 
 
 # Substrings that indicate the underlying WebSocket / transport went away
