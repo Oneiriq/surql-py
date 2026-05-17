@@ -5,6 +5,34 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.5.10] - 2026-05-17
+
+### Fixed
+
+- **`_denormalize_params` over-coerced composite string IDs into RecordIDs (#85).**
+  The record-id detection regex accepted any `<word>:<rest>` shape, which
+  meant Cosmos-style composite identifiers (`BFS:community:1`,
+  `tenant:env:version`, `{org}:{repo}:{branch}`) were being silently
+  rewritten as `RecordID('BFS', 'community:1')` and rejected by SurrealDB
+  at the schema layer with `Couldn't coerce value for field `x`: Expected
+  `string` but found `BFS:community:1``. The id portion is now restricted
+  to `[^:\s/]+` (no extra colons, whitespace, or slashes), and the
+  angle-bracketed form `table:<id>` is matched by a parallel pattern that
+  treats anything inside the brackets as the id — including colons —
+  preserving SurrealDB v3's `community:<a:b:c>` escape hatch. Pattern
+  detection is still best-effort; callers wanting an unambiguous record
+  reference should pass `RecordID(table, id)` or `RecordRef(table, id)`
+  directly.
+
+  Regression coverage: `test_composite_string_id_not_record_id`,
+  `test_angle_bracketed_id_with_colons_still_record_id`.
+
+### Verified
+
+- `ruff check src tests` + `ruff format --check src tests` — clean.
+- `mypy src --strict` — no issues.
+- `uv run pytest --no-cov --ignore=tests/integration` — **2537 passed, 9 skipped, 2 xfailed**.
+
 ## [1.5.9] - 2026-05-17
 
 ### Fixed
