@@ -995,7 +995,7 @@ wheels = [
 
 [[package]]
 name = "oneiriq-surql"
-version = "1.5.9"
+version = "1.5.11"
 source = { editable = "." }
 dependencies = [
     { name = "aiohttp" },

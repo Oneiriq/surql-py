@@ -25,10 +25,10 @@ class RecordID[T](BaseModel):
     >>> str(record_id)
     'user:alice'
 
-    Complex IDs with angle brackets:
+    Complex IDs with unicode angle brackets (SurrealDB v3 syntax):
     >>> record_id = RecordID(table='outlet', id='alaskabeacon.com')
     >>> str(record_id)
-    'outlet:<alaskabeacon.com>'
+    'outlet:⟨alaskabeacon.com⟩'
 
     Parse from string:
     >>> record_id = RecordID.parse('user:123')
@@ -95,16 +95,19 @@ class RecordID[T](BaseModel):
     return not re.match(r'^[a-zA-Z0-9_]+$', id_value)
 
   def __str__(self) -> str:
-    """Return string representation in table:id format.
+    r"""Return string representation in table:id format.
 
-    Automatically adds angle brackets for complex IDs.
+    Automatically wraps complex IDs in **unicode** angle brackets (U+27E8 /
+    U+27E9) which are the SurrealDB v3 record-id escape syntax. ASCII `<` /
+    `>` are rejected by the v3 parser with `Unexpected token \`<\`, expected
+    a record-id key` (issue #87).
 
     Returns:
-      String in format 'table:id' or 'table:<id>'
+      String in format `'table:id'` or `'table:⟨id⟩'`.
     """
     id_str = str(self.id)
     if self._needs_angle_brackets(self.id):
-      return f'{self.table}:<{id_str}>'
+      return f'{self.table}:⟨{id_str}⟩'
     return f'{self.table}:{id_str}'
 
   def __repr__(self) -> str:
@@ -139,6 +142,9 @@ class RecordID[T](BaseModel):
 
       >>> RecordID.parse('outlet:<alaskabeacon.com>')
       RecordID(table='outlet', id='alaskabeacon.com')
+
+      >>> RecordID.parse('outlet:⟨alaskabeacon.com⟩')
+      RecordID(table='outlet', id='alaskabeacon.com')
     """
     if ':' not in record_id:
       raise ValueError(f'Invalid record ID format: {record_id}. Expected format: table:id')
@@ -154,8 +160,14 @@ class RecordID[T](BaseModel):
     if not id_str or not id_str.strip():
       raise ValueError(f'Invalid record ID: id cannot be empty in {record_id!r}')
 
-    # Strip angle brackets if present
-    if id_str.startswith('<') and id_str.endswith('>'):
+    # Strip angle brackets if present — accept BOTH ASCII `<>` (legacy / older
+    # serialization) and unicode `⟨⟩` (current SurrealDB v3 syntax).
+    if (
+      id_str.startswith('<')
+      and id_str.endswith('>')
+      or id_str.startswith('⟨')
+      and id_str.endswith('⟩')
+    ):
       id_str = id_str[1:-1]
 
     # Try to parse as int, otherwise keep as string
