@@ -5,6 +5,36 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.5.11] - 2026-05-17
+
+### Fixed
+
+- **`RecordID.__str__` emitted ASCII `<>` brackets that SurrealDB v3 rejects (#87).**
+  Every record id with special characters (hyphens, dots, colons) was being
+  formatted as `f'{table}:<{id}>'`, and SurrealDB's v3 parser fails on the
+  ASCII `<` with `Unexpected token \`<\`, expected a record-id key`. So
+  every `upsert_record`, `Query().upsert(...)`, `merge_record`, etc. call
+  that built its target via `str(RecordID(...))` for a composite id was
+  silently producing invalid SQL. The fix emits unicode brackets U+27E8 /
+  U+27E9 (`⟨⟩`) which v3's parser accepts. `RecordID.parse` now accepts
+  BOTH ASCII and unicode forms for backward-compat reads.
+
+- **`_quote_value` serialized lists and dicts as quoted strings (#87).**
+  Falling through to `f"'{str(value)}'"` meant `[1, 2, 3]` became the
+  literal SurrealQL string `'[1, 2, 3]'` and `{'k': 'v'}` became
+  `"{'k': 'v'}"`. SurrealDB then rejected these against `TYPE array` /
+  `TYPE object` columns. The fix emits proper SurrealQL array literals
+  (`[1, 2, 3]`) and object literals (`{k: 'v'}`), recursing through
+  `_quote_value` for nested values. Also added an explicit `RecordID`
+  branch that emits the record-id literal directly (e.g. `user:alice`,
+  `spec:⟨BFS:community:1⟩`) instead of quoting it as a string.
+
+### Verified
+
+- `ruff check src tests` + `ruff format --check src tests` — clean.
+- `mypy src --strict` — no issues.
+- `uv run pytest --no-cov --ignore=tests/integration` — **2539 passed, 9 skipped, 2 xfailed**.
+
 ## [1.5.10] - 2026-05-17
 
 ### Fixed

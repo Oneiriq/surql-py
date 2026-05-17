@@ -579,16 +579,20 @@ def _validate_identifier(name: str, context: str = 'identifier') -> str:
 def _quote_value(value: Any) -> str:
   """Quote value for SurrealQL.
 
-  Handles SurrealFn, RecordRef, and query ``FunctionExpression`` instances
-  by rendering them as raw SurrealQL expressions instead of quoted strings.
+  Handles SurrealFn, RecordRef, RecordID, and query ``Expression`` instances
+  by rendering them as raw SurrealQL expressions. Lists and dicts emit native
+  SurrealQL array / object literals (recursing through `_quote_value`) — fixes
+  issue #87 where arrays were being serialized as quoted strings (`'[1, 2, 3]'`)
+  and rejected by SurrealDB as type mismatches against `TYPE array` columns.
 
   Args:
     value: Value to quote
 
   Returns:
-    Quoted string representation
+    SurrealQL expression suitable for embedding in a query
   """
   from surql.query.expressions import Expression
+  from surql.types.record_id import RecordID
   from surql.types.record_ref import RecordRef
   from surql.types.surreal_fn import SurrealFn
 
@@ -596,6 +600,11 @@ def _quote_value(value: Any) -> str:
     return 'NULL'
   elif isinstance(value, (SurrealFn, RecordRef, Expression)):
     return value.to_surql()
+  elif isinstance(value, RecordID):
+    # RecordID's `__str__` already produces the correct SurrealQL record-id
+    # literal (e.g. `community:⟨community-lakewood⟩`) — emit verbatim, NOT
+    # quoted as a string.
+    return str(value)
   elif isinstance(value, bool):
     return 'true' if value else 'false'
   elif isinstance(value, (int, float)):
@@ -605,6 +614,23 @@ def _quote_value(value: Any) -> str:
     # The order matters: \ must be escaped before ' to prevent \' escaping out
     escaped = value.replace('\\', '\\\\').replace("'", "\\'")
     return f"'{escaped}'"
+  elif isinstance(value, list):
+    return '[' + ', '.join(_quote_value(item) for item in value) + ']'
+  elif isinstance(value, dict):
+    parts = [f'{_quote_object_key(k)}: {_quote_value(v)}' for k, v in value.items()]
+    return '{' + ', '.join(parts) + '}'
   else:
     # For other types, convert to string and quote
     return f"'{str(value)}'"
+
+
+_BARE_KEY_RE = re.compile(r'^[A-Za-z_][A-Za-z0-9_]*$')
+
+
+def _quote_object_key(key: Any) -> str:
+  """Object keys: bare identifier if it qualifies, otherwise a quoted string."""
+  s = str(key)
+  if _BARE_KEY_RE.match(s):
+    return s
+  escaped = s.replace('\\', '\\\\').replace("'", "\\'")
+  return f"'{escaped}'"

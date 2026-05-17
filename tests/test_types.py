@@ -141,7 +141,7 @@ class TestRecordID:
 
     assert record_id.table == 'outlet'
     assert record_id.id == 'alaskabeacon.com'
-    assert str(record_id) == 'outlet:<alaskabeacon.com>'
+    assert str(record_id) == 'outlet:⟨alaskabeacon.com⟩'
 
   def test_record_id_with_composite_id(self) -> None:
     """Test RecordID with composite ID containing colon."""
@@ -149,13 +149,13 @@ class TestRecordID:
 
     assert record_id.table == 'document'
     assert record_id.id == 'alaskabeacon.com:01JEHE123'
-    assert str(record_id) == 'document:<alaskabeacon.com:01JEHE123>'
+    assert str(record_id) == 'document:⟨alaskabeacon.com:01JEHE123⟩'
 
   def test_record_id_with_hyphen_id(self) -> None:
     """Test RecordID with hyphen in ID (requires angle brackets)."""
     record_id = RecordID(table='user', id='john-doe')
 
-    assert str(record_id) == 'user:<john-doe>'
+    assert str(record_id) == 'user:⟨john-doe⟩'
 
   def test_record_id_simple_no_brackets(self) -> None:
     """Test that simple alphanumeric IDs don't get angle brackets."""
@@ -171,19 +171,19 @@ class TestRecordID:
 
   def test_record_id_parse_angle_bracket_domain(self) -> None:
     """Test parsing RecordID with angle bracket domain syntax."""
-    record_id = RecordID.parse('outlet:<alaskabeacon.com>')
+    record_id = RecordID.parse('outlet:⟨alaskabeacon.com⟩')
 
     assert record_id.table == 'outlet'
     assert record_id.id == 'alaskabeacon.com'
-    assert str(record_id) == 'outlet:<alaskabeacon.com>'
+    assert str(record_id) == 'outlet:⟨alaskabeacon.com⟩'
 
   def test_record_id_parse_angle_bracket_composite(self) -> None:
     """Test parsing RecordID with angle bracket composite ID."""
-    record_id = RecordID.parse('document:<domain.com:ulid123>')
+    record_id = RecordID.parse('document:⟨domain.com:ulid123⟩')
 
     assert record_id.table == 'document'
     assert record_id.id == 'domain.com:ulid123'
-    assert str(record_id) == 'document:<domain.com:ulid123>'
+    assert str(record_id) == 'document:⟨domain.com:ulid123⟩'
 
   def test_record_id_bidirectional_parsing_simple(self) -> None:
     """Test bidirectional parsing for simple IDs."""
@@ -223,13 +223,13 @@ class TestRecordID:
     assert record_id.table == 'outlet'
     assert record_id.id == 'alaskabeacon.com'
     # When converted to string, brackets are added automatically
-    assert str(record_id) == 'outlet:<alaskabeacon.com>'
+    assert str(record_id) == 'outlet:⟨alaskabeacon.com⟩'
 
   def test_record_id_to_surql_with_angle_brackets(self) -> None:
     """Test converting RecordID with angle brackets to SurrealQL format."""
     record_id = RecordID(table='outlet', id='alaskabeacon.com')
 
-    assert record_id.to_surql() == 'outlet:<alaskabeacon.com>'
+    assert record_id.to_surql() == 'outlet:⟨alaskabeacon.com⟩'
 
   def test_record_id_integer_no_brackets(self) -> None:
     """Test that integer IDs never get angle brackets."""
@@ -269,9 +269,31 @@ class TestQuoteValue:
     """Test quoting string with single quote (should escape)."""
     assert _quote_value("it's") == "'it\\'s'"
 
-  def test_quote_other_types(self) -> None:
-    """Test quoting other types (converts to string)."""
-    assert _quote_value([1, 2, 3]) == "'[1, 2, 3]'"
+  def test_quote_list_emits_array_literal(self) -> None:
+    """Lists serialize as native SurrealQL array literals (issue #87)."""
+    assert _quote_value([1, 2, 3]) == '[1, 2, 3]'
+    assert _quote_value(['a', 'b']) == "['a', 'b']"
+    assert _quote_value([]) == '[]'
+    # Nested
+    assert _quote_value([[1, 2], [3]]) == '[[1, 2], [3]]'
+
+  def test_quote_dict_emits_object_literal(self) -> None:
+    """Dicts serialize as native SurrealQL object literals (issue #87)."""
+    assert _quote_value({'name': 'Alice', 'age': 30}) == "{name: 'Alice', age: 30}"
+    assert _quote_value({}) == '{}'
+    # Nested dict
+    assert _quote_value({'meta': {'k': 'v'}}) == "{meta: {k: 'v'}}"
+    # Dict with list value
+    assert _quote_value({'tags': ['x', 'y']}) == "{tags: ['x', 'y']}"
+
+  def test_quote_record_id_emits_unbracketed_expression(self) -> None:
+    """RecordID values emit verbatim (not as quoted strings) so they reach SurrealDB as records."""
+    from surql.types.record_id import RecordID
+
+    rid = RecordID(table='user', id='alice')
+    assert _quote_value(rid) == 'user:alice'
+    composite = RecordID(table='spec', id='BFS:community:1')
+    assert _quote_value(composite) == 'spec:⟨BFS:community:1⟩'
 
 
 class TestComparisonOperators:
