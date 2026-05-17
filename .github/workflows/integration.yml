@@ -19,7 +19,11 @@ env:
 jobs:
   integration:
     name: SurrealDB v3 integration tests
-    runs-on: [self-hosted, aur0]
+    # aur0 self-hosted for push to main and same-repo PRs; fork PRs
+    # fall back to ubuntu-latest. Spinning up Docker on aur0 with
+    # fork-controlled code (pytest + uv sync) would expose the
+    # internal runner to arbitrary contributors.
+    runs-on: ${{ github.event.pull_request.head.repo.fork && 'ubuntu-latest' || fromJSON('["self-hosted", "aur0"]') }}
 
     steps:
       - name: Checkout code

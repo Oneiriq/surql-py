@@ -121,7 +121,7 @@ class TestGenerateTableSql:
     assert any('WHEN $before.email != $after.email' in s for s in stmts)
 
   def test_table_with_permissions(self) -> None:
-    """Generates DEFINE FIELD PERMISSIONS statements for permissions."""
+    """Folds PERMISSIONS clauses into the DEFINE TABLE statement per SurrealDB v3 grammar."""
     table = table_schema(
       'user',
       permissions={'select': '$auth.id = id'},
@@ -129,7 +129,54 @@ class TestGenerateTableSql:
 
     stmts = generate_table_sql(table)
 
-    assert any('FOR SELECT' in s and '$auth.id = id' in s for s in stmts)
+    # Permissions live on the DEFINE TABLE statement, not as separate DEFINE FIELD PERMISSIONS.
+    assert stmts[0] == 'DEFINE TABLE user SCHEMAFULL PERMISSIONS FOR select WHERE $auth.id = id;'
+    # Regression guard: the broken `DEFINE FIELD PERMISSIONS ...` form must not appear anywhere.
+    assert not any('DEFINE FIELD PERMISSIONS' in s for s in stmts)
+
+  def test_table_with_all_four_permissions(self) -> None:
+    """All CRUD permission actions render in order on the DEFINE TABLE line."""
+    table = table_schema(
+      'user',
+      permissions={
+        'select': 'tenant_id = $auth.tenant',
+        'create': 'tenant_id = $auth.tenant',
+        'update': 'tenant_id = $auth.tenant',
+        'delete': 'tenant_id = $auth.tenant',
+      },
+    )
+
+    stmts = generate_table_sql(table)
+
+    assert stmts[0] == (
+      'DEFINE TABLE user SCHEMAFULL '
+      'PERMISSIONS '
+      'FOR select WHERE tenant_id = $auth.tenant '
+      'FOR create WHERE tenant_id = $auth.tenant '
+      'FOR update WHERE tenant_id = $auth.tenant '
+      'FOR delete WHERE tenant_id = $auth.tenant;'
+    )
+
+  def test_table_permissions_lowercase_actions(self) -> None:
+    """Action keys are emitted lowercase regardless of input casing (SurrealDB grammar requires it)."""
+    table = table_schema(
+      'user',
+      permissions={'SELECT': 'true', 'Create': 'true'},
+    )
+
+    stmts = generate_table_sql(table)
+
+    assert 'FOR select WHERE true' in stmts[0]
+    assert 'FOR create WHERE true' in stmts[0]
+    assert 'FOR SELECT' not in stmts[0]
+
+  def test_table_without_permissions_omits_clause(self) -> None:
+    """No PERMISSIONS clause is emitted when no permissions are set."""
+    table = table_schema('user')
+
+    stmts = generate_table_sql(table)
+
+    assert 'PERMISSIONS' not in stmts[0]
 
   def test_minimal_table_returns_single_statement(self) -> None:
     """Returns exactly one statement for a table with no components."""
@@ -191,6 +238,35 @@ class TestGenerateEdgeSql:
     stmts = generate_edge_sql(edge)
 
     assert any('DEFINE FIELD created_at ON TABLE likes TYPE datetime' in s for s in stmts)
+
+  def test_relation_edge_with_permissions(self) -> None:
+    """Permissions on RELATION edges fold into the DEFINE TABLE ... TYPE RELATION statement."""
+    from surql.schema.edge import with_edge_permissions
+
+    edge = with_edge_permissions(
+      edge_schema('likes', from_table='user', to_table='post'),
+      {'select': 'true', 'create': '$auth.id = in'},
+    )
+
+    stmts = generate_edge_sql(edge)
+
+    assert stmts[0] == (
+      'DEFINE TABLE likes TYPE RELATION FROM user TO post '
+      'PERMISSIONS FOR select WHERE true FOR create WHERE $auth.id = in;'
+    )
+
+  def test_schemafull_edge_with_permissions(self) -> None:
+    """Permissions on SCHEMAFULL edges fold into the DEFINE TABLE statement."""
+    from surql.schema.edge import with_edge_permissions
+
+    edge = with_edge_permissions(
+      edge_schema('membership', mode=EdgeMode.SCHEMAFULL),
+      {'select': 'true'},
+    )
+
+    stmts = generate_edge_sql(edge)
+
+    assert stmts[0] == 'DEFINE TABLE membership SCHEMAFULL PERMISSIONS FOR select WHERE true;'
 
   def test_relation_edge_missing_from_table_raises(self) -> None:
     """Raises ValueError for RELATION mode when from_table is missing."""

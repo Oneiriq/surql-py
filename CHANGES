@@ -5,6 +5,89 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.5.8] - 2026-05-16
+
+### Fixed — SurrealDB v3 grammar compatibility
+
+- **Table PERMISSIONS clauses emitted invalid SurrealDB SQL.** `generate_table_sql`
+  was emitting `DEFINE FIELD PERMISSIONS FOR SELECT ON TABLE x WHERE ...` for
+  each permission action — not valid grammar in any SurrealDB version. SurrealDB
+  rejected migrations with `Parse error: Unexpected token FOR, expected ON`.
+  Permissions now fold into the `DEFINE TABLE` statement itself per the v3
+  grammar: `DEFINE TABLE x SCHEMAFULL PERMISSIONS FOR select WHERE ... FOR create WHERE ...;`
+  Action keys are emitted lowercase regardless of input casing.
+- **Edge PERMISSIONS clauses were silently dropped.** `generate_edge_sql`
+  ignored `EdgeDefinition.permissions` entirely. Edges built with
+  `with_edge_permissions(...)` now correctly emit permissions on their
+  `DEFINE TABLE ... TYPE RELATION ... PERMISSIONS ...;` statement.
+- **Migration diff had the same broken PERMISSIONS SQL in parallel.**
+  `_generate_modify_permissions_diff` emitted the invalid `DEFINE FIELD
+  PERMISSIONS` form; `_generate_add_table_diffs` failed to fold permissions
+  into the initial `DEFINE TABLE`. Both paths now use a shared
+  `_permissions_clause_sql` helper and emit valid v3 syntax. Permission
+  changes re-DEFINE the table (SurrealDB has no `ALTER TABLE`); rollback
+  re-DEFINEs with the old permissions.
+- **`type::thing(table, id)` was removed in SurrealDB v3.** Calling it now
+  raises `Invalid function/constant path, did you maybe mean ``type::record```.
+  The two-arg form `type::record(table, id)` IS the v3 constructor (verified
+  against v3.0.4). Switched every emission: `RecordRef.to_surql`,
+  `surreal_fn.type_record` / `type_thing`, `DatabaseClient.select`'s
+  record-id dispatch (`SELECT * FROM type::record($table, $id)`), and
+  `migration.history.record_migration`'s `CREATE type::record($table, $id) SET ...`.
+  Earlier doc comments claiming `type::record(value, type)` was coercion-only
+  described pre-v3 alpha behavior; v3.0+ uses constructor semantics for the
+  two-arg form. `type_thing()` is kept as a deprecated alias that emits the
+  same v3 output as `type_record()`.
+
+### Fixed — docs / CI / record-ID coercion (originally scoped for 1.5.7)
+
+- **Record-ID auto-coercion false positive.** `DatabaseClient` parameter
+  normalization was coercing ordinary prose strings that merely contained
+  a `word:word` substring into SurrealDB record references. Detection is
+  now anchored so only genuine record-id literals are converted; plain
+  text passes through untouched. (Already included; landed via PR #81 →
+  main as part of 1.5.7.)
+- **Docs**: fixed broken `v3-patterns.md` anchor links in `migration.md`
+  and `query-ux.md` — the `#record-id-construction-...` fragment did not
+  match the generated heading id, so `mkdocs build --strict` reported it.
+- **Docs site**: `site_name` corrected to `surql-py` (was `surql`, so
+  every page title and the site header showed the wrong project name);
+  the description now notes the Python port.
+
+### Changed
+
+- **CI**: `ci.yml` runs only on pull requests (not on push); the nightly
+  cron is disabled (`workflow_dispatch` only); `docs.yml` runs
+  `mkdocs build --strict` on PRs so doc breakage is caught before merge.
+  Fork-PR CI runs now route to `ubuntu-latest` runners explicitly.
+
+### Tests
+
+- Strengthened permissions test coverage: existing `test_table_with_permissions`
+  was too lenient (`'FOR SELECT' in sql` matched the broken output). Added
+  explicit equality assertions plus regression guards that
+  `DEFINE FIELD PERMISSIONS` never appears, action keys are always
+  lowercased, and edges with permissions render their PERMISSIONS clause.
+- Updated all `type::thing` test assertions to expect the v3 `type::record`
+  emission.
+- Marked two `TestRecordMigrationAgainstEmbeddedDb` cases as `xfail` because
+  the embedded `surrealdb` Python SDK (latest PyPI 2.0.0) still ships pre-v3
+  grammar where `type::record(value, type)` is coercion. Production users run
+  v3.0+ servers and get the correct constructor behavior; the xfail covers
+  the SDK version skew, not a regression in our code. Re-enable once the
+  Python SDK ships a v3-grammar wheel.
+
+### Verified
+
+- `ruff check src tests` and `ruff format --check src tests` — all clean.
+- `mypy src --strict` — success, no issues found in 81 source files.
+- `uv run pytest --no-cov --ignore=tests/integration` — **2531 passed, 9 skipped, 2 xfailed**.
+- End-to-end verified against a live SurrealDB v3.0.4 Docker container by a
+  downstream consumer: `migrate up` applied 17 tables + 1 `TYPE RELATION`
+  edge with PERMISSIONS clauses; `INFO FOR DB` echoes
+  `PERMISSIONS FOR select, create, update, delete WHERE tenant_id = $auth.tenant`
+  on every table.
+
 ## [1.5.7] - 2026-05-05
 
 ### Fixed

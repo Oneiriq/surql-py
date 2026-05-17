@@ -104,7 +104,7 @@ Nothing is required to keep 1.3.x code running. If you hand-write SurrealQL anyw
 
 - Replace `count(*)` with `count()` and add `GROUP ALL` to any full-table aggregate. See [v3 patterns: count() aggregates](v3-patterns.md#count-aggregates-require-group-all).
 - Cast datetime literals explicitly: `<datetime> $value` or `<datetime> '2026-...'`. See [v3 patterns: datetime cast](v3-patterns.md#datetime-cast-on-insert).
-- Use `type::thing('table', id)` for record-id construction (and prefer `type_thing(...)` / `type_record(...)` helpers). See [v3 patterns: record-ID construction](v3-patterns.md#record-id-construction-typething-table-id).
+- Use `type::thing('table', id)` for record-id construction (and prefer `type_thing(...)` / `type_record(...)` helpers). See [v3 patterns: record-ID construction](v3-patterns.md#record-id-construction-typethingtable-id).
 - Ensure `BEGIN TRANSACTION; ...; COMMIT TRANSACTION;` is issued in a single `client.execute(...)` call, or use the `transaction()` context manager which already does so.
 
 ## 1.3.1 -- embedded migration fix

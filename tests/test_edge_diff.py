@@ -276,7 +276,7 @@ class TestPermissionRollback:
   """Tests for permission rollback SQL generation."""
 
   def test_rollback_generates_old_permissions(self) -> None:
-    """Backward SQL contains the old permission definitions."""
+    """Backward SQL re-defines the table with the old permissions (SurrealDB v3 grammar)."""
     old = TableDefinition(
       name='user',
       permissions={'select': '$auth.id = id'},
@@ -289,18 +289,21 @@ class TestPermissionRollback:
     diffs = diff_permissions(old, new)
 
     assert len(diffs) == 1
-    assert 'FOR SELECT' in diffs[0].backward_sql
-    assert '$auth.id = id' in diffs[0].backward_sql
+    # Backward SQL is a DEFINE TABLE re-issue (no ALTER TABLE in SurrealDB) with the old PERMISSIONS clause.
+    assert diffs[0].backward_sql == (
+      'DEFINE TABLE user SCHEMAFULL PERMISSIONS FOR select WHERE $auth.id = id;'
+    )
 
   def test_rollback_empty_when_no_old_permissions(self) -> None:
-    """Backward SQL is empty when old table had no permissions."""
+    """Backward SQL re-defines the table with no PERMISSIONS clause when old table had none."""
     old = TableDefinition(name='user')
     new = TableDefinition(name='user', permissions={'select': 'true'})
 
     diffs = diff_permissions(old, new)
 
     assert len(diffs) == 1
-    assert diffs[0].backward_sql == ''
+    # Rollback re-defines the table without a PERMISSIONS clause (SurrealDB has no ALTER TABLE).
+    assert diffs[0].backward_sql == 'DEFINE TABLE user SCHEMAFULL;'
 
   def test_forward_and_backward_roundtrip(self) -> None:
     """Forward SQL has new permissions, backward has old."""

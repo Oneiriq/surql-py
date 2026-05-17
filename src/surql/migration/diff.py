@@ -310,8 +310,11 @@ def _generate_add_table_diffs(table: TableDefinition) -> list[SchemaDiff]:
   """Generate diffs for adding a new table."""
   diffs: list[SchemaDiff] = []
 
-  # Main table definition
-  forward_sql = f'DEFINE TABLE {table.name} {table.mode.value};'
+  # Main table definition — fold PERMISSIONS into the DEFINE TABLE statement per
+  # SurrealDB v3 grammar. Emitting them as a separate `DEFINE FIELD PERMISSIONS`
+  # statement is not valid SurrealQL and is rejected at apply time with a parse error.
+  permissions_clause = _permissions_clause_sql(table.permissions)
+  forward_sql = f'DEFINE TABLE {table.name} {table.mode.value}{permissions_clause};'
   backward_sql = f'REMOVE TABLE {table.name};'
 
   diffs.append(
@@ -335,10 +338,6 @@ def _generate_add_table_diffs(table: TableDefinition) -> list[SchemaDiff]:
   # Add all events
   for event in table.events:
     diffs.append(_generate_add_event_diff(table.name, event))
-
-  # Add permissions if defined
-  if table.permissions:
-    diffs.append(_generate_modify_permissions_diff(table.name, table.permissions))
 
   return diffs
 
@@ -509,30 +508,45 @@ def _generate_drop_event_diff(table_name: str, event: EventDefinition) -> Schema
   )
 
 
+def _permissions_clause_sql(permissions: dict[str, str] | None) -> str:
+  """Render a SurrealDB ``PERMISSIONS FOR <action> WHERE <rule>`` clause body.
+
+  Returns a leading-space string for direct concatenation into a `DEFINE TABLE`
+  statement, or empty string when no permissions are defined.
+  """
+  if not permissions:
+    return ''
+  clauses = ' '.join(f'FOR {action.lower()} WHERE {rule}' for action, rule in permissions.items())
+  return f' PERMISSIONS {clauses}'
+
+
 def _generate_modify_permissions_diff(
   table_name: str,
   permissions: dict[str, str] | None,
   old_permissions: dict[str, str] | None = None,
 ) -> SchemaDiff:
-  """Generate diff for modifying permissions."""
-  forward_sql_parts = []
+  """Generate diff for modifying permissions.
 
-  if permissions:
-    for operation, condition in permissions.items():
-      forward_sql_parts.append(
-        f'DEFINE FIELD PERMISSIONS FOR {operation.upper()} ON TABLE {table_name} WHERE {condition};'
-      )
+  SurrealDB has no `ALTER TABLE` syntax; permissions are modified by re-issuing
+  a `DEFINE TABLE` statement that includes the new PERMISSIONS clause. The
+  table's mode (SCHEMAFULL/SCHEMALESS/RELATION) must be re-stated — for safety
+  we default to SCHEMAFULL and the caller is responsible for ensuring this
+  matches the table's actual mode.
 
-  forward_sql = ' '.join(forward_sql_parts) if forward_sql_parts else ''
-
-  # Generate rollback SQL from old permissions
-  backward_sql_parts = []
-  if old_permissions:
-    for operation, condition in old_permissions.items():
-      backward_sql_parts.append(
-        f'DEFINE FIELD PERMISSIONS FOR {operation.upper()} ON TABLE {table_name} WHERE {condition};'
-      )
-  backward_sql = ' '.join(backward_sql_parts) if backward_sql_parts else ''
+  Either or both of `permissions` / `old_permissions` may be None: a None
+  forward permits dropping the clause (re-DEFINE with no PERMISSIONS);
+  a None rollback means the table previously had no permissions.
+  """
+  forward_sql = (
+    f'DEFINE TABLE {table_name} SCHEMAFULL{_permissions_clause_sql(permissions)};'
+    if permissions is not None
+    else f'DEFINE TABLE {table_name} SCHEMAFULL;'
+  )
+  backward_sql = (
+    f'DEFINE TABLE {table_name} SCHEMAFULL{_permissions_clause_sql(old_permissions)};'
+    if old_permissions is not None
+    else f'DEFINE TABLE {table_name} SCHEMAFULL;'
+  )
 
   return SchemaDiff(
     operation=DiffOperation.MODIFY_PERMISSIONS,
@@ -549,7 +563,10 @@ def _generate_add_edge_diffs(edge: EdgeDefinition) -> list[SchemaDiff]:
 
   diffs: list[SchemaDiff] = []
 
-  # Edge table definition - varies by mode
+  # Edge table definition - varies by mode; PERMISSIONS clause folds in on whichever shape
+  # so edges with `with_edge_permissions(...)` apply isolation at the DB layer.
+  permissions_clause = _permissions_clause_sql(edge.permissions)
+
   if edge.mode == EdgeMode.RELATION:
     # TYPE RELATION syntax
     forward_sql = f'DEFINE TABLE {edge.name} TYPE RELATION'
@@ -560,12 +577,12 @@ def _generate_add_edge_diffs(edge: EdgeDefinition) -> list[SchemaDiff]:
     if edge.to_table:
       forward_sql += f' TO {edge.to_table}'
 
-    forward_sql += ';'
+    forward_sql += f'{permissions_clause};'
   elif edge.mode == EdgeMode.SCHEMAFULL:
     # Traditional SCHEMAFULL table
-    forward_sql = f'DEFINE TABLE {edge.name} SCHEMAFULL;'
+    forward_sql = f'DEFINE TABLE {edge.name} SCHEMAFULL{permissions_clause};'
   else:  # SCHEMALESS
-    forward_sql = f'DEFINE TABLE {edge.name} SCHEMALESS;'
+    forward_sql = f'DEFINE TABLE {edge.name} SCHEMALESS{permissions_clause};'
 
   backward_sql = f'REMOVE TABLE {edge.name};'
 

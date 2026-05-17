@@ -3,6 +3,10 @@ name: Deploy Documentation
 on:
   push:
     branches: [main]
+  # Run the strict build on PRs too, so broken links / nav are caught
+  # before merge instead of failing silently in the post-merge deploy.
+  pull_request:
+    branches: [main, 'release/**']
   workflow_dispatch:
 
 permissions:
@@ -19,7 +23,10 @@ env:
 
 jobs:
   build:
-    runs-on: [self-hosted, aur0]
+    # Build runs on push to main, dispatch, AND fork PRs (link check).
+    # Same-repo PRs + push run on aur0; fork PRs fall back to
+    # ubuntu-latest so untrusted PR code never executes on aur0.
+    runs-on: ${{ github.event.pull_request.head.repo.fork && 'ubuntu-latest' || fromJSON('["self-hosted", "aur0"]') }}
     steps:
       - uses: actions/checkout@v6
 
@@ -42,6 +49,8 @@ jobs:
           path: site/
 
   deploy:
+    # Deploy only on push to main / manual dispatch — never for PR builds.
+    if: github.event_name != 'pull_request'
     runs-on: [self-hosted, aur0]
     needs: build
     environment:

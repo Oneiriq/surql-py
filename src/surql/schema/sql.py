@@ -28,6 +28,25 @@ def _ine_clause(if_not_exists: bool) -> str:
   return ' IF NOT EXISTS' if if_not_exists else ''
 
 
+def _permissions_clause(permissions: dict[str, str] | None) -> str:
+  """Render a SurrealDB PERMISSIONS clause for inclusion in DEFINE TABLE.
+
+  SurrealDB v3 syntax: ``PERMISSIONS FOR <action> WHERE <rule> [FOR <action> WHERE <rule>]...``
+  where actions are lowercase ``select``, ``create``, ``update``, ``delete``.
+
+  Args:
+    permissions: Action -> rule mapping (e.g. ``{'select': 'id = $auth.id'}``).
+      Accepts mixed-case keys; emits them lowercased per SurrealDB grammar.
+
+  Returns:
+    ' PERMISSIONS FOR select WHERE ... FOR create WHERE ...' or empty string.
+  """
+  if not permissions:
+    return ''
+  clauses = ' '.join(f'FOR {action.lower()} WHERE {rule}' for action, rule in permissions.items())
+  return f' PERMISSIONS {clauses}'
+
+
 def _generate_field_sql(
   table_name: str,
   field_def: FieldDefinition,
@@ -173,10 +192,12 @@ def generate_table_sql(
     'DEFINE TABLE user SCHEMAFULL;'
   """
   ine = _ine_clause(if_not_exists)
+  permissions = _permissions_clause(table.permissions)
   statements: list[str] = []
 
-  # Table definition
-  statements.append(f'DEFINE TABLE{ine} {table.name} {table.mode.value};')
+  # Table definition — permissions fold into the DEFINE TABLE statement itself per
+  # SurrealDB v3 grammar (DEFINE TABLE ... PERMISSIONS FOR <action> WHERE <rule> ...).
+  statements.append(f'DEFINE TABLE{ine} {table.name} {table.mode.value}{permissions};')
 
   # Field definitions
   for field_def in table.fields:
@@ -189,13 +210,6 @@ def generate_table_sql(
   # Event definitions
   for event_def in table.events:
     statements.append(_generate_event_sql(table.name, event_def, if_not_exists=if_not_exists))
-
-  # Permission definitions
-  if table.permissions:
-    for action, rule in table.permissions.items():
-      statements.append(
-        f'DEFINE FIELD PERMISSIONS FOR {action.upper()} ON TABLE {table.name} WHERE {rule};'
-      )
 
   return statements
 
@@ -225,6 +239,7 @@ def generate_edge_sql(
     raise ValueError(f'Edge {edge.name!r} with RELATION mode requires both from_table and to_table')
 
   ine = _ine_clause(if_not_exists)
+  permissions = _permissions_clause(edge.permissions)
   statements: list[str] = []
 
   if edge.mode == EdgeMode.RELATION:
@@ -233,11 +248,11 @@ def generate_edge_sql(
       table_sql += f' FROM {edge.from_table}'
     if edge.to_table:
       table_sql += f' TO {edge.to_table}'
-    table_sql += ';'
+    table_sql += f'{permissions};'
   elif edge.mode == EdgeMode.SCHEMAFULL:
-    table_sql = f'DEFINE TABLE{ine} {edge.name} SCHEMAFULL;'
+    table_sql = f'DEFINE TABLE{ine} {edge.name} SCHEMAFULL{permissions};'
   else:
-    table_sql = f'DEFINE TABLE{ine} {edge.name} SCHEMALESS;'
+    table_sql = f'DEFINE TABLE{ine} {edge.name} SCHEMALESS{permissions};'
 
   statements.append(table_sql)
 

@@ -1,10 +1,11 @@
 name: CI
 
+# Code-quality checks run only on open PRs. Pushes to main don't fire CI
+# directly — the merge must already have passed the PR-triggered run, so a
+# post-merge re-run costs minutes for no incremental signal.
 on:
-  push:
-    branches: [main, develop]
   pull_request:
-    branches: [main, develop]
+    branches: [main, 'release/**']
 
 permissions:
   contents: read
@@ -14,7 +15,10 @@ env:
 
 jobs:
   test:
-    runs-on: [self-hosted, aur0]
+    # aur0 self-hosted for same-repo PRs; fork PRs fall back to
+    # ubuntu-latest. `uv sync` + `pytest` run fork-controlled code,
+    # so they must never touch aur0.
+    runs-on: ${{ github.event.pull_request.head.repo.fork && 'ubuntu-latest' || fromJSON('["self-hosted", "aur0"]') }}
     strategy:
       matrix:
         python-version: ['3.12']

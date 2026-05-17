@@ -37,7 +37,7 @@ type_thing('user', 'alice').to_surql()
 # -> "type::thing('user', 'alice')"
 ```
 
-Both forms emit the same SurrealQL; pick whichever name reads better in your code (see [v3 patterns](v3-patterns.md#record-id-construction-typething-table-id)).
+Both forms emit the same SurrealQL; pick whichever name reads better in your code (see [v3 patterns](v3-patterns.md#record-id-construction-typethingtable-id)).
 
 ## Function factories (`SurrealFn`)
 

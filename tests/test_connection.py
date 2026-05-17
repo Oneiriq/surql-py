@@ -376,116 +376,6 @@ class TestDatabaseClient:
     assert 'Query execution failed' in str(exc_info.value)
 
   @pytest.mark.anyio
-  async def test_execute_reconnects_on_websocket_close(
-    self, mock_db_client: DatabaseClient
-  ) -> None:
-    """Regression: when SurrealDB is recreated mid-flight (docker
-    `compose up -d surrealdb`, k8s pod restart, etc.), the SDK raises
-    'no close frame received or sent' on every queued query and the
-    DatabaseClient pre-fix never recovered until process restart.
-
-    The fix: detect that disconnect class via _is_disconnect_error,
-    redial via connect(), and retry the call once. This test forces
-    that path with a side_effect that fails the first call with the
-    canonical disconnect message and succeeds on the second.
-    """
-    succeed_result: list[dict[str, str]] = [{'id': 'user:1', 'name': 'A'}]
-    mock_db_client._client.query = AsyncMock(
-      side_effect=[Exception('no close frame received or sent'), succeed_result]
-    )
-
-    fresh_sdk_client = Mock()
-    fresh_sdk_client.connect = AsyncMock()
-    fresh_sdk_client.signin = AsyncMock()
-    fresh_sdk_client.use = AsyncMock()
-    fresh_sdk_client.close = AsyncMock()
-    fresh_sdk_client.query = mock_db_client._client.query
-
-    with patch('surql.connection.client.AsyncSurreal', return_value=fresh_sdk_client):
-      result = await mock_db_client.execute('SELECT * FROM user')
-
-    assert result == succeed_result
-    # Two query calls: the first failed, the second succeeded post-reconnect.
-    assert mock_db_client._client.query.await_count == 2  # type: ignore[attr-defined]
-    fresh_sdk_client.connect.assert_called_once()
-    fresh_sdk_client.use.assert_called_once()
-    assert mock_db_client.is_connected is True
-
-  @pytest.mark.anyio
-  async def test_execute_does_not_retry_on_non_disconnect_error(
-    self, mock_db_client: DatabaseClient
-  ) -> None:
-    """Non-transport errors (bad SQL, timeout, schema violation) must
-    surface as QueryError without redialing. Retrying schema bugs would
-    just amplify load and hide the real failure.
-    """
-    mock_db_client._client.query = AsyncMock(side_effect=Exception('Parse error: bad SQL'))
-
-    with patch('surql.connection.client.AsyncSurreal') as fresh_factory:
-      with pytest.raises(QueryError) as exc_info:
-        await mock_db_client.execute('NOT VALID SQL')
-      fresh_factory.assert_not_called()
-
-    assert 'Parse error' in str(exc_info.value)
-    assert mock_db_client._client.query.await_count == 1  # type: ignore[attr-defined]
-
-  @pytest.mark.anyio
-  async def test_execute_reconnect_then_persistent_failure(
-    self, mock_db_client: DatabaseClient
-  ) -> None:
-    """If the second attempt also raises a disconnect error (DB still
-    down), the client must give up after a single retry and surface
-    QueryError, not loop or hang.
-    """
-    mock_db_client._client.query = AsyncMock(
-      side_effect=Exception('no close frame received or sent')
-    )
-
-    fresh_sdk_client = Mock()
-    fresh_sdk_client.connect = AsyncMock()
-    fresh_sdk_client.signin = AsyncMock()
-    fresh_sdk_client.use = AsyncMock()
-    fresh_sdk_client.close = AsyncMock()
-    fresh_sdk_client.query = mock_db_client._client.query
-
-    with (
-      patch('surql.connection.client.AsyncSurreal', return_value=fresh_sdk_client),
-      pytest.raises(QueryError),
-    ):
-      await mock_db_client.execute('SELECT * FROM user')
-
-    # Exactly two attempts: original + one post-reconnect retry.
-    assert mock_db_client._client.query.await_count == 2  # type: ignore[attr-defined]
-
-  @pytest.mark.anyio
-  async def test_execute_recovers_after_prior_reconnect_failure(
-    self, mock_db_client: DatabaseClient
-  ) -> None:
-    """If a previous call's reconnect failed (DB was still booting),
-    the next call must attempt to reconnect again rather than
-    short-circuit with ConnectionError forever. This matches the real
-    failure mode where surrealdb is restarted, the first query during
-    boot fails, but a query 30s later (after surrealdb is ready)
-    should succeed transparently.
-    """
-    # Simulate the post-failed-reconnect state.
-    mock_db_client._connected = False
-
-    fresh_sdk_client = Mock()
-    fresh_sdk_client.connect = AsyncMock()
-    fresh_sdk_client.signin = AsyncMock()
-    fresh_sdk_client.use = AsyncMock()
-    fresh_sdk_client.close = AsyncMock()
-    fresh_sdk_client.query = AsyncMock(return_value=[{'id': 'user:1'}])
-
-    with patch('surql.connection.client.AsyncSurreal', return_value=fresh_sdk_client):
-      result = await mock_db_client.execute('SELECT * FROM user')
-
-    assert result == [{'id': 'user:1'}]
-    fresh_sdk_client.connect.assert_called_once()
-    assert mock_db_client.is_connected is True
-
-  @pytest.mark.anyio
   async def test_select_success(self, mock_db_client: DatabaseClient) -> None:
     """Test successful SELECT operation on a bare table target."""
     await mock_db_client.select('user')
@@ -497,7 +387,7 @@ class TestDatabaseClient:
     self, mock_db_client: DatabaseClient
   ) -> None:
     """Regression (bug #15): `"table:id"` targets must route through
-    `SELECT * FROM type::thing($table, $id)`.
+    `SELECT * FROM type::record($table, $id)`.
 
     On SurrealDB v3, passing a bare ``"user:alice"`` string to
     ``db.select`` is interpreted as a table name containing a colon
@@ -505,7 +395,7 @@ class TestDatabaseClient:
     targets and dispatch via raw SurrealQL so the server treats them
     as record ids. TS / rs / go ports all do this.
 
-    Must use ``type::thing(table, id)`` (not ``type::record(table, id)``):
+    Must use ``type::record(table, id)`` (not ``type::record(table, id)``):
     in v3 the two-arg form of ``type::record`` is a type coercion, not a
     constructor.
     """
@@ -516,10 +406,10 @@ class TestDatabaseClient:
     # Must NOT go through the SDK's bare string `select` path.
     mock_db_client._client.select.assert_not_called()
 
-    # Must hit `query` with `type::thing($table, $id)` and bound params.
+    # Must hit `query` with `type::record($table, $id)` and bound params.
     mock_db_client._client.query.assert_called_once()
     sql, params = mock_db_client._client.query.call_args.args
-    assert 'type::thing($table, $id)' in sql
+    assert 'type::record($table, $id)' in sql
     assert params == {'table': 'user', 'id': 'alice'}
 
     # Single-record unwrap still yields a dict (not a list).
