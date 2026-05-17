@@ -23,11 +23,15 @@ env:
 jobs:
   integration:
     name: SurrealDB v3 integration tests
-    # aur0 self-hosted for push to main and same-repo PRs; fork PRs
-    # fall back to ubuntu-latest. Spinning up Docker on aur0 with
-    # fork-controlled code (pytest + uv sync) would expose the
-    # internal runner to arbitrary contributors.
-    runs-on: ${{ github.event.pull_request.head.repo.fork && 'ubuntu-latest' || fromJSON('["self-hosted", "aur0"]') }}
+    # Pinned to `ubuntu-latest` (NOT aur0 self-hosted). The job runs
+    # SurrealDB as a sibling Docker container and expects pytest to
+    # reach it via `localhost:8000` — only valid on GH-hosted runners
+    # where the runner IS the host. On a containerized aur0 runner,
+    # pytest sits on its own bridge network and the connect fails;
+    # additionally, `kushtakas-surrealdb` already owns host :8000 on
+    # aur0, so the bind itself 409s. Reverting to ubuntu-latest also
+    # avoids exposing aur0 to fork-PR code execution.
+    runs-on: ubuntu-latest
 
     steps:
       - name: Checkout code
