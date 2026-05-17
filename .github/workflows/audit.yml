@@ -9,16 +9,15 @@ on:
       - 'pyproject.toml'
       - 'uv.lock'
       - '.github/workflows/audit.yml'
-  push:
-    branches:
-      - main
-    paths:
-      - 'pyproject.toml'
-      - 'uv.lock'
-      - '.github/workflows/audit.yml'
   schedule:
     - cron: '0 4 * * *'
   workflow_dispatch:
+
+# Only one run per (workflow, ref). New pushes to the same branch cancel any
+# in-flight run — only the latest commit ever produces signal.
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
 
 env:
   FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true

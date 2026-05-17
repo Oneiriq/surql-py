@@ -7,6 +7,12 @@ on:
   pull_request:
     branches: [main, 'release/**']
 
+# Only one run per (workflow, ref). New pushes to the same PR branch cancel any
+# in-flight run — only the latest commit ever produces signal.
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
 permissions:
   contents: read
 

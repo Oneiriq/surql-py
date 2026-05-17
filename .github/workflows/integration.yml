@@ -5,10 +5,14 @@ on:
     branches:
       - main
       - 'release/**'
-  push:
-    branches:
-      - main
-      - 'release/**'
+  workflow_dispatch:
+
+# One run per (workflow, ref). Push to a PR branch cancels the prior in-flight
+# integration run for that PR — only the latest commit's integration result
+# matters. No `push:` trigger: integration tests fire on PR open / synchronize.
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
 
 permissions:
   contents: read

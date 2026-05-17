@@ -14,9 +14,12 @@ permissions:
   pages: write
   id-token: write
 
+# Cancel in-progress doc builds on the same ref when a newer commit arrives.
+# Keyed by ref (not the global 'pages' group) so a PR build doesn't block the
+# main-branch deploy.
 concurrency:
-  group: pages
-  cancel-in-progress: false
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
 
 env:
   FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
