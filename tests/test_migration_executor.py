@@ -43,15 +43,13 @@ class TestExecuteMigration:
       assert isinstance(result, int)
       assert result >= 0
 
-      # Bug #13: whole migration is flushed as a single batched
-      # BEGIN...;stmts;COMMIT RPC, so v3 never sees a bare COMMIT in a
-      # standalone request.
-      assert mock_db_client._client.query.call_count == 1
-      batched = mock_db_client._client.query.call_args.args[0]
-      assert batched.startswith('BEGIN TRANSACTION;')
-      assert batched.rstrip().endswith('COMMIT TRANSACTION;')
-      assert 'CREATE TABLE test;' in batched
-      assert 'CREATE TABLE test2;' in batched
+      # Issue #83: statements run individually (not batched in BEGIN/COMMIT)
+      # so per-statement errors surface as raised QueryErrors instead of
+      # being swallowed by surrealdb-py's null-on-failure response for
+      # batched transactions.
+      assert mock_db_client._client.query.call_count == 2
+      issued = [call.args[0] for call in mock_db_client._client.query.call_args_list]
+      assert issued == ['CREATE TABLE test;', 'CREATE TABLE test2;']
 
       # Verify migration was recorded
       mock_record.assert_called_once()
@@ -66,11 +64,13 @@ class TestExecuteMigration:
     clean_env,  # noqa: ARG002
     tmp_path: Path,
   ):
-    """BEGIN/COMMIT are skipped when the client is connected to an embedded engine.
+    """Statements are issued individually for embedded engines too.
 
-    The underlying surrealdb Python SDK (v1.0.x) crashes on transaction control
-    statements in embedded mode (IndexError in async_ws.query()). Migrations in
-    embedded are atomic-by-process so we elide the wrapper.
+    Historically embedded engines were the one path that elided the BEGIN/COMMIT
+    wrapper (the surrealdb-py SDK's embedded transport crashes on transaction
+    control). After issue #83 (silent-failure-swallow) all paths now run
+    statements individually; this test still serves as a regression guard that
+    embedded clients see each statement as its own RPC.
     """
     from unittest.mock import Mock
 
@@ -172,12 +172,11 @@ class TestExecuteMigration:
 
   @pytest.mark.anyio
   async def test_execute_migration_statement_failure(self, mock_db_client, tmp_path: Path):
-    """Test migration execution with statement failure.
+    """Statement-level failure is surfaced as MigrationExecutionError.
 
-    With the bug #13 batched strategy the whole migration lands in a
-    single ``query`` RPC; an error anywhere inside the batch surfaces
-    as a single failure which must be wrapped as
-    ``MigrationExecutionError``.
+    Post-issue-#83 the executor runs statements individually, so the failure
+    message names the specific failing statement index (not just the migration
+    version) — much easier to diagnose mid-migration breakage.
     """
     migration = Migration(
       version='20260101_120000',
@@ -192,8 +191,49 @@ class TestExecuteMigration:
     with pytest.raises(MigrationExecutionError) as exc_info:
       await execute_migration(mock_db_client, migration, MigrationDirection.UP)
 
-    assert 'Failed to execute migration' in str(exc_info.value)
+    assert 'Failed to execute statement 0' in str(exc_info.value)
     assert '20260101_120000' in str(exc_info.value)
+
+  @pytest.mark.anyio
+  async def test_execute_migration_surfaces_midbatch_failure_no_history_write(
+    self, mock_db_client, tmp_path: Path
+  ):
+    """Issue #83 regression: a failing statement raises and history is NOT written.
+
+    Pre-fix, the executor batched every statement into one BEGIN/COMMIT block
+    and surrealdb-py returned `null` for partial failures, swallowing every
+    per-statement error. The executor saw no exception, wrote the history row,
+    and logged `applied_count=1` while the schema was actually empty. After
+    the fix statements run individually; the SDK raises on the first error,
+    the executor surfaces it as MigrationExecutionError, and no history row
+    is written.
+    """
+    migration = Migration(
+      version='20260101_120000',
+      description='Trips on stmt 2',
+      path=tmp_path / 'test.py',
+      up=lambda: [
+        'CREATE TABLE good;',
+        'DEFINE FIELD bad ON TABLE rel TYPE option<object> FLEXIBLE;',
+      ],
+      down=lambda: [],
+    )
+
+    # Mock: first stmt succeeds (None), second raises.
+    mock_db_client._client.query = AsyncMock(
+      side_effect=[None, QueryError('FLEXIBLE can only be used in SCHEMAFULL tables')]
+    )
+
+    with (
+      patch('surql.migration.executor.record_migration', new=AsyncMock()) as mock_record,
+      pytest.raises(MigrationExecutionError) as exc_info,
+    ):
+      await execute_migration(mock_db_client, migration, MigrationDirection.UP)
+
+    assert 'statement 1' in str(exc_info.value)
+    assert '20260101_120000' in str(exc_info.value)
+    mock_record.assert_not_called()
+    assert mock_db_client._client.query.call_count == 2
 
   @pytest.mark.anyio
   async def test_execute_migration_empty_statements(self, mock_db_client, tmp_path: Path):

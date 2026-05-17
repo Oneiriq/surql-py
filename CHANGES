@@ -5,6 +5,35 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.5.9] - 2026-05-17
+
+### Fixed
+
+- **`migrate_up` silently swallowed per-statement errors inside the BEGIN/COMMIT
+  transaction wrapper (#83).** The executor used to flush every migration as a
+  single `BEGIN TRANSACTION; <stmts>; COMMIT TRANSACTION;` RPC for atomicity.
+  surrealdb-py returns `null` for a partially-failed batched transaction (the
+  per-statement error list never reaches the caller), so the executor saw no
+  exception, wrote the history row, and logged `applied_count=1` while the
+  schema was effectively empty. The fix runs statements individually so each
+  failing statement raises a `QueryError` the executor wraps as
+  `MigrationExecutionError(..., 'Failed to execute statement N ...')`. The
+  history row is not written on failure.
+
+  Trade-off: a mid-migration failure no longer rolls back earlier statements.
+  For an additive migration the resulting state is incomplete but recoverable —
+  fix the offending statement, drop the partial schema, re-run. The visibility
+  win matters far more than the atomicity loss for the failure case, and the
+  success case is unchanged.
+
+  Regression coverage: `test_execute_migration_surfaces_midbatch_failure_no_history_write`.
+
+### Verified
+
+- `ruff check src tests` + `ruff format --check src tests` — clean.
+- `mypy src --strict` — no issues.
+- `uv run pytest --no-cov --ignore=tests/integration` — **2535 passed, 9 skipped, 2 xfailed**.
+
 ## [1.5.8] - 2026-05-16
 
 ### Added
