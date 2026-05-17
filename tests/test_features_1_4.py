@@ -1,7 +1,7 @@
 """Tests for features #1-#4: aggregation, record_ref, surql_fn, result extraction.
 
 Issue #1: GROUP BY / GROUP ALL aggregation support
-Issue #2: type::thing() helper
+Issue #2: type::record() helper
 Issue #3: time::now() / SurrealDB function support
 Issue #4: Result extraction helpers
 """
@@ -229,7 +229,7 @@ class TestAggregationExpressionComposition:
 
 
 # =============================================================================
-# Issue #2: type::thing() helper
+# Issue #2: type::record() helper
 # =============================================================================
 
 
@@ -239,12 +239,12 @@ class TestRecordRef:
   def test_record_ref_string_id(self) -> None:
     """Test RecordRef with string ID."""
     ref = RecordRef(table='user', record_id='alice')
-    assert ref.to_surql() == "type::thing('user', 'alice')"
+    assert ref.to_surql() == "type::record('user', 'alice')"
 
   def test_record_ref_int_id(self) -> None:
     """Test RecordRef with integer ID."""
     ref = RecordRef(table='post', record_id=123)
-    assert ref.to_surql() == "type::thing('post', 123)"
+    assert ref.to_surql() == "type::record('post', 123)"
 
   def test_record_ref_str_method(self) -> None:
     """Test RecordRef __str__ matches to_surql."""
@@ -277,13 +277,13 @@ class TestRecordRefFunction:
     """Test record_ref() helper with string ID."""
     ref = record_ref('user', 'alice')
     assert isinstance(ref, RecordRef)
-    assert ref.to_surql() == "type::thing('user', 'alice')"
+    assert ref.to_surql() == "type::record('user', 'alice')"
 
   def test_record_ref_helper_int_id(self) -> None:
     """Test record_ref() helper with integer ID."""
     ref = record_ref('post', 42)
     assert isinstance(ref, RecordRef)
-    assert ref.to_surql() == "type::thing('post', 42)"
+    assert ref.to_surql() == "type::record('post', 42)"
 
 
 class TestRecordRefInQueries:
@@ -294,21 +294,21 @@ class TestRecordRefInQueries:
     ref = record_ref('user', 'alice')
     query = Query().insert('post', {'title': 'Hello', 'author': ref})
     sql = query.to_surql()
-    assert "author: type::thing('user', 'alice')" in sql
+    assert "author: type::record('user', 'alice')" in sql
 
   def test_record_ref_in_update(self) -> None:
     """Test RecordRef used as a value in UPDATE query."""
     ref = record_ref('category', 'tech')
     query = Query().update('post:123', {'category': ref})
     sql = query.to_surql()
-    assert "category = type::thing('category', 'tech')" in sql
+    assert "category = type::record('category', 'tech')" in sql
 
   def test_record_ref_in_upsert(self) -> None:
     """Test RecordRef used as a value in UPSERT query."""
     ref = record_ref('org', 'acme')
     query = Query().upsert('member:alice', {'org': ref})
     sql = query.to_surql()
-    assert "org: type::thing('org', 'acme')" in sql
+    assert "org: type::record('org', 'acme')" in sql
 
 
 # =============================================================================
@@ -437,7 +437,7 @@ class TestSurrealFnAndRecordRefMixed:
       },
     )
     sql = query.to_surql()
-    assert "author: type::thing('user', 'alice')" in sql
+    assert "author: type::record('user', 'alice')" in sql
     assert 'created_at: time::now()' in sql
     assert "title: 'Hello'" in sql
 
@@ -673,10 +673,10 @@ class TestIntegrationAggregationQueries:
 
 
 class TestIntegrationRecordRefQueries:
-  """Integration tests verifying type::thing() in full queries."""
+  """Integration tests verifying type::record() in full queries."""
 
   def test_create_with_record_ref(self) -> None:
-    """Test CREATE query with type::thing() reference."""
+    """Test CREATE query with type::record() reference."""
     ref = record_ref('user', 'alice')
     query = Query().insert(
       'comment',
@@ -689,17 +689,17 @@ class TestIntegrationRecordRefQueries:
     expected_parts = [
       'CREATE comment CONTENT',
       "text: 'Great post!'",
-      "author: type::thing('user', 'alice')",
+      "author: type::record('user', 'alice')",
     ]
     for part in expected_parts:
       assert part in sql
 
   def test_update_with_record_ref(self) -> None:
-    """Test UPDATE query with type::thing() reference."""
+    """Test UPDATE query with type::record() reference."""
     ref = record_ref('department', 'engineering')
     query = Query().update('employee:123', {'dept': ref})
     sql = query.to_surql()
-    assert "dept = type::thing('department', 'engineering')" in sql
+    assert "dept = type::record('department', 'engineering')" in sql
 
 
 class TestIntegrationSurrealFnQueries:

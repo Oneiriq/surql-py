@@ -5,10 +5,14 @@ on:
     branches:
       - main
       - 'release/**'
-  push:
-    branches:
-      - main
-      - 'release/**'
+  workflow_dispatch:
+
+# One run per (workflow, ref). Push to a PR branch cancels the prior in-flight
+# integration run for that PR — only the latest commit's integration result
+# matters. No `push:` trigger: integration tests fire on PR open / synchronize.
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
 
 permissions:
   contents: read
@@ -19,7 +23,15 @@ env:
 jobs:
   integration:
     name: SurrealDB v3 integration tests
-    runs-on: [self-hosted, aur0]
+    # Pinned to `ubuntu-latest` (NOT aur0 self-hosted). The job runs
+    # SurrealDB as a sibling Docker container and expects pytest to
+    # reach it via `localhost:8000` — only valid on GH-hosted runners
+    # where the runner IS the host. On a containerized aur0 runner,
+    # pytest sits on its own bridge network and the connect fails;
+    # additionally, `kushtakas-surrealdb` already owns host :8000 on
+    # aur0, so the bind itself 409s. Reverting to ubuntu-latest also
+    # avoids exposing aur0 to fork-PR code execution.
+    runs-on: ubuntu-latest
 
     steps:
       - name: Checkout code
@@ -27,6 +39,10 @@ jobs:
 
       - name: Start SurrealDB v3
         run: |
+          # On self-hosted runners (aur0) a stopped `surrealdb` container from a
+          # prior run can still own the name; idempotent removal avoids a
+          # "Conflict. The container name '/surrealdb' is already in use" 409.
+          docker rm -f surrealdb >/dev/null 2>&1 || true
           docker run -d \
             --name surrealdb \
             -p 8000:8000 \

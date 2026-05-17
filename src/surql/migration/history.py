@@ -32,7 +32,7 @@ def _record_id_for(version: str) -> str:
   """Sanitize a migration version into a safe SurrealDB record id.
 
   SurrealDB record ids must be alphanumeric/underscore (or bracketed).
-  Replace anything else with ``_`` so ``type::thing($table, $id)``
+  Replace anything else with ``_`` so ``type::record($table, $id)``
   accepts the value without extra quoting.
 
   Args:
@@ -197,16 +197,13 @@ async def record_migration(
       params['execution_time_ms'] = execution_time_ms
       set_clauses.append('execution_time_ms = $execution_time_ms')
 
-    # Use `type::thing(table, id)` (not `type::record`). In SurrealDB v3,
-    # `type::record(value, type)` with two args is a runtime type-check that
-    # coerces `value` into a `record<type>` -- it's NOT a table+id record-id
-    # constructor. Calling `type::record('_migration_history', '0001_init')`
-    # is interpreted as "coerce '_migration_history' into record<0001_init>"
-    # and fails with `Expected a record<0001_init> but cannot convert
-    # '_migration_history' into a record<0001_init>`. The correct constructor
-    # is `type::thing(table, id)`, which takes a table name + id and returns
-    # a record id of that table.
-    statement = f'CREATE type::thing($table, $id) SET {", ".join(set_clauses)};'
+    # SurrealDB v3 renamed the record-id constructor: `type::thing(table, id)`
+    # was removed and `type::record(table, id)` is now the constructor that
+    # takes a table name + id and returns a record id of that table.
+    # Verified against v3.0.4: `CREATE type::record('foo', 'bar') SET x = 1`
+    # produces a record id of `foo:bar`. The earlier `type::record(value, type)`
+    # coercion semantics no longer apply with this signature in v3.
+    statement = f'CREATE type::record($table, $id) SET {", ".join(set_clauses)};'
     await client.execute(statement, params)
 
     log.info('migration_recorded', version=version)

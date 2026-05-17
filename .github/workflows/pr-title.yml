@@ -8,6 +8,10 @@ on:
       - synchronize
       - reopened
 
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
 env:
   FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
 
@@ -17,7 +21,11 @@ permissions:
 jobs:
   lint-pr-title:
     name: Conventional Commit PR title
-    runs-on: [self-hosted, aur0]
+    # pull_request_target fires for fork PRs too. Even though no fork
+    # code runs here (only the metadata-reading third-party action),
+    # aur0 is reserved for org-internal triggers — same-repo PRs use
+    # aur0, fork PRs fall to ubuntu-latest.
+    runs-on: ${{ github.event.pull_request.head.repo.fork && 'ubuntu-latest' || fromJSON('["self-hosted", "aur0"]') }}
     steps:
       - uses: amannn/action-semantic-pull-request@v6
         env:

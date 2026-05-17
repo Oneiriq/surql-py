@@ -703,7 +703,9 @@ class TestSchemaIntegration:
     assert 'DEFAULT time::now()' in sql
     assert 'READONLY' in sql
     assert 'DEFINE INDEX email_idx ON TABLE user COLUMNS email UNIQUE' in sql
-    assert 'FOR SELECT' in sql
+    # Permissions render lowercase per SurrealDB v3 grammar.
+    assert 'FOR select WHERE $auth.id = id' in sql
+    assert 'FOR update WHERE $auth.id = id' in sql
 
   def test_build_complete_edge_schema(self) -> None:
     """Composed edge schema generates valid SQL with all components."""

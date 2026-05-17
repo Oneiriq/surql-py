@@ -1,9 +1,15 @@
 name: Nightly
 
+# Cost-conscious surface: manual-only. The nightly cron was disabled to
+# stop consuming runner minutes; re-enable the schedule when budget allows.
 on:
-  schedule:
-    - cron: '0 3 * * *'
   workflow_dispatch:
+
+# Manual-only trigger today; concurrency block included for hygiene in case the
+# cron is ever re-enabled and overlaps a manual dispatch.
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
 
 permissions:
   contents: read

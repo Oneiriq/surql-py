@@ -69,6 +69,10 @@ class FieldDefinition(BaseModel):
   permissions: dict[str, str] | None = None
   readonly: bool = False
   flexible: bool = False
+  # When True, emits `TYPE option<X>` instead of `TYPE X` so the column accepts
+  # NONE in addition to values of the declared type. Required for SCHEMAFULL
+  # tables whose source data may omit the field.
+  nullable: bool = False
 
   model_config = ConfigDict(frozen=True)
 
@@ -86,6 +90,7 @@ def field(
   permissions: dict[str, str] | None = None,
   readonly: bool = False,
   flexible: bool = False,
+  nullable: bool = False,
 ) -> FieldDefinition:
   """Create a field definition.
 
@@ -126,6 +131,7 @@ def field(
     permissions=permissions,
     readonly=readonly,
     flexible=flexible,
+    nullable=nullable,
   )
 
 

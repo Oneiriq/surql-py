@@ -9,16 +9,15 @@ on:
       - 'pyproject.toml'
       - 'uv.lock'
       - '.github/workflows/audit.yml'
-  push:
-    branches:
-      - main
-    paths:
-      - 'pyproject.toml'
-      - 'uv.lock'
-      - '.github/workflows/audit.yml'
   schedule:
     - cron: '0 4 * * *'
   workflow_dispatch:
+
+# Only one run per (workflow, ref). New pushes to the same branch cancel any
+# in-flight run — only the latest commit ever produces signal.
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
 
 env:
   FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
@@ -29,7 +28,10 @@ permissions:
 jobs:
   audit:
     name: pip-audit
-    runs-on: [self-hosted, aur0]
+    # aur0 self-hosted for push/schedule/dispatch + same-repo PRs.
+    # Fork PRs fall back to ubuntu-latest — `uv sync` runs install
+    # hooks from PR code, so it must never touch aur0.
+    runs-on: ${{ github.event.pull_request.head.repo.fork && 'ubuntu-latest' || fromJSON('["self-hosted", "aur0"]') }}
     steps:
       - uses: actions/checkout@v6
 

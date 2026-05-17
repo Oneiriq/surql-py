@@ -81,7 +81,7 @@ def surql_fn(name: str, *args: Any) -> SurrealFn:
 
 
 def _render_record_id_arg(record_id: Any) -> str:
-  """Render a record_id argument for ``type::thing`` calls.
+  """Render a record_id argument for ``type::record`` calls.
 
   - ``RecordID`` instances render via their ``to_surql()`` form.
   - ``SurrealFn`` values render verbatim (so nested function calls compose).
@@ -112,17 +112,18 @@ def _render_record_id_arg(record_id: Any) -> str:
 
 
 def type_record(table: str, record_id: Any) -> SurrealFn:
-  """Build a ``type::thing('table', id)`` SurrealDB function call.
+  """Build a ``type::record('table', id)`` SurrealDB function call.
 
-  Note: previously this emitted ``type::record('table', id)``, but in
-  SurrealDB v3 the two-arg form of ``type::record(value, type)`` is a *type
-  coercion* (cast ``value`` into ``record<type>``), NOT a table+id
-  constructor. Calling ``type::record('task', 'abc')`` is interpreted as
-  "coerce 'task' into ``record<abc>``" and fails. The correct constructor
-  is ``type::thing(table, id)``, which is what we emit now. The Python
-  helper is still named ``type_record`` for source compatibility, but the
-  SurrealQL it produces is ``type::thing(...)`` -- :func:`type_thing` is
-  a thin alias that produces the same output.
+  ``type::record(table, id)`` is the record-id constructor in SurrealDB v3
+  (verified against v3.0.4): given a table name and an id, it returns a
+  record id of that table.
+
+  Earlier surql-py versions emitted ``type::thing('table', id)`` based on
+  a comment claiming ``type::record(value, type)`` was coercion-only. That
+  reasoning was outdated — ``type::thing`` was removed in v3 (calling it
+  raises ``Invalid function/constant path, did you maybe mean `type::record```),
+  so this now emits ``type::record(...)`` and :func:`type_thing` is kept
+  only as a deprecated alias that also emits the v3-correct form.
 
   Produces a :class:`SurrealFn` that renders as raw SurrealQL, so it
   composes with query builders and raw queries just like :func:`surql_fn`.
@@ -134,25 +135,26 @@ def type_record(table: str, record_id: Any) -> SurrealFn:
       :class:`SurrealFn` values render verbatim.
 
   Returns:
-    ``SurrealFn`` wrapping a ``type::thing('table', id)`` expression.
+    ``SurrealFn`` wrapping a ``type::record('table', id)`` expression.
 
   Examples:
     >>> type_record('task', 'abc').to_surql()
-    "type::thing('task', 'abc')"
+    "type::record('task', 'abc')"
 
     >>> type_record('post', 42).to_surql()
-    "type::thing('post', 42)"
+    "type::record('post', 42)"
   """
   arg = _render_record_id_arg(record_id)
-  return SurrealFn(expression=f"type::thing('{table}', {arg})")
+  return SurrealFn(expression=f"type::record('{table}', {arg})")
 
 
 def type_thing(table: str, record_id: Any) -> SurrealFn:
-  """Build a ``type::thing('table', id)`` SurrealDB function call.
+  """Deprecated alias for :func:`type_record` — emits ``type::record(...)``.
 
-  ``type::thing(table, id)`` is the SurrealQL constructor for record IDs
-  in both v2 and v3. This is now an alias for :func:`type_record`, which
-  also emits ``type::thing(...)``.
+  Kept for source compatibility only. The literal SurrealQL function
+  ``type::thing`` no longer exists in v3 (parse error), so this helper
+  now emits ``type::record(table, id)`` exactly like :func:`type_record`.
+  New code should prefer :func:`type_record` directly.
 
   Args:
     table: Target table name.
@@ -161,14 +163,15 @@ def type_thing(table: str, record_id: Any) -> SurrealFn:
       :class:`SurrealFn` values render verbatim.
 
   Returns:
-    ``SurrealFn`` wrapping a ``type::thing('table', id)`` expression.
+    ``SurrealFn`` wrapping a ``type::record('table', id)`` expression
+    (identical output to :func:`type_record`).
 
   Examples:
     >>> type_thing('user', 'alice').to_surql()
-    "type::thing('user', 'alice')"
+    "type::record('user', 'alice')"
 
     >>> type_thing('order', 7).to_surql()
-    "type::thing('order', 7)"
+    "type::record('order', 7)"
   """
   arg = _render_record_id_arg(record_id)
-  return SurrealFn(expression=f"type::thing('{table}', {arg})")
+  return SurrealFn(expression=f"type::record('{table}', {arg})")

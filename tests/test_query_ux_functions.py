@@ -119,7 +119,7 @@ class TestFunctionFactoryComposition:
     now = time_now_fn()
     query = Query().update('post:1', {'author': ref, 'updated_at': now})
     sql = query.to_surql()
-    assert "author = type::thing('user', 'alice')" in sql
+    assert "author = type::record('user', 'alice')" in sql
     assert 'updated_at = time::now()' in sql
 
 

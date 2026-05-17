@@ -650,6 +650,18 @@ class TestAddFieldBackfillSQL:
     assert 'UPDATE' not in diff.forward_sql
     assert 'WHERE' not in diff.forward_sql
 
+  def test_nullable_field_emits_option_type(self) -> None:
+    """`nullable=True` on a FieldDefinition wraps the TYPE clause in `option<...>`."""
+    field = FieldDefinition(
+      name='middle_name',
+      type=FieldType.STRING,
+      nullable=True,
+    )
+
+    diff = _generate_add_field_diff('user', field)
+
+    assert 'DEFINE FIELD middle_name ON TABLE user TYPE option<string>;' in diff.forward_sql
+
   def test_field_with_string_default_includes_backfill(self) -> None:
     """Test backfill SQL with string default value."""
     field = FieldDefinition(

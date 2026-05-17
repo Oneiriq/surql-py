@@ -1,6 +1,6 @@
-site_name: surql
+site_name: surql-py
 site_url: https://oneiriq.github.io/surql-py
-site_description: Code-first database toolkit for SurrealDB
+site_description: Code-first database toolkit for SurrealDB (Python port)
 site_author: Oneiriq
 repo_url: https://github.com/Oneiriq/surql-py
 repo_name: Oneiriq/surql-py
