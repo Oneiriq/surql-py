@@ -35,6 +35,10 @@ jobs:
 
       - name: Start SurrealDB v3
         run: |
+          # On self-hosted runners (aur0) a stopped `surrealdb` container from a
+          # prior run can still own the name; idempotent removal avoids a
+          # "Conflict. The container name '/surrealdb' is already in use" 409.
+          docker rm -f surrealdb >/dev/null 2>&1 || true
           docker run -d \
             --name surrealdb \
             -p 8000:8000 \
