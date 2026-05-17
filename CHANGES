@@ -5,6 +5,26 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.5.12] - 2026-05-17
+
+### Fixed
+
+- **`_quote_value(None)` emitted SurrealQL `NULL` but `TYPE option<X>` columns
+  require `NONE` (#89).** SurrealDB v3 strictly distinguishes NONE (absence of
+  value) from NULL (explicit null value); `option<X>` fields reject NULL with
+  `Expected 'none | X' but found 'NULL'`. Python `None` semantically maps to
+  "no value", so NONE is the correct serialization. Affects `_quote_value`,
+  `Eq('field', None)` (now renders `field = NONE`), and `value(None)`. Callers
+  who want a genuine NULL comparison should use the `IsNull` operator (already
+  exists and is unchanged). Surfaced immediately when downstream consumers
+  started using the helpers for nullable string/array fields.
+
+### Verified
+
+- `ruff check src tests` + `ruff format --check src tests` — clean.
+- `mypy src --strict` — no issues.
+- `uv run pytest --no-cov --ignore=tests/integration` — **2539 passed, 9 skipped, 2 xfailed**.
+
 ## [1.5.11] - 2026-05-17
 
 ### Fixed

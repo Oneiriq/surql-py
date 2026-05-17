@@ -576,12 +576,12 @@ class TestBuildUpsertQuery:
     assert 'admin' in query
     assert '"role"' in query or "'role'" in query
 
-  def test_build_upsert_query_with_null_values(self) -> None:
-    """Test building upsert query with null values."""
+  def test_build_upsert_query_with_none_values(self) -> None:
+    """None values render as SurrealQL `NONE` (issue #89)."""
     items = [{'name': 'Alice', 'age': None}]
     query = build_upsert_query('users', items)
 
-    assert 'NULL' in query
+    assert 'NONE' in query
 
   def test_build_upsert_query_with_boolean_values(self) -> None:
     """Test building upsert query with boolean values."""
