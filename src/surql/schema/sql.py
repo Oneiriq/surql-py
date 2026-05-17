@@ -64,7 +64,8 @@ def _generate_field_sql(
     SurrealQL DEFINE FIELD statement
   """
   ine = _ine_clause(if_not_exists)
-  sql = f'DEFINE FIELD{ine} {field_def.name} ON TABLE {table_name} TYPE {field_def.type.value}'
+  type_clause = f'option<{field_def.type.value}>' if field_def.nullable else field_def.type.value
+  sql = f'DEFINE FIELD{ine} {field_def.name} ON TABLE {table_name} TYPE {type_clause}'
 
   if field_def.assertion:
     sql += f' ASSERT {field_def.assertion}'

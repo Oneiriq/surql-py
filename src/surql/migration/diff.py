@@ -634,7 +634,8 @@ def _field_to_sql(table_name: str, field: FieldDefinition) -> str:
   Returns:
     SQL statement string
   """
-  sql = f'DEFINE FIELD {field.name} ON TABLE {table_name} TYPE {field.type.value}'
+  type_clause = f'option<{field.type.value}>' if field.nullable else field.type.value
+  sql = f'DEFINE FIELD {field.name} ON TABLE {table_name} TYPE {type_clause}'
 
   if field.assertion:
     sql += f' ASSERT {field.assertion}'

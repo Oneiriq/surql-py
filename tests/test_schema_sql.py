@@ -3,7 +3,7 @@
 import pytest
 
 from surql.schema.edge import EdgeMode, edge_schema
-from surql.schema.fields import datetime_field, int_field, string_field
+from surql.schema.fields import FieldType, datetime_field, field, int_field, string_field
 from surql.schema.sql import generate_edge_sql, generate_schema_sql, generate_table_sql
 from surql.schema.table import (
   IndexType,
@@ -68,6 +68,21 @@ class TestGenerateTableSql:
     stmts = generate_table_sql(table)
 
     assert any('DEFAULT time::now()' in s for s in stmts)
+
+  def test_nullable_field_emits_option_type(self) -> None:
+    """`nullable=True` wraps the TYPE clause in `option<...>` so the column accepts NONE."""
+    table = table_schema(
+      'event',
+      fields=[
+        field('title', FieldType.STRING),
+        field('subtitle', FieldType.STRING, nullable=True),
+      ],
+    )
+
+    stmts = generate_table_sql(table)
+
+    assert any('DEFINE FIELD title ON TABLE event TYPE string;' in s for s in stmts)
+    assert any('DEFINE FIELD subtitle ON TABLE event TYPE option<string>;' in s for s in stmts)
 
   def test_table_with_readonly_field(self) -> None:
     """Generates READONLY clause for readonly fields."""
