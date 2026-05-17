@@ -152,9 +152,9 @@ class TestValueBuilder:
     assert expr.to_surql() == 'false'
 
   def test_value_none(self):
-    """Test None value."""
+    """Test None value — emits SurrealQL NONE (issue #89)."""
     expr = value(None)
-    assert expr.to_surql() == 'NULL'
+    assert expr.to_surql() == 'NONE'
 
 
 class TestFunctionBuilder:

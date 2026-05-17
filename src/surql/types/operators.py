@@ -597,7 +597,11 @@ def _quote_value(value: Any) -> str:
   from surql.types.surreal_fn import SurrealFn
 
   if value is None:
-    return 'NULL'
+    # SurrealDB v3 distinguishes NONE (absence of value) from NULL (explicit
+    # null). For `TYPE option<X>` columns the server expects NONE and rejects
+    # NULL with `Couldn't coerce value: Expected `none | X` but found `NULL``.
+    # Python `None` maps to "no value", so NONE is correct.
+    return 'NONE'
   elif isinstance(value, (SurrealFn, RecordRef, Expression)):
     return value.to_surql()
   elif isinstance(value, RecordID):

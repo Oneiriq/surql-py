@@ -241,9 +241,15 @@ class TestRecordID:
 class TestQuoteValue:
   """Test suite for _quote_value helper function."""
 
-  def test_quote_none(self) -> None:
-    """Test quoting None value."""
-    assert _quote_value(None) == 'NULL'
+  def test_quote_none_emits_surreal_none(self) -> None:
+    """Python None serializes as SurrealQL `NONE`, not `NULL`.
+
+    SurrealDB v3 distinguishes the two (NONE = absence, NULL = explicit
+    null). `TYPE option<X>` columns reject NULL with `Expected 'none | X'
+    but found 'NULL'` — Python `None` semantically maps to "no value", so
+    NONE is the correct serialization. See issue #89.
+    """
+    assert _quote_value(None) == 'NONE'
 
   def test_quote_bool_true(self) -> None:
     """Test quoting boolean True."""
@@ -545,10 +551,15 @@ class TestOperatorBaseClass:
 class TestOperatorEdgeCases:
   """Test suite for operator edge cases."""
 
-  def test_eq_with_null_value(self) -> None:
-    """Test Eq operator with None value."""
+  def test_eq_with_none_value(self) -> None:
+    """`Eq('field', None)` renders `field = NONE` (issue #89).
+
+    SurrealDB v3 distinguishes NONE from NULL — for absence-of-value
+    comparisons against `option<X>` columns NONE is correct. If you genuinely
+    want to compare against an explicit NULL, use `IsNull` operator instead.
+    """
     op = Eq('deleted_at', None)
-    assert op.to_surql() == 'deleted_at = NULL'
+    assert op.to_surql() == 'deleted_at = NONE'
 
   def test_eq_with_bool_value(self) -> None:
     """Test Eq operator with boolean value."""
