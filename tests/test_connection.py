@@ -446,26 +446,52 @@ class TestDatabaseClient:
 
   @pytest.mark.anyio
   async def test_update_success(self, mock_db_client: DatabaseClient) -> None:
-    """Test successful UPDATE operation."""
+    """Test successful UPDATE operation.
+
+    Targets shaped like record IDs (`'user:alice'`) are normalized to SDK
+    `RecordID(table, id)` objects before reaching the underlying client so the
+    SDK doesn't have to re-parse the string (and so bracketed unicode forms
+    like `'user:⟨a-b⟩'` work — #91).
+    """
+    from surrealdb import RecordID as SdkRecordID
+
     data = {'status': 'active'}
     await mock_db_client.update('user:alice', data)
 
-    mock_db_client._client.update.assert_called_once_with('user:alice', data)
+    mock_db_client._client.update.assert_called_once()
+    call_args = mock_db_client._client.update.call_args
+    assert isinstance(call_args[0][0], SdkRecordID)
+    assert call_args[0][0].table_name == 'user'
+    assert call_args[0][0].id == 'alice'
+    assert call_args[0][1] == data
 
   @pytest.mark.anyio
   async def test_merge_success(self, mock_db_client: DatabaseClient) -> None:
-    """Test successful MERGE operation."""
+    """Test successful MERGE operation. Target normalized to SDK RecordID — see #91."""
+    from surrealdb import RecordID as SdkRecordID
+
     data = {'status': 'active'}
     await mock_db_client.merge('user:alice', data)
 
-    mock_db_client._client.merge.assert_called_once_with('user:alice', data)
+    mock_db_client._client.merge.assert_called_once()
+    call_args = mock_db_client._client.merge.call_args
+    assert isinstance(call_args[0][0], SdkRecordID)
+    assert call_args[0][0].table_name == 'user'
+    assert call_args[0][0].id == 'alice'
+    assert call_args[0][1] == data
 
   @pytest.mark.anyio
   async def test_delete_success(self, mock_db_client: DatabaseClient) -> None:
-    """Test successful DELETE operation."""
+    """Test successful DELETE operation. Target normalized to SDK RecordID — see #91."""
+    from surrealdb import RecordID as SdkRecordID
+
     await mock_db_client.delete('user:alice')
 
-    mock_db_client._client.delete.assert_called_once_with('user:alice')
+    mock_db_client._client.delete.assert_called_once()
+    call_args = mock_db_client._client.delete.call_args
+    assert isinstance(call_args[0][0], SdkRecordID)
+    assert call_args[0][0].table_name == 'user'
+    assert call_args[0][0].id == 'alice'
 
   @pytest.mark.anyio
   async def test_insert_relation_success(self, mock_db_client: DatabaseClient) -> None:

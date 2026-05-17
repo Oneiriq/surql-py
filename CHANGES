@@ -5,6 +5,47 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.5.13] - 2026-05-17
+
+### Fixed
+
+- **`db.select` / `db.merge` / `db.update` / `db.delete` mishandled bracketed
+  record-id targets emitted by `str(RecordID(...))` (#91).** After 1.5.11
+  switched `RecordID.__str__` to unicode `⟨⟩` brackets for v3 compatibility,
+  callers like `get_record(table, RecordID(table, 'a-b'), Model)` produced a
+  target string `'table:⟨a-b⟩'`. `db.select` was passing the bracketed inner
+  `'⟨a-b⟩'` as the `$id` param to `type::record($table, $id)`, so SurrealDB
+  looked up `table:'⟨a-b⟩'` (a different, non-existent record) and returned
+  None. Same hazard existed for `db.merge/update/delete` paths where the SDK's
+  string parser doesn't understand the bracketed form. The fix:
+
+  - Extended `_RECORD_ID_BRACKETED_PATTERN` to match both ASCII `<>` and
+    unicode `⟨⟩` brackets.
+  - Added `_strip_record_id_brackets` (used by `_denormalize_params` and
+    `db.select`'s `type::record` dispatch) so the inner id is stripped of
+    brackets before lookup.
+  - Added `_normalize_target` (used by `db.merge/update/delete`) which
+    converts any record-id-shaped string target into an `SdkRecordID`
+    object so the SDK gets a type it understands instead of trying to
+    parse the bracketed string itself.
+
+  Surfaced immediately when downstream consumers started using `get_record`
+  + `merge_record` for entities with hyphenated record ids.
+
+- **`_denormalize_params` didn't recognize surql's own `RecordID` (#91).** When
+  callers built `merge_record(table, id, {'community': RecordID(...)})`, the
+  surql `RecordID` wrapper sailed straight through `_denormalize_params` and
+  hit the SDK's CBOR encoder, which raised
+  `('no encoder for type ', <class 'surql.types.record_id.RecordID'>)`.
+  Added a `SurqlRecordID -> SdkRecordID` conversion branch so callers can hand
+  the helpers either a string or a `RecordID` instance and have either work.
+
+### Verified
+
+- `ruff check src tests` + `ruff format --check src tests` — clean.
+- `mypy src --strict` — no issues.
+- `uv run pytest --no-cov --ignore=tests/integration` — **2539 passed**, 9 skipped, 2 xfailed.
+
 ## [1.5.12] - 2026-05-17
 
 ### Fixed
