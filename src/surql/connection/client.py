@@ -57,7 +57,34 @@ logger = structlog.get_logger(__name__)
 # callers who want an unambiguous record reference should pass
 # ``RecordID(table, id)`` or ``RecordRef(table, id)`` directly.
 _RECORD_ID_PATTERN = re.compile(r'^[a-zA-Z_][a-zA-Z0-9_]*:[^:\s/]+\Z')
-_RECORD_ID_BRACKETED_PATTERN = re.compile(r'^[a-zA-Z_][a-zA-Z0-9_]*:<[^>]+>\Z')
+# Accept both ASCII (`<>`) and unicode (`⟨⟩`) bracket forms. RecordID.__str__
+# emits the unicode form for SurrealDB v3 compatibility (#87), but callers
+# may still pass ASCII-bracketed strings from older serializations.
+_RECORD_ID_BRACKETED_PATTERN = re.compile(r'^[a-zA-Z_][a-zA-Z0-9_]*:(?:<[^>]+>|⟨[^⟩]+⟩)\Z')
+
+
+def _strip_record_id_brackets(id_part: str) -> str:
+  """Remove ASCII `<>` or unicode `⟨⟩` brackets around a record id."""
+  if id_part.startswith('<') and id_part.endswith('>'):
+    return id_part[1:-1]
+  if id_part.startswith('⟨') and id_part.endswith('⟩'):
+    return id_part[1:-1]
+  return id_part
+
+
+def _normalize_target(target: str) -> Any:
+  """Convert a record-id-shaped target to an SDK RecordID; pass tables through.
+
+  The SurrealDB Python SDK accepts either a plain table name (`'user'`) for
+  table-level ops or an `SdkRecordID` for record-level ops. Bracketed
+  record-id strings (`'user:⟨a-b⟩'`) confuse the SDK's string parser, so we
+  pre-convert to `SdkRecordID(table, bare_id)` for any bracketed/composite
+  shape. Tables (no colon) pass through unchanged.
+  """
+  if not _is_record_id_target(target):
+    return target
+  table, id_part = target.split(':', 1)
+  return SdkRecordID(table, _strip_record_id_brackets(id_part))
 
 
 def _is_record_id_target(target: str) -> bool:
@@ -78,7 +105,7 @@ def _is_record_id_target(target: str) -> bool:
 
 
 def _denormalize_params(value: Any) -> Any:
-  """Recursively convert record ID strings back to SDK RecordID objects.
+  """Recursively convert record ID strings and surql RecordIDs to SDK RecordIDs.
 
   When consumers receive normalized responses (RecordID -> string), they may
   pass those strings back as field values in subsequent create/update calls.
@@ -86,18 +113,25 @@ def _denormalize_params(value: Any) -> Any:
   function detects strings matching the ``table:id`` pattern and converts them
   back to ``surrealdb.RecordID`` objects before sending to the SDK.
 
+  surql's own ``RecordID`` pydantic wrapper is also converted to the SDK type
+  here — the SDK's CBOR encoder only knows about ``surrealdb.RecordID``.
+
   Args:
     value: Any value from user-provided data (dicts, lists, scalars)
 
   Returns:
     The value with record ID strings replaced by SDK RecordID objects
   """
+  # Local import to avoid a top-level cycle (types -> connection -> types).
+  from surql.types.record_id import RecordID as SurqlRecordID
+
+  if isinstance(value, SurqlRecordID):
+    return SdkRecordID(value.table, value.id)
   if isinstance(value, str) and _is_record_id_target(value):
     table, id_part = value.split(':', 1)
-    # Strip the angle-bracket wrappers from `table:<id>` form so the SDK gets
-    # the bare id (the brackets are SurrealQL syntax, not part of the id).
-    if id_part.startswith('<') and id_part.endswith('>'):
-      id_part = id_part[1:-1]
+    # Strip the angle-bracket wrappers (ASCII `<>` or unicode `⟨⟩`) so the SDK
+    # gets the bare id (the brackets are SurrealQL syntax, not part of the id).
+    id_part = _strip_record_id_brackets(id_part)
     return SdkRecordID(table, id_part)
   if isinstance(value, dict):
     return {k: _denormalize_params(v) for k, v in value.items()}
@@ -465,6 +499,10 @@ class DatabaseClient:
 
         if _is_record_id_target(target):
           table, id_part = target.split(':', 1)
+          # Strip angle-bracket wrappers (ASCII `<>` or unicode `⟨⟩`) so the
+          # value passed to type::record($table, $id) is the bare id, not the
+          # bracket-wrapped SurrealQL syntax form.
+          id_part = _strip_record_id_brackets(id_part)
           raw = await self._client.query(
             'SELECT * FROM type::record($table, $id)',
             {'table': table, 'id': id_part},
@@ -528,7 +566,7 @@ class DatabaseClient:
     async with self._semaphore:
       try:
         self._log.debug('executing_update', target=target, data=data)
-        result = await self._client.update(target, _denormalize_params(data))
+        result = await self._client.update(_normalize_target(target), _denormalize_params(data))
         return _normalize_sdk_value(result)
       except Exception as e:
         self._log.error('update_failed', error=str(e), target=target)
@@ -554,7 +592,7 @@ class DatabaseClient:
     async with self._semaphore:
       try:
         self._log.debug('executing_merge', target=target, data=data)
-        result = await self._client.merge(target, _denormalize_params(data))
+        result = await self._client.merge(_normalize_target(target), _denormalize_params(data))
         return _normalize_sdk_value(result)
       except Exception as e:
         self._log.error('merge_failed', error=str(e), target=target)
@@ -579,7 +617,7 @@ class DatabaseClient:
     async with self._semaphore:
       try:
         self._log.debug('executing_delete', target=target)
-        result = await self._client.delete(target)
+        result = await self._client.delete(_normalize_target(target))
         return _normalize_sdk_value(result)
       except Exception as e:
         self._log.error('delete_failed', error=str(e), target=target)
