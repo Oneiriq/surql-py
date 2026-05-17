@@ -30,33 +30,43 @@ logger = structlog.get_logger(__name__)
 
 # Pattern matching SurrealDB record ID targets: "table:id" or "table:<complex_id>"
 #
-# Two guards keep this from over-matching:
+# Three guards keep this from over-matching:
 #
-# 1. Negative lookahead ``(?!//)`` after the colon excludes URL schemes
-#    (``http://``, ``https://``, ``ws://``, ``wss://``, ``file://``, ...) which
-#    share the ``<word>:<rest>`` shape with record-id literals. Without this
-#    guard, ``base_url='http://10.0.0.51:11434'`` was silently rewritten to
-#    ``RecordID('http', '//10.0.0.51:11434')`` and SurrealDB returned a coerce
-#    error in the result text of an otherwise OK-status query response.
+# 1. The id portion ``[^:\s/]+`` excludes additional colons, whitespace, and
+#    slashes. Without the "no extra colons" guard, composite string IDs that
+#    happen to contain colons -- e.g. ``BFS:community:1`` (Cosmos-style
+#    ``{tenant}:{type}:{version}``), ``tenant:env:version`` -- were being
+#    misread as ``RecordID('BFS', 'community:1')`` and rejected at the schema
+#    layer with "Couldn't coerce value for field `x`: Expected `string` but
+#    found `BFS:community:1`" (#85). The slash exclusion subsumes the prior
+#    ``(?!//)`` negative lookahead for URL schemes.
 #
-# 2. ``\S+$`` (non-whitespace, end-anchored) rejects prose. Real record IDs
-#    never contain whitespace; English content fields starting with a word
-#    plus colon (``Pattern: when ...``, ``TODO: implement``, ``Note: see``)
-#    were being coerced to ``RecordID('Pattern', ' when ...')`` and rejected
-#    at the schema layer with "Couldn't coerce value for field `content`...
-#    Expected `string` but found `Pattern:`...". Pattern-matching string
-#    values to detect record IDs is best-effort -- callers can always pass
-#    ``RecordID(table, id)`` explicitly when the target really is a record
-#    that happens to contain unusual characters.
+# 2. The angle-bracket form (``table:<id>``) is matched by the parallel
+#    ``_RECORD_ID_BRACKETED_PATTERN`` below, which permits anything inside
+#    the brackets including colons -- v3 supports ``community:<a:b:c>`` as a
+#    legitimate record ID, and the brackets are an explicit "treat as record"
+#    signal from the caller.
+#
+# 3. ``[^...\s]`` keeps the whitespace exclusion that rejects prose strings
+#    (``"TODO: implement"``, ``"Note: see ..."``) from being coerced.
+#
 # ``\Z`` (absolute end-of-string) is used instead of ``$`` so a trailing
-# newline doesn't slip past the anchor -- ``$`` matches at end-of-string OR
-# just before a final ``\n`` by default, which would let ``"user:alice\n"``
-# coerce.
-_RECORD_ID_PATTERN = re.compile(r'^[a-zA-Z_][a-zA-Z0-9_]*:(?!//)\S+\Z')
+# newline doesn't slip past the anchor.
+#
+# Pattern-matching string values to detect record IDs is still best-effort --
+# callers who want an unambiguous record reference should pass
+# ``RecordID(table, id)`` or ``RecordRef(table, id)`` directly.
+_RECORD_ID_PATTERN = re.compile(r'^[a-zA-Z_][a-zA-Z0-9_]*:[^:\s/]+\Z')
+_RECORD_ID_BRACKETED_PATTERN = re.compile(r'^[a-zA-Z_][a-zA-Z0-9_]*:<[^>]+>\Z')
 
 
 def _is_record_id_target(target: str) -> bool:
   """Check whether a target string looks like a single record ID (table:id).
+
+  Accepts both the bare ``table:id`` form (no extra colons in the id) and the
+  angle-bracketed ``table:<id>`` form (anything inside the brackets, including
+  colons, dots, hyphens). Composite string IDs like ``BFS:community:1`` are
+  intentionally NOT matched -- see the pattern comment above for #85 context.
 
   Args:
     target: The select target string
@@ -64,7 +74,7 @@ def _is_record_id_target(target: str) -> bool:
   Returns:
     True if target matches record ID format, False for table-only targets
   """
-  return bool(_RECORD_ID_PATTERN.match(target))
+  return bool(_RECORD_ID_PATTERN.match(target) or _RECORD_ID_BRACKETED_PATTERN.match(target))
 
 
 def _denormalize_params(value: Any) -> Any:
@@ -84,6 +94,10 @@ def _denormalize_params(value: Any) -> Any:
   """
   if isinstance(value, str) and _is_record_id_target(value):
     table, id_part = value.split(':', 1)
+    # Strip the angle-bracket wrappers from `table:<id>` form so the SDK gets
+    # the bare id (the brackets are SurrealQL syntax, not part of the id).
+    if id_part.startswith('<') and id_part.endswith('>'):
+      id_part = id_part[1:-1]
     return SdkRecordID(table, id_part)
   if isinstance(value, dict):
     return {k: _denormalize_params(v) for k, v in value.items()}

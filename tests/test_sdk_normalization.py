@@ -100,6 +100,31 @@ class TestIsRecordIdTarget:
     assert _is_record_id_target('Reason: cache miss on the warm path') is False
     assert _is_record_id_target('Why: the schema requires it') is False
 
+  def test_composite_string_id_not_record_id(self) -> None:
+    """Composite IDs with multiple colons must not be detected as record IDs (#85).
+
+    Cosmos-style ``{tenant}:{entityType}:{version}`` identifiers (e.g.
+    ``BFS:community:1``) were being misread as ``RecordID('BFS', 'community:1')``
+    and rejected by SurrealDB at the schema layer with
+    ``Couldn't coerce value for field `x`: Expected `string` but found `BFS:community:1```.
+    The tightened pattern excludes any id portion containing additional colons.
+    Callers who really want a record reference with colons in the id should
+    use the angle-bracketed form ``community:<a:b:c>`` (matched separately).
+    """
+    assert _is_record_id_target('BFS:community:1') is False
+    assert _is_record_id_target('tenant:env:version') is False
+    assert _is_record_id_target('a:b:c:d') is False
+
+  def test_angle_bracketed_id_with_colons_still_record_id(self) -> None:
+    """The angle-bracketed form is an explicit "treat as record" signal.
+
+    Anything inside the brackets is the id portion, colons included. This
+    matches SurrealDB v3's bracketed-id syntax for unusual characters.
+    """
+    assert _is_record_id_target('community:<community-lakewood>') is True
+    assert _is_record_id_target('outlet:<alaskabeacon.com>') is True
+    assert _is_record_id_target('weird:<a:b:c>') is True
+
   def test_record_id_with_trailing_whitespace_not_record_id(self) -> None:
     """Record-ID-shaped strings with trailing whitespace are rejected.
 
