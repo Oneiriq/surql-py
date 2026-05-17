@@ -7,6 +7,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [1.5.8] - 2026-05-16
 
+### Added
+
+- **`field(..., nullable=True)`** — emits `TYPE option<X>` instead of `TYPE X`
+  so a SCHEMAFULL column accepts NONE. Without this knob, every CREATE that
+  omits an optional column fails on SurrealDB v3 with
+  `Couldn't coerce value for field <x>: Expected <type> but found NONE`.
+  Applies to both `schema/sql.py` (initial DEFINE FIELD) and
+  `migration/diff.py` (incremental ADD FIELD diffs). Default is `False`, so
+  existing code is unaffected.
+
 ### Fixed — SurrealDB v3 grammar compatibility
 
 - **Table PERMISSIONS clauses emitted invalid SurrealDB SQL.** `generate_table_sql`
