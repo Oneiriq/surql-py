@@ -884,6 +884,107 @@ class TestTransaction:
     assert txn.state == TransactionState.COMMITTED
 
   @pytest.mark.anyio
+  async def test_commit_normalizes_surql_record_id_params(
+    self, mock_db_client: DatabaseClient
+  ) -> None:
+    """1.6.1: Transaction.commit normalises ``surql.RecordID`` bound params.
+
+    ``DatabaseClient.execute`` runs incoming params through
+    ``_denormalize_params`` so ``surql.types.record_id.RecordID``
+    (surql-py's Pydantic wrapper) is converted to ``surrealdb.RecordID``
+    (the SDK's native CBOR-encodable class) before the SDK's encoder
+    sees them. Pre-1.6.1, ``Transaction.commit`` skipped that
+    normalisation and passed the params dict through unchanged to
+    ``query_raw``, so callers that queued ``surql.RecordID`` values via
+    bound params (``txn.execute(sql, {'parent': RecordID(...)})``)
+    crashed at commit with
+    ``no encoder for type <class 'surql.types.record_id.RecordID'>``.
+
+    The fix routes the Transaction param dict through the same
+    ``_denormalize_params`` helper inside ``Transaction._raw_query``.
+    This asserts the params handed to the SDK are
+    ``surrealdb.RecordID`` instances, NOT surql-py's wrapper.
+    """
+    from surrealdb import RecordID as SdkRecordID
+
+    from surql.types.record_id import RecordID as SurqlRecordID
+
+    captured: dict[str, dict[str, object]] = {}
+
+    async def capture_query_raw(_sql: str, params: dict[str, object]) -> dict[str, object]:
+      captured['params'] = params
+      return {'result': [{'result': '__txn_ok__', 'status': 'OK'}]}
+
+    mock_db_client._client.query_raw = AsyncMock(side_effect=capture_query_raw)
+
+    txn = Transaction(mock_db_client)
+    await txn.begin()
+    await txn.execute(
+      'UPDATE foo:bar SET parent = $parent',
+      {'parent': SurqlRecordID(table='foo', id='baz')},
+    )
+    # The commit must not raise: pre-1.6.1 the SDK's CBOR encoder
+    # would reject the surql-py wrapper.
+    await txn.commit()
+
+    assert txn.state == TransactionState.COMMITTED
+    sdk_params = captured['params']
+    assert 'parent' in sdk_params
+    # Critical: the SDK must receive the native ``surrealdb.RecordID``,
+    # not surql-py's Pydantic wrapper. If this assertion regresses, the
+    # ``no encoder`` crash will return for real callers.
+    assert isinstance(sdk_params['parent'], SdkRecordID)
+    assert not isinstance(sdk_params['parent'], SurqlRecordID)
+    assert sdk_params['parent'].table_name == 'foo'
+    assert sdk_params['parent'].id == 'baz'
+
+  @pytest.mark.anyio
+  async def test_commit_normalizes_mixed_param_types(self, mock_db_client: DatabaseClient) -> None:
+    """1.6.1: param normalisation preserves non-RecordID values.
+
+    ``_denormalize_params`` recurses into dicts/lists; primitives and
+    other values pass through untouched. This guards against a future
+    over-eager conversion damaging strings, ints, bools, dicts, or
+    lists that share a params dict with a ``surql.RecordID``.
+    """
+    from surrealdb import RecordID as SdkRecordID
+
+    from surql.types.record_id import RecordID as SurqlRecordID
+
+    captured: dict[str, dict[str, object]] = {}
+
+    async def capture_query_raw(_sql: str, params: dict[str, object]) -> dict[str, object]:
+      captured['params'] = params
+      return {'result': [{'result': '__txn_ok__', 'status': 'OK'}]}
+
+    mock_db_client._client.query_raw = AsyncMock(side_effect=capture_query_raw)
+
+    txn = Transaction(mock_db_client)
+    await txn.begin()
+    await txn.execute(
+      'UPDATE foo:bar SET parent = $parent, name = $name, count = $count, '
+      'tags = $tags, meta = $meta',
+      {
+        'parent': SurqlRecordID(table='foo', id='baz'),
+        'name': 'Alice',
+        'count': 42,
+        'tags': ['a', 'b', 'c'],
+        'meta': {'active': True, 'score': 3.14},
+      },
+    )
+    await txn.commit()
+
+    assert txn.state == TransactionState.COMMITTED
+    sdk_params = captured['params']
+    # RecordID converted to SDK type.
+    assert isinstance(sdk_params['parent'], SdkRecordID)
+    # Primitives untouched.
+    assert sdk_params['name'] == 'Alice'
+    assert sdk_params['count'] == 42
+    assert sdk_params['tags'] == ['a', 'b', 'c']
+    assert sdk_params['meta'] == {'active': True, 'score': 3.14}
+
+  @pytest.mark.anyio
   async def test_duplicate_param_keys_rejected(self, mock_db_client: DatabaseClient) -> None:
     """Duplicate param names across queued statements raise early."""
     txn = Transaction(mock_db_client)

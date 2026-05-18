@@ -66,7 +66,7 @@ from typing import Any
 
 import structlog
 
-from surql.connection.client import DatabaseClient
+from surql.connection.client import DatabaseClient, _denormalize_params
 
 logger = structlog.get_logger(__name__)
 
@@ -256,6 +256,21 @@ class Transaction:
     silent-swallow behaviour on unsupported SDK versions rather than
     breaking the commit path.
 
+    Params are routed through :func:`_denormalize_params` before being
+    handed to the SDK so ``surql.types.record_id.RecordID`` values
+    (surql-py's Pydantic wrapper) are converted to ``surrealdb.RecordID``
+    (the SDK's native CBOR-encodable class) — symmetry with
+    :meth:`DatabaseClient.execute`, which already normalises its own
+    params. Without this conversion the SDK's CBOR encoder raises
+    ``no encoder for type <class 'surql.types.record_id.RecordID'>``
+    when callers queue bound-param RecordIDs via ``txn.execute``.
+    The fallback ``execute`` branch double-normalises (``execute``
+    runs ``_denormalize_params`` again internally) — that is a no-op
+    because ``_denormalize_params`` is idempotent: an already-converted
+    :class:`surrealdb.RecordID` is neither a ``SurqlRecordID``, nor a
+    string matching the record-id regex, nor a dict/list, so it falls
+    through to the final ``return value``.
+
     Args:
       batched: The full ``BEGIN ... <stmts> ... RETURN '<sentinel>'; COMMIT;``
         string.
@@ -270,12 +285,13 @@ class Transaction:
       callers must skip sentinel inspection in that case (the SDK has
       already collapsed the envelope and there is nothing to probe).
     """
+    resolved_params = _denormalize_params(params) if params else None
     sdk_client = getattr(self._client, '_client', None)
     query_raw = getattr(sdk_client, 'query_raw', None) if sdk_client is not None else None
     if query_raw is None:
       self._log.debug('query_raw_unavailable_falling_back_to_execute')
-      return await self._client.execute(batched, params), False
-    return await query_raw(batched, params or {}), True
+      return await self._client.execute(batched, resolved_params), False
+    return await query_raw(batched, resolved_params or {}), True
 
   async def cancel(self) -> None:
     """Cancel/rollback the transaction.
