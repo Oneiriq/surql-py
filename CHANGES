@@ -5,6 +5,52 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.6.1] - 2026-05-17
+
+### Fixed
+
+- **`Transaction.commit` skipped param normalisation, crashing on
+  `surql.RecordID` bound params.** `DatabaseClient.execute` routes its
+  incoming `params` dict through `_denormalize_params`, which converts
+  `surql.types.record_id.RecordID` (surql-py's Pydantic wrapper) to
+  `surrealdb.RecordID` (the SDK's native CBOR-encodable class) before
+  the encoder sees them. `Transaction.commit` flushed buffered
+  statements via `Transaction._raw_query` → `query_raw` (or the
+  fallback `DatabaseClient.execute`) and passed `self._params` through
+  unchanged — skipping the normalisation step entirely. The asymmetry
+  meant callers who placed `surql.RecordID` values into bound params
+  via `txn.execute(sql, {'foo': RecordID(...)})` crashed at commit
+  with `('no encoder for type ', <class 'surql.types.record_id.RecordID'>)`,
+  defeating the bound-param ergonomics inside transactions.
+
+  Fix: route the `Transaction` param dict through the existing
+  `_denormalize_params` helper inside `Transaction._raw_query` before
+  invoking `query_raw` or the fallback `execute`. No change to
+  `_denormalize_params` itself or to `DatabaseClient.execute`; the
+  only behavioural change is plumbing the existing normalisation into
+  the transaction path. The fallback `execute` branch double-normalises
+  (`execute` runs `_denormalize_params` again internally), which is a
+  no-op — `_denormalize_params` is idempotent on already-converted
+  `surrealdb.RecordID` values (they are neither a `SurqlRecordID`,
+  nor a regex-matching string, nor a dict/list, so they fall through
+  to the final `return value`). Module docstring on
+  `Transaction._raw_query` documents the symmetry with
+  `DatabaseClient.execute` and the idempotency rationale.
+
+  Regression coverage:
+  `tests/test_connection.py::TestTransaction::test_commit_normalizes_surql_record_id_params`
+  and `test_commit_normalizes_mixed_param_types` (4 new tests across
+  two anyio backends; mixed-type test guards against an over-eager
+  conversion damaging primitives, strings, lists, or nested dicts that
+  share a params dict with a `RecordID`).
+
+### Verified
+
+- `ruff check src tests` + `ruff format --check src tests` — clean.
+- `mypy src --strict` — no issues.
+- `uv run pytest --no-cov --ignore=tests/integration` — **2605 passed**
+  (was 2601 in 1.6.0; +4 new regression tests covering the fix above).
+
 ## [1.6.0] - 2026-05-17
 
 ### Added
