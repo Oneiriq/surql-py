@@ -232,6 +232,19 @@ def diff_permissions(
 ) -> list[SchemaDiff]:
   """Compare permission definitions between two table versions.
 
+  Normalises empty / None permissions before comparing so a parsed live
+  table with `permissions=None` (which is what the parser returns for
+  the SurrealDB `PERMISSIONS NONE` / `PERMISSIONS FULL` default the v3
+  server stores on every table that wasn't created with an explicit
+  per-action permissions block) does NOT spuriously diff against a
+  code-side `permissions={}` or `permissions=None`.
+
+  Pre-1.6.2 a raw `!=` comparison on `dict | None` reported every
+  PERMISSIONS-bearing table as drifted because the parser always returned
+  `None` regardless of what the live DB stored; the 1.6.2 parser now
+  extracts the per-action rules and this helper compares them
+  symmetrically.
+
   Args:
     old_table: Previous table definition
     new_table: New table definition
@@ -241,14 +254,46 @@ def diff_permissions(
   """
   diffs: list[SchemaDiff] = []
 
-  if old_table.permissions != new_table.permissions:
-    diffs.append(
-      _generate_modify_permissions_diff(
-        old_table.name, new_table.permissions, old_table.permissions
-      )
-    )
+  if _permissions_equal(old_table.permissions, new_table.permissions):
+    return diffs
+
+  diffs.append(
+    _generate_modify_permissions_diff(old_table.name, new_table.permissions, old_table.permissions)
+  )
 
   return diffs
+
+
+def _permissions_equal(
+  left: dict[str, str] | None,
+  right: dict[str, str] | None,
+) -> bool:
+  """Compare two PERMISSIONS dicts for semantic equality.
+
+  Treats `None`, `{}`, and the live-DB shape (which is also `None` after
+  parser normalisation of `PERMISSIONS NONE` / `PERMISSIONS FULL`) as
+  equivalent. For non-empty dicts, normalises action keys to lowercase
+  and rule whitespace before comparing — matches how the emitter
+  serialises permissions clauses.
+  """
+  left_normalised = _normalise_permissions(left)
+  right_normalised = _normalise_permissions(right)
+  return left_normalised == right_normalised
+
+
+def _normalise_permissions(
+  permissions: dict[str, str] | None,
+) -> dict[str, str]:
+  """Normalise a permissions dict for stable comparison.
+
+  - `None` or empty -> `{}` (equivalent to "no per-action rules").
+  - Lowercases action keys (SurrealDB grammar is case-insensitive but
+    the emitter writes lowercase).
+  - Collapses whitespace in rule expressions.
+  """
+  if not permissions:
+    return {}
+  return {action.lower(): ' '.join(rule.split()) for action, rule in permissions.items()}
 
 
 def diff_edges(
@@ -673,6 +718,17 @@ def _field_to_sql(table_name: str, field: FieldDefinition) -> str:
 def _fields_equal(field1: FieldDefinition, field2: FieldDefinition) -> bool:
   """Check if two field definitions are equal.
 
+  Compares the seven attributes that produce observable SurrealDB schema
+  differences: name, type, nullable (option<X>), target_table (record<X>),
+  assertion, default, value, readonly, flexible.
+
+  Pre-1.6.2 this missed `nullable` and `target_table` — which made every
+  parsed live field that the emitter produced via `TYPE option<X>` or
+  `TYPE record<target>` look unequal to the code declaration, since the
+  parser also failed to lift those out of `none | X` / `record<target>`
+  textual forms. Both are addressed in 1.6.2: parser sets nullable +
+  target_table when present, and this comparison includes them.
+
   Args:
     field1: First field definition
     field2: Second field definition
@@ -683,12 +739,30 @@ def _fields_equal(field1: FieldDefinition, field2: FieldDefinition) -> bool:
   return (
     field1.name == field2.name
     and field1.type == field2.type
-    and field1.assertion == field2.assertion
-    and field1.default == field2.default
-    and field1.value == field2.value
+    and field1.nullable == field2.nullable
+    and field1.target_table == field2.target_table
+    and _expressions_equal(field1.assertion, field2.assertion)
+    and _expressions_equal(field1.default, field2.default)
+    and _expressions_equal(field1.value, field2.value)
     and field1.readonly == field2.readonly
     and field1.flexible == field2.flexible
   )
+
+
+def _expressions_equal(left: str | None, right: str | None) -> bool:
+  """Compare two SurrealQL expressions for semantic equality.
+
+  Normalises both sides through whitespace collapsing so cosmetic
+  differences (extra spaces, trailing whitespace) don't trip the diff.
+  This mirrors the same normalisation `surql.schema.validator` applies
+  to expression comparisons, so the two code paths agree on what counts
+  as "drift".
+  """
+  if left is None and right is None:
+    return True
+  if left is None or right is None:
+    return False
+  return ' '.join(left.split()) == ' '.join(right.split())
 
 
 def _mtree_index_to_sql(table_name: str, index: IndexDefinition) -> str:

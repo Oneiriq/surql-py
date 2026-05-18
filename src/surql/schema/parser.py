@@ -2,6 +2,27 @@
 
 This module parses SurrealDB INFO responses into TableDefinition objects.
 This enables comparison between code-defined schemas and database schemas.
+
+# Round-trip symmetry (1.6.2)
+
+`parse_table_info` is the inverse of `surql.schema.sql._generate_field_sql`
+and `surql.migration.diff._field_to_sql`. After a `migrate_up`, the
+INFO FOR TABLE response stored by SurrealDB v3 differs textually from
+what the emitter produced:
+
+  emitted               -> stored / returned by INFO FOR TABLE
+  TYPE option<X>        -> TYPE none | X            (option unfolded)
+  TYPE option<record<Y>> -> TYPE none | record<Y>
+  TYPE record<Y>         -> TYPE record<Y>          (unchanged)
+  TYPE object FLEXIBLE   -> FLEXIBLE TYPE object    (FLEXIBLE clause moved)
+  no PERMISSIONS         -> PERMISSIONS FULL        (per-field DB default)
+  TYPE array             -> TYPE array + a separate <field>[*] (or <field>.*)
+                            entry holding the element-type spec.
+
+The parser normalises these back into the same FieldDefinition / TableDefinition
+shape the emitter started from, so a fresh `diff_tables(parsed_db, code_table)`
+returns `[]` when DB and code match. This is exercised by
+`tests/test_diff_round_trip.py`.
 """
 
 import re
@@ -28,6 +49,38 @@ class SchemaParseError(Exception):
   """Error parsing database schema."""
 
 
+# Tokens that mark the start of a top-level clause in a DEFINE FIELD statement.
+# Used to slice the definition into (TYPE, ASSERT, DEFAULT, VALUE) bodies so
+# each extractor only sees its own clause body — not a substring of a later
+# clause or of the field name (which is what the pre-1.6.2 regexes did, hence
+# the `Unsafe default value expression: 'ON ... TYPE ...'` crash on tables
+# with a field named `default`).
+#
+# Keywords that may appear in either DEFINE FIELD or DEFINE TABLE position.
+# Order matters only when one keyword is a prefix of another — none are here.
+_FIELD_CLAUSE_KEYWORDS = (
+  'TYPE',
+  'ASSERT',
+  'DEFAULT',
+  'VALUE',
+  'READONLY',
+  'FLEXIBLE',
+  'PERMISSIONS',
+  'COMMENT',
+)
+
+# Pattern matching `record<TableName>` (and `record<TableName, ...>` if SurrealDB
+# ever emits comma-separated record-link variants — we take the first target).
+_RECORD_TYPE_PATTERN = re.compile(r'\brecord\s*<\s*([a-zA-Z_][a-zA-Z0-9_]*)', re.IGNORECASE)
+
+# Pattern matching a SurrealDB array sub-field entry — the per-element type
+# spec that `INFO FOR TABLE` emits alongside the parent array field.
+# Recognises both observed forms:
+#   `unresolved_refs[*]`   (bracket form)
+#   `jurisdiction.*`       (dot-star form)
+_ARRAY_SUBFIELD_PATTERN = re.compile(r'(?:\[\*\]|\.\*)\s*$')
+
+
 def parse_table_info(
   table_name: str,
   info: dict[str, Any],
@@ -51,10 +104,20 @@ def parse_table_info(
   try:
     logger.debug('parsing_table_info', table=table_name)
 
-    # Parse table mode from tb field
-    mode = _parse_table_mode(info.get('tb', ''))
+    tb_definition = info.get('tb', '')
 
-    # Parse fields - support both 'fields' and 'fd' keys
+    # Parse table mode from tb field
+    mode = _parse_table_mode(tb_definition)
+
+    # Parse table-level permissions from tb field (1.6.2 — previously
+    # always `None`, which made every PERMISSIONS-bearing code table
+    # report a false-positive `MODIFY_PERMISSIONS` diff).
+    permissions = _parse_table_permissions(tb_definition)
+
+    # Parse fields - support both 'fields' and 'fd' keys.
+    # Skip array sub-field entries (`<field>[*]` / `<field>.*`) — they're
+    # part of the parent array type spec, not standalone fields, so the
+    # diff should NOT see them as orphan drops.
     fields_dict = info.get('fields') or info.get('fd') or {}
     fields = _parse_fields(fields_dict)
 
@@ -72,7 +135,7 @@ def parse_table_info(
       fields=fields,
       indexes=indexes,
       events=events,
-      permissions=None,  # Permissions are complex to parse, leave for later
+      permissions=permissions,
     )
 
   except Exception as e:
@@ -104,6 +167,61 @@ def _parse_table_mode(tb_definition: str) -> TableMode:
   return TableMode.SCHEMALESS
 
 
+def _parse_table_permissions(tb_definition: str) -> dict[str, str] | None:
+  """Extract per-action PERMISSIONS clauses from a DEFINE TABLE statement.
+
+  Recognises three shapes SurrealDB v3 emits:
+
+  - ``PERMISSIONS NONE`` → returns ``None`` (no per-action rules: the table
+    has the default-deny posture, which is the same shape the code-side
+    helper emits when no ``permissions=`` kwarg was passed).
+  - ``PERMISSIONS FULL`` → returns ``None`` for the same reason (the code-side
+    helper has no representation for "all actions = full"; this normalisation
+    avoids a permanent false-positive `MODIFY_PERMISSIONS` diff on every table
+    whose code declaration omitted permissions).
+  - ``PERMISSIONS FOR select WHERE <r1> FOR create WHERE <r2> ...`` →
+    returns ``{'select': '<r1>', 'create': '<r2>', ...}`` matching the
+    code-side `dict[str, str]` shape.
+
+  Returns ``None`` when no PERMISSIONS clause is present.
+  """
+  if not tb_definition:
+    return None
+
+  # Locate the PERMISSIONS clause body (everything after the keyword up to end-of-string
+  # or to a trailing semicolon).
+  perm_match = re.search(
+    r'\bPERMISSIONS\b(.*?)(?:\s*;|\s*$)',
+    tb_definition,
+    re.IGNORECASE | re.DOTALL,
+  )
+  if not perm_match:
+    return None
+
+  body = perm_match.group(1).strip()
+  if not body:
+    return None
+
+  # Bare `NONE` / `FULL` → no per-action rules to compare. Code-side
+  # `permissions=None` is the canonical match.
+  if body.upper() in ('NONE', 'FULL'):
+    return None
+
+  # Per-action form: collect all `FOR <action> WHERE <rule>` clauses.
+  # Capture each rule up to the next `FOR`, end-of-string, or semicolon.
+  rules: dict[str, str] = {}
+  for action_match in re.finditer(
+    r'\bFOR\s+(select|create|update|delete)\s+WHERE\s+(.*?)(?=\s+FOR\s+(?:select|create|update|delete)\b|\s*;|\s*$)',
+    body,
+    re.IGNORECASE | re.DOTALL,
+  ):
+    action = action_match.group(1).lower()
+    rule = action_match.group(2).strip()
+    rules[action] = rule
+
+  return rules or None
+
+
 def _parse_fields(fd_dict: dict[str, str]) -> list[FieldDefinition]:
   """Parse field definitions from fd dictionary.
 
@@ -111,11 +229,16 @@ def _parse_fields(fd_dict: dict[str, str]) -> list[FieldDefinition]:
     fd_dict: Dictionary of field name to DEFINE FIELD statement
 
   Returns:
-    List of FieldDefinition objects
+    List of FieldDefinition objects (sub-field array element entries
+    like `<field>[*]` and `<field>.*` are skipped — they're part of
+    the parent array's type spec, not standalone fields).
   """
   fields = []
 
   for field_name, definition in fd_dict.items():
+    if _is_array_subfield_name(field_name):
+      logger.debug('skipping_array_subfield', field=field_name)
+      continue
     try:
       field_def = _parse_field_definition(field_name, definition)
       if field_def:
@@ -124,6 +247,18 @@ def _parse_fields(fd_dict: dict[str, str]) -> list[FieldDefinition]:
       logger.warning('field_parse_warning', field=field_name, error=str(e))
 
   return fields
+
+
+def _is_array_subfield_name(name: str) -> bool:
+  """Return True for SurrealDB array sub-field entries.
+
+  SurrealDB v3 reports the per-element type spec for an array field as
+  its own entry in the `INFO FOR TABLE` `fields` dict, with names like
+  `unresolved_refs[*]` or `jurisdiction.*`. These are NOT standalone
+  fields — they're the typed-element spec for the parent array — and
+  the diff should not treat them as orphan drops.
+  """
+  return bool(_ARRAY_SUBFIELD_PATTERN.search(name))
 
 
 def _parse_field_definition(field_name: str, definition: str) -> FieldDefinition | None:
@@ -141,12 +276,25 @@ def _parse_field_definition(field_name: str, definition: str) -> FieldDefinition
 
   logger.debug('parsing_field', field=field_name, definition=definition)
 
-  field_type = _extract_field_type(definition)
-  assertion = _extract_assertion(definition)
-  default = _extract_default(definition)
-  value = _extract_value(definition)
-  readonly = _extract_readonly(definition)
-  flexible = _extract_flexible(definition)
+  # Slice the DEFINE FIELD statement into clause bodies so each extractor
+  # only sees its own clause text — never a substring of the field name
+  # nor a token from a later clause. This is the 1.6.2 root-cause fix for
+  # the `Unsafe default value expression: 'ON ... TYPE ...'` crash on
+  # tables with a field named `default` (and similarly-named hazards).
+  clauses = _split_field_clauses(definition)
+
+  type_clause = clauses.get('TYPE', '')
+  field_type, nullable, target_table = _parse_type_clause(type_clause)
+
+  assertion = clauses.get('ASSERT') or None
+  default = clauses.get('DEFAULT') or None
+  value = clauses.get('VALUE') or None
+
+  # READONLY / FLEXIBLE are flag clauses (no body). `clauses` includes
+  # them as empty strings if they were present; absent keys mean the
+  # flag was not in the definition.
+  readonly = 'READONLY' in clauses
+  flexible = 'FLEXIBLE' in clauses
 
   return FieldDefinition(
     name=field_name,
@@ -156,27 +304,119 @@ def _parse_field_definition(field_name: str, definition: str) -> FieldDefinition
     value=value,
     readonly=readonly,
     flexible=flexible,
+    nullable=nullable,
+    target_table=target_table,
   )
 
 
-def _extract_field_type(definition: str) -> FieldType:
-  """Extract field type from DEFINE FIELD statement.
+def _split_field_clauses(definition: str) -> dict[str, str]:
+  """Split a DEFINE FIELD statement into clause bodies keyed by keyword.
 
-  Args:
-    definition: DEFINE FIELD statement
+  Returns a dict like ``{'TYPE': 'none | record<x>', 'PERMISSIONS': 'FULL'}``
+  containing each clause body verbatim (trailing whitespace stripped).
 
-  Returns:
-    FieldType enum value
+  Implementation note: we scan for clause keywords as standalone tokens
+  (delimited by whitespace or the start/end of the definition string)
+  AFTER skipping past the `DEFINE FIELD <name> ON [TABLE] <table>` prefix.
+  This ensures `default` as a field name does not match the DEFAULT clause
+  keyword, and that `<name>.*` and `[*]` sub-fields are handled by the
+  caller's name filter rather than blowing up here.
+
+  Flag-only clauses (READONLY, FLEXIBLE) get an empty-string body but ARE
+  present in the returned dict so callers can use `key in clauses` to test
+  presence.
   """
-  # Match TYPE keyword followed by type name
-  type_pattern = r'TYPE\s+(\w+)'
-  match = re.search(type_pattern, definition, re.IGNORECASE)
+  # Find the end of the `ON [TABLE] <name>` prefix so we don't scan the
+  # field/table name itself for clause keywords. SurrealDB v3 emits
+  # `DEFINE FIELD <name> ON <table>` (no `TABLE` token); older SurrealDB
+  # / our own emitter writes `ON TABLE <name>`. Skip past either form.
+  prefix_match = re.match(
+    r'\s*DEFINE\s+FIELD\s+\S+\s+ON\s+(?:TABLE\s+)?\S+\s*',
+    definition,
+    re.IGNORECASE,
+  )
+  scan_start = prefix_match.end() if prefix_match else 0
+  body = definition[scan_start:]
 
-  if not match:
-    return FieldType.ANY
+  # Locate each top-level clause keyword (word-boundary anchored) and
+  # record (keyword, start_index_of_body, end_index_of_keyword).
+  keyword_alt = '|'.join(_FIELD_CLAUSE_KEYWORDS)
+  matches = list(re.finditer(rf'\b({keyword_alt})\b', body, re.IGNORECASE))
 
-  type_str = match.group(1).lower()
+  clauses: dict[str, str] = {}
+  for i, m in enumerate(matches):
+    keyword = m.group(1).upper()
+    body_start = m.end()
+    body_end = matches[i + 1].start() if i + 1 < len(matches) else len(body)
+    clause_body = body[body_start:body_end].strip()
+    # Drop a trailing semicolon if present (only meaningful at the very end).
+    if clause_body.endswith(';'):
+      clause_body = clause_body[:-1].rstrip()
+    # Last-clause-wins is intentional: SurrealDB never emits the same
+    # top-level clause twice, so duplicates would indicate a parse bug.
+    clauses[keyword] = clause_body
 
+  return clauses
+
+
+def _parse_type_clause(
+  type_clause: str,
+) -> tuple[FieldType, bool, str | None]:
+  """Parse the body of a TYPE clause into (field_type, nullable, target_table).
+
+  Recognises:
+    `string`                     -> (STRING, False, None)
+    `option<string>`             -> (STRING, True, None)
+    `none | string`              -> (STRING, True, None)
+    `record<user>`               -> (RECORD, False, 'user')
+    `option<record<user>>`       -> (RECORD, True, 'user')
+    `none | record<user>`        -> (RECORD, True, 'user')
+    `object`                     -> (OBJECT, False, None)
+    empty / unknown              -> (ANY, False, None)
+  """
+  if not type_clause:
+    return FieldType.ANY, False, None
+
+  type_str = type_clause.strip()
+  nullable = False
+
+  # `option<X>` -> X, nullable
+  option_match = re.match(r'\s*option\s*<\s*(.+)\s*>\s*$', type_str, re.IGNORECASE)
+  if option_match:
+    nullable = True
+    type_str = option_match.group(1).strip()
+
+  # `none | X` and `X | none` -> X, nullable. SurrealDB v3 stores
+  # `option<X>` as `none | X`; the emitter writes `option<X>` — both must
+  # parse to the same field type so round-trip diffs are clean.
+  union_parts = [p.strip() for p in re.split(r'\s*\|\s*', type_str) if p.strip()]
+  if any(p.lower() == 'none' for p in union_parts):
+    nullable = True
+    non_none = [p for p in union_parts if p.lower() != 'none']
+    if non_none:
+      # Pick the first non-none branch as the canonical type. Multi-branch
+      # unions other than `none | X` aren't representable in the current
+      # FieldDefinition model — fall back to ANY for safety.
+      if len(non_none) == 1:
+        type_str = non_none[0]
+      else:
+        return FieldType.ANY, nullable, None
+
+  # `record<target>` -> RECORD with target_table=target
+  record_match = _RECORD_TYPE_PATTERN.match(type_str)
+  if record_match:
+    return FieldType.RECORD, nullable, record_match.group(1)
+
+  # Bare type name — match the leading word.
+  type_word_match = re.match(r'\s*([a-zA-Z_][a-zA-Z0-9_]*)', type_str)
+  if not type_word_match:
+    return FieldType.ANY, nullable, None
+
+  return _field_type_from_word(type_word_match.group(1)), nullable, None
+
+
+def _field_type_from_word(type_word: str) -> FieldType:
+  """Map a SurrealDB type word to a FieldType enum value."""
   type_mapping = {
     'string': FieldType.STRING,
     'int': FieldType.INT,
@@ -192,96 +432,7 @@ def _extract_field_type(definition: str) -> FieldType:
     'geometry': FieldType.GEOMETRY,
     'any': FieldType.ANY,
   }
-
-  return type_mapping.get(type_str, FieldType.ANY)
-
-
-def _extract_assertion(definition: str) -> str | None:
-  """Extract ASSERT clause from definition.
-
-  Args:
-    definition: DEFINE FIELD statement
-
-  Returns:
-    Assertion expression or None
-  """
-  # Match ASSERT followed by the assertion expression
-  assert_pattern = r'ASSERT\s+(.+?)(?:DEFAULT|VALUE|READONLY|FLEXIBLE|PERMISSIONS|\s*;|\s*$)'
-  match = re.search(assert_pattern, definition, re.IGNORECASE | re.DOTALL)
-
-  if match:
-    return match.group(1).strip()
-
-  # Simpler pattern if no following keyword
-  assert_pattern_simple = r'ASSERT\s+(.+?)(?:\s*;|\s*$)'
-  match = re.search(assert_pattern_simple, definition, re.IGNORECASE | re.DOTALL)
-
-  if match:
-    return match.group(1).strip()
-
-  return None
-
-
-def _extract_default(definition: str) -> str | None:
-  """Extract DEFAULT clause from definition.
-
-  Args:
-    definition: DEFINE FIELD statement
-
-  Returns:
-    Default expression or None
-  """
-  # Match DEFAULT followed by the default value
-  default_pattern = r'DEFAULT\s+(.+?)(?:VALUE|READONLY|FLEXIBLE|PERMISSIONS|ASSERT|\s*;|\s*$)'
-  match = re.search(default_pattern, definition, re.IGNORECASE | re.DOTALL)
-
-  if match:
-    return match.group(1).strip()
-
-  return None
-
-
-def _extract_value(definition: str) -> str | None:
-  """Extract VALUE clause (computed field) from definition.
-
-  Args:
-    definition: DEFINE FIELD statement
-
-  Returns:
-    Value expression or None
-  """
-  # Match VALUE followed by the computed value
-  value_pattern = r'VALUE\s+(.+?)(?:DEFAULT|READONLY|FLEXIBLE|PERMISSIONS|ASSERT|\s*;|\s*$)'
-  match = re.search(value_pattern, definition, re.IGNORECASE | re.DOTALL)
-
-  if match:
-    return match.group(1).strip()
-
-  return None
-
-
-def _extract_readonly(definition: str) -> bool:
-  """Check if field is readonly.
-
-  Args:
-    definition: DEFINE FIELD statement
-
-  Returns:
-    True if readonly, False otherwise
-  """
-  return bool(re.search(r'\bREADONLY\b', definition, re.IGNORECASE))
-
-
-def _extract_flexible(definition: str) -> bool:
-  """Check if field is flexible.
-
-  Args:
-    definition: DEFINE FIELD statement
-
-  Returns:
-    True if flexible, False otherwise
-  """
-  return bool(re.search(r'\bFLEXIBLE\b', definition, re.IGNORECASE))
+  return type_mapping.get(type_word.lower(), FieldType.ANY)
 
 
 def _parse_indexes(ix_dict: dict[str, str]) -> list[IndexDefinition]:
