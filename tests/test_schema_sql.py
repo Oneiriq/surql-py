@@ -523,3 +523,93 @@ class TestIfNotExists:
     assert any(
       s == 'DEFINE INDEX IF NOT EXISTS title_idx ON TABLE post COLUMNS title;' for s in stmts
     )
+
+
+class TestTypedRecordFields:
+  """RECORD fields emit `record<target>` so SurrealDB introspection picks up the link (#92)."""
+
+  def test_record_with_explicit_target_table_emits_parameterized_type(self) -> None:
+    """`target_table='user'` -> `TYPE record<user>` instead of bare `TYPE record`."""
+    table = table_schema(
+      'post',
+      mode=TableMode.SCHEMAFULL,
+      fields=[field('author', FieldType.RECORD, target_table='user')],
+    )
+
+    stmts = generate_table_sql(table)
+
+    assert 'DEFINE FIELD author ON TABLE post TYPE record<user>;' in stmts
+
+  def test_record_with_target_table_and_nullable_wraps_in_option(self) -> None:
+    """`nullable=True` + typed RECORD -> `TYPE option<record<X>>`."""
+    table = table_schema(
+      'post',
+      mode=TableMode.SCHEMAFULL,
+      fields=[field('author', FieldType.RECORD, target_table='user', nullable=True)],
+    )
+
+    stmts = generate_table_sql(table)
+
+    assert 'DEFINE FIELD author ON TABLE post TYPE option<record<user>>;' in stmts
+
+  def test_record_with_value_coercion_auto_detects_target_table(self) -> None:
+    """`value='type::record("user", $value)'` is recognized and lifted into the TYPE.
+
+    Backward-compat path: existing schemas that used `value=` to encode the
+    target table now automatically get the typed form without code changes.
+    The redundant VALUE clause is dropped (the type parameter enforces it).
+    """
+    table = table_schema(
+      'post',
+      mode=TableMode.SCHEMAFULL,
+      fields=[
+        field('author', FieldType.RECORD, value='type::record("user", $value)', nullable=True),
+      ],
+    )
+
+    stmts = generate_table_sql(table)
+
+    assert 'DEFINE FIELD author ON TABLE post TYPE option<record<user>>;' in stmts
+    # No leftover VALUE clause — it was redundant.
+    assert not any('VALUE type::record' in s for s in stmts)
+
+  def test_record_with_custom_value_keeps_bare_record_and_value(self) -> None:
+    """A non-canonical `value=` expression is left alone — only the exact
+    `type::record("X", $value)` pattern triggers the upgrade.
+    """
+    table = table_schema(
+      'post',
+      mode=TableMode.SCHEMAFULL,
+      fields=[
+        field('author', FieldType.RECORD, value='string::lowercase($value.id.to_string())'),
+      ],
+    )
+
+    stmts = generate_table_sql(table)
+
+    # Untouched: bare TYPE record, VALUE clause kept verbatim.
+    assert any(
+      s
+      == 'DEFINE FIELD author ON TABLE post TYPE record VALUE string::lowercase($value.id.to_string());'
+      for s in stmts
+    )
+
+  def test_record_with_explicit_target_table_drops_matching_value(self) -> None:
+    """When `target_table` matches what `value` would have coerced to, drop VALUE."""
+    table = table_schema(
+      'post',
+      mode=TableMode.SCHEMAFULL,
+      fields=[
+        field(
+          'author',
+          FieldType.RECORD,
+          target_table='user',
+          value='type::record("user", $value)',
+        ),
+      ],
+    )
+
+    stmts = generate_table_sql(table)
+
+    assert 'DEFINE FIELD author ON TABLE post TYPE record<user>;' in stmts
+    assert not any('VALUE' in s for s in stmts)

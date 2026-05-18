@@ -5,6 +5,46 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.5.14] - 2026-05-17
+
+### Added
+
+- **Typed `record<target>` field emission for cross-table introspection (#92).**
+  Until now, `field('author', FieldType.RECORD, value='type::record("user", $value)')`
+  emitted `DEFINE FIELD author ... TYPE record VALUE type::record("user", $value)`
+  — bare `TYPE record` plus a VALUE coercion. SurrealDB stored the link correctly,
+  but the type system carried no signal of WHICH table the field links to, so
+  introspection-driven tools (Surrealist's Table Graph designer, ERD generators,
+  any code reading `INFO FOR TABLE`) couldn't render the cross-table arrow.
+
+  Two new behaviors:
+
+  - **Explicit:** `field(name, FieldType.RECORD, target_table='user')` emits
+    `DEFINE FIELD name ON TABLE ... TYPE record<user>;` (`option<record<user>>`
+    when `nullable=True`). No `VALUE` clause — the parameterized type enforces
+    the same constraint.
+  - **Auto-detection (backward-compat):** when `target_table` isn't passed but
+    `value=` matches the canonical `type::record("X", $value)` coercion pattern,
+    the emitter lifts X into `target_table=X` automatically and drops the
+    now-redundant VALUE clause. Existing schemas that used the `value=`
+    convention get the typed form on the next migration with zero code changes.
+
+  Non-canonical `value=` expressions (e.g. `value='string::lowercase($value.id)'`)
+  are left untouched — only the exact `type::record("X", $value)` shape triggers
+  the upgrade, so callers who deliberately wrote a custom coercion keep their
+  VALUE clause.
+
+  Applies to both `schema/sql.py::_generate_field_sql` (initial DEFINE FIELD)
+  and `migration/diff.py::_field_to_sql` (incremental ADD FIELD diffs). 7
+  regression tests in `tests/test_schema_sql.py::TestTypedRecordFields` and
+  `tests/test_migration_generator.py::TestAddFieldBackfillSQL`.
+
+### Verified
+
+- `ruff check src tests` + `ruff format --check src tests` — clean.
+- `mypy src --strict` — no issues.
+- `uv run pytest --no-cov --ignore=tests/integration` — **2546 passed, 9 skipped, 2 xfailed**.
+
 ## [1.5.13] - 2026-05-17
 
 ### Fixed

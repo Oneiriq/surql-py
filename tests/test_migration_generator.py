@@ -662,6 +662,33 @@ class TestAddFieldBackfillSQL:
 
     assert 'DEFINE FIELD middle_name ON TABLE user TYPE option<string>;' in diff.forward_sql
 
+  def test_record_with_target_table_emits_parameterized_type(self) -> None:
+    """RECORD field with `target_table` -> `record<X>` in diff SQL (matches schema/sql.py)."""
+    field = FieldDefinition(
+      name='author',
+      type=FieldType.RECORD,
+      target_table='user',
+    )
+
+    diff = _generate_add_field_diff('post', field)
+
+    assert 'DEFINE FIELD author ON TABLE post TYPE record<user>;' in diff.forward_sql
+
+  def test_record_with_target_table_drops_redundant_value_coercion(self) -> None:
+    """When `value` is the canonical `type::record("X", $value)`, drop it (#92)."""
+    field = FieldDefinition(
+      name='author',
+      type=FieldType.RECORD,
+      target_table='user',
+      value='type::record("user", $value)',
+      nullable=True,
+    )
+
+    diff = _generate_add_field_diff('post', field)
+
+    assert 'DEFINE FIELD author ON TABLE post TYPE option<record<user>>;' in diff.forward_sql
+    assert 'VALUE' not in diff.forward_sql
+
   def test_field_with_string_default_includes_backfill(self) -> None:
     """Test backfill SQL with string default value."""
     field = FieldDefinition(

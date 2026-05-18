@@ -14,6 +14,25 @@ from surql.types.reserved import check_reserved_word
 
 _FIELD_NAME_PART_PATTERN = re.compile(r'^[a-zA-Z_][a-zA-Z0-9_]*$')
 
+# Recognizes the `type::record("<table>", $value)` coercion pattern in a
+# `value=` arg so we can lift the target table into the field's TYPE clause
+# (`record<table>`). Matches both single and double quotes, optional whitespace.
+_TYPE_RECORD_COERCION_PATTERN = re.compile(
+  r'type::record\s*\(\s*["\']([a-zA-Z_][a-zA-Z0-9_]*)["\']\s*,\s*\$value\s*\)\s*\Z'
+)
+
+
+def _detect_target_table_from_value(value: str | None) -> str | None:
+  """If `value` is the canonical record-coercion expression, return the target table.
+
+  `type::record("plan", $value)` -> `"plan"`. Returns None for anything else,
+  including more complex VALUE expressions a caller deliberately wrote.
+  """
+  if not value:
+    return None
+  m = _TYPE_RECORD_COERCION_PATTERN.match(value.strip())
+  return m.group(1) if m else None
+
 
 class FieldType(Enum):
   """SurrealDB field types.
@@ -73,6 +92,14 @@ class FieldDefinition(BaseModel):
   # NONE in addition to values of the declared type. Required for SCHEMAFULL
   # tables whose source data may omit the field.
   nullable: bool = False
+  # For RECORD fields: the target table this field links to. When set, the
+  # emitter writes `TYPE record<{target_table}>` (parameterized) instead of
+  # bare `TYPE record`, which is what SurrealDB's introspection (and tools
+  # like Surrealist's graph designer) need to render cross-table relationships.
+  # If unset on a RECORD field but `value` matches the canonical
+  # `type::record("X", $value)` coercion pattern, the emitter auto-detects X
+  # from the value string and treats it as `target_table=X`.
+  target_table: str | None = None
 
   model_config = ConfigDict(frozen=True)
 
@@ -91,6 +118,7 @@ def field(
   readonly: bool = False,
   flexible: bool = False,
   nullable: bool = False,
+  target_table: str | None = None,
 ) -> FieldDefinition:
   """Create a field definition.
 
@@ -105,6 +133,14 @@ def field(
     permissions: Optional dict of permission rules (select, create, update, delete)
     readonly: If True, field value cannot be modified after creation
     flexible: If True, field allows flexible schema
+    nullable: If True, emits `TYPE option<X>` so the column accepts NONE.
+    target_table: For RECORD fields, the target table — emits
+      `TYPE record<{target_table}>` (parameterized) so SurrealDB introspection
+      and Surrealist's graph designer can render cross-table relationships.
+      If left unset on a RECORD field but `value` matches the canonical
+      `type::record("X", $value)` coercion pattern, the emitter auto-detects X
+      and treats it as `target_table=X` (so existing schemas get the upgrade
+      with no code changes — see #92).
 
   Returns:
     Immutable FieldDefinition instance
@@ -115,12 +151,21 @@ def field(
 
     >>> field('age', FieldType.INT, assertion='$value >= 0 AND $value <= 150')
     FieldDefinition(name='age', type=FieldType.INT, assertion='$value >= 0 AND $value <= 150', ...)
+
+    >>> field('author', FieldType.RECORD, target_table='user')  # explicit
+    >>> field('author', FieldType.RECORD, value='type::record("user", $value)')  # auto-detected
   """
   _validate_field_name(name)
 
   reserved_warning = check_reserved_word(name)
   if reserved_warning is not None:
     warnings.warn(reserved_warning, stacklevel=2)
+
+  # If the caller didn't pass target_table explicitly but supplied the canonical
+  # `type::record("X", $value)` coercion as `value=`, lift X into target_table
+  # so the emitter writes `record<X>` and (optionally) drops the redundant VALUE.
+  if field_type == FieldType.RECORD and target_table is None:
+    target_table = _detect_target_table_from_value(value)
 
   return FieldDefinition(
     name=name,
@@ -132,6 +177,7 @@ def field(
     readonly=readonly,
     flexible=flexible,
     nullable=nullable,
+    target_table=target_table,
   )
 
 
