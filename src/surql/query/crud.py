@@ -2,6 +2,28 @@
 
 This module provides convenient async functions for common database operations
 with type safety through Pydantic models.
+
+Untyped vs typed — when to use which
+====================================
+
+The helpers here (``create_record``, ``update_record``,
+``upsert_record``) return ``dict[str, Any]`` after SDK
+normalisation, and ``get_record`` / ``query_records`` already accept
+a ``model: type[T]`` argument and return typed instances when given
+one. They are the right call when you want the raw dict shape, are
+working across heterogeneous record types, or are inside the builder
+flow.
+
+The parallel module :mod:`surql.query.typed` provides
+``create_typed`` / ``update_typed`` / ``upsert_typed`` which differ
+in return type only: they take a concrete
+:class:`~pydantic.BaseModel` instance and revalidate the response
+through ``data.__class__``, returning ``T`` instead of
+``dict[str, Any]``. Prefer the typed module when the call site
+already has the concrete model in hand and the strict-mypy gates
+want a typed handle. See ``surql/query/typed.py`` for the full
+asymmetry table (notably, ``query_typed`` runs raw SurrealQL — it is
+NOT a typed variant of :func:`query_records`).
 """
 
 from __future__ import annotations

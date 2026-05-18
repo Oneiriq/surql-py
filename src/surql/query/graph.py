@@ -21,6 +21,7 @@ from surql.connection.context import get_db
 from surql.query.builder import Query
 from surql.query.executor import fetch_all
 from surql.query.graph_query import GraphQuery, _extract_graph_result
+from surql.types.operators import Operator
 from surql.types.record_id import RecordID
 
 # Re-export GraphQuery for backward compatibility
@@ -366,6 +367,7 @@ async def traverse[T: BaseModel](
   start: str | RecordID[Any],
   path: str,
   model: type[T],
+  conditions: list[str | Operator] | None = None,
   client: DatabaseClient | None = None,
 ) -> list[T]:
   """Navigate relationships using graph traversal.
@@ -374,6 +376,12 @@ async def traverse[T: BaseModel](
     start: Starting record ID
     path: Traversal path (e.g., '->likes->post', '<-follows<-user')
     model: Pydantic model class for deserialization
+    conditions: Optional WHERE conditions appended to the generated query.
+      Each entry is rendered via :meth:`Query.where`, so raw SurrealQL
+      strings and :class:`Operator` instances are both accepted. Multiple
+      conditions combine with AND. Mirrors the shape accepted by
+      :func:`~surql.query.crud.query_records`. Used for multi-tenant row
+      filtering and any other row-level isolation a caller needs.
     client: Database client. If None, uses context client.
 
   Returns:
@@ -391,12 +399,21 @@ async def traverse[T: BaseModel](
 
     >>> # Multi-hop: followers of followers
     >>> fof = await traverse('user:alice', '<-follows<-user<-follows<-user', User)
+
+    >>> # Tenant-scoped traversal
+    >>> from surql.types.operators import eq
+    >>> posts = await traverse(
+    ...     'user:alice', '->likes->post', Post,
+    ...     conditions=[eq('tenant_id', 'acme')],
+    ... )
   """
   start_str = str(start) if isinstance(start, RecordID) else start
 
   logger.info('traversing_graph', start=start_str, path=path)
 
   query = Query[T]().select().from_table(start_str).traverse(path)
+  for cond in conditions or []:
+    query = query.where(cond)
 
   return await fetch_all(query, model, client)
 
@@ -408,6 +425,7 @@ async def traverse_with_depth[T: BaseModel](
   direction: str = 'out',
   depth: int | None = None,
   model: type[T] | None = None,
+  conditions: list[str | Operator] | None = None,
   client: DatabaseClient | None = None,
 ) -> list[T] | list[dict[str, Any]]:
   """Navigate relationships with optional depth limit.
@@ -419,6 +437,10 @@ async def traverse_with_depth[T: BaseModel](
     direction: Traversal direction ('out', 'in', 'both')
     depth: Maximum depth (None for unlimited)
     model: Optional Pydantic model for deserialization
+    conditions: Optional WHERE conditions appended to the generated query.
+      Same shape as :func:`~surql.query.crud.query_records` — accepts raw
+      SurrealQL strings and :class:`Operator` instances; multiple entries
+      combine with AND.
     client: Database client. If None, uses context client.
 
   Returns:
@@ -452,10 +474,12 @@ async def traverse_with_depth[T: BaseModel](
   logger.info('traversing_with_depth', start=start_str, path=path, depth=depth)
 
   if model:
-    return await traverse(start_str, path, model, client)
+    return await traverse(start_str, path, model, conditions=conditions, client=client)
   else:
     # Return raw results
     query: Query[Any] = Query().select().from_table(start_str).traverse(path)
+    for cond in conditions or []:
+      query = query.where(cond)
     db = client or get_db()
     result = await db.execute(query.to_surql())
 
@@ -567,6 +591,7 @@ async def get_outgoing_edges[T: BaseModel](
   record: str | RecordID[Any],
   edge_table: str,
   model: type[T] | None = None,
+  conditions: list[str | Operator] | None = None,
   client: DatabaseClient | None = None,
 ) -> list[T] | list[dict[str, Any]]:
   """Get all outgoing edges from a record.
@@ -575,6 +600,10 @@ async def get_outgoing_edges[T: BaseModel](
     record: Source record ID
     edge_table: Edge table name
     model: Optional Pydantic model for deserialization
+    conditions: Optional WHERE conditions appended to the generated query.
+      Each entry may be a raw SurrealQL string or an :class:`Operator`
+      instance; multiple entries combine with AND. Same shape as
+      :func:`~surql.query.crud.query_records`.
     client: Database client. If None, uses context client.
 
   Returns:
@@ -583,15 +612,23 @@ async def get_outgoing_edges[T: BaseModel](
   Examples:
     >>> # Get all likes from user
     >>> likes = await get_outgoing_edges('user:alice', 'likes')
+
+    >>> # Tenant-scoped variant
+    >>> from surql.types.operators import eq
+    >>> likes = await get_outgoing_edges(
+    ...     'user:alice', 'likes', conditions=[eq('tenant_id', 'acme')],
+    ... )
   """
   record_str = str(record) if isinstance(record, RecordID) else record
 
   logger.info('fetching_outgoing_edges', record=record_str, edge_table=edge_table)
 
-  sql = f'SELECT * FROM {record_str}->{edge_table}'
+  query: Query[Any] = Query().select().from_table(f'{record_str}->{edge_table}')
+  for cond in conditions or []:
+    query = query.where(cond)
 
   db = client or get_db()
-  result = await db.execute(sql)
+  result = await db.execute(query.to_surql())
 
   # Extract data
   data: list[Any] = []
@@ -608,6 +645,7 @@ async def get_incoming_edges[T: BaseModel](
   record: str | RecordID[Any],
   edge_table: str,
   model: type[T] | None = None,
+  conditions: list[str | Operator] | None = None,
   client: DatabaseClient | None = None,
 ) -> list[T] | list[dict[str, Any]]:
   """Get all incoming edges to a record.
@@ -616,6 +654,10 @@ async def get_incoming_edges[T: BaseModel](
     record: Target record ID
     edge_table: Edge table name
     model: Optional Pydantic model for deserialization
+    conditions: Optional WHERE conditions appended to the generated query.
+      Each entry may be a raw SurrealQL string or an :class:`Operator`
+      instance; multiple entries combine with AND. Same shape as
+      :func:`~surql.query.crud.query_records`.
     client: Database client. If None, uses context client.
 
   Returns:
@@ -624,6 +666,12 @@ async def get_incoming_edges[T: BaseModel](
   Examples:
     >>> # Get all follows to user
     >>> follows = await get_incoming_edges('user:alice', 'follows')
+
+    >>> # Tenant-scoped variant
+    >>> from surql.types.operators import eq
+    >>> follows = await get_incoming_edges(
+    ...     'user:alice', 'follows', conditions=[eq('tenant_id', 'acme')],
+    ... )
   """
   record_str = str(record) if isinstance(record, RecordID) else record
 
@@ -631,10 +679,12 @@ async def get_incoming_edges[T: BaseModel](
 
   # v3-safe form: anchor record on the left (`record<-edge`), not the
   # v2 `<-edge<-record` which v3 rejects. See Oneiriq/surql-py#33.
-  sql = f'SELECT * FROM {record_str}<-{edge_table}'
+  query: Query[Any] = Query().select().from_table(f'{record_str}<-{edge_table}')
+  for cond in conditions or []:
+    query = query.where(cond)
 
   db = client or get_db()
-  result = await db.execute(sql)
+  result = await db.execute(query.to_surql())
 
   # Extract data
   data: list[Any] = []
@@ -653,6 +703,7 @@ async def get_related_records[T: BaseModel](
   target_table: str,
   direction: str = 'out',
   model: type[T] | None = None,
+  conditions: list[str | Operator] | None = None,
   client: DatabaseClient | None = None,
 ) -> list[T] | list[dict[str, Any]]:
   """Get records related through an edge.
@@ -663,6 +714,10 @@ async def get_related_records[T: BaseModel](
     target_table: Related records table name
     direction: Relationship direction ('out' or 'in')
     model: Optional Pydantic model for deserialization
+    conditions: Optional WHERE conditions appended to the generated query.
+      Each entry may be a raw SurrealQL string or an :class:`Operator`
+      instance; multiple entries combine with AND. Same shape as
+      :func:`~surql.query.crud.query_records`.
     client: Database client. If None, uses context client.
 
   Returns:
@@ -674,6 +729,13 @@ async def get_related_records[T: BaseModel](
 
     >>> # Get all users who liked a post
     >>> users = await get_related_records('post:123', 'likes', 'user', 'in', User)
+
+    >>> # Tenant-scoped variant
+    >>> from surql.types.operators import eq
+    >>> posts = await get_related_records(
+    ...     'user:alice', 'likes', 'post', 'out', Post,
+    ...     conditions=[eq('tenant_id', 'acme')],
+    ... )
   """
   record_str = str(record) if isinstance(record, RecordID) else record
 
@@ -689,11 +751,13 @@ async def get_related_records[T: BaseModel](
     raise ValueError(f'Invalid direction: {direction}. Must be "out" or "in"')
 
   if model:
-    return await traverse(record_str, path, model, client)
+    return await traverse(record_str, path, model, conditions=conditions, client=client)
   else:
-    sql = f'SELECT * FROM {record_str}{path}'
+    query: Query[Any] = Query().select().from_table(f'{record_str}{path}')
+    for cond in conditions or []:
+      query = query.where(cond)
     db = client or get_db()
-    result = await db.execute(sql)
+    result = await db.execute(query.to_surql())
 
     # Extract data
     if (
@@ -765,6 +829,7 @@ async def shortest_path(
   to_record: str | RecordID[Any],
   edge_table: str,
   max_depth: int = 10,
+  conditions: list[str | Operator] | None = None,
   client: DatabaseClient | None = None,
 ) -> list[dict[str, Any]]:
   """Find shortest path between two records.
@@ -777,6 +842,11 @@ async def shortest_path(
     to_record: Target record ID
     edge_table: Edge table to traverse
     max_depth: Maximum path depth to search
+    conditions: Optional WHERE conditions appended to the generated query.
+      Each entry may be a raw SurrealQL string or an :class:`Operator`
+      instance; multiple entries combine with AND. The mandatory
+      ``id = <to_record>`` predicate is always included; supplied
+      conditions widen the filter (e.g. tenant scoping).
     client: Database client. If None, uses context client.
 
   Returns:
@@ -784,6 +854,13 @@ async def shortest_path(
 
   Examples:
     >>> path = await shortest_path('user:alice', 'user:charlie', 'follows', max_depth=5)
+
+    >>> # Tenant-scoped variant
+    >>> from surql.types.operators import eq
+    >>> path = await shortest_path(
+    ...     'user:alice', 'user:charlie', 'follows',
+    ...     conditions=[eq('tenant_id', 'acme')],
+    ... )
   """
   from_str = str(from_record) if isinstance(from_record, RecordID) else from_record
   to_str = str(to_record) if isinstance(to_record, RecordID) else to_record
@@ -795,14 +872,14 @@ async def shortest_path(
   # hops. See Oneiriq/surql-py#34.
   for depth in range(1, max_depth + 1):
     hops = ''.join(f'->{edge_table}->?' for _ in range(depth))
-    sql = f"""
-    SELECT * FROM {from_str}{hops}
-    WHERE id = {to_str}
-    LIMIT 1
-    """
+    query: Query[Any] = (
+      Query().select().from_table(f'{from_str}{hops}').where(f'id = {to_str}').limit(1)
+    )
+    for cond in conditions or []:
+      query = query.where(cond)
 
     db = client or get_db()
-    result = await db.execute(sql)
+    result = await db.execute(query.to_surql())
 
     if result:
       # Found path at this depth

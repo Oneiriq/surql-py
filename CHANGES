@@ -5,6 +5,111 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.6.0] - 2026-05-17
+
+### Added
+
+- **`conditions=` parameter on graph traversal helpers.** Six graph
+  helpers — `traverse`, `traverse_with_depth`, `get_related_records`,
+  `get_outgoing_edges`, `get_incoming_edges`, and `shortest_path` —
+  now accept an optional `conditions: list[str | Operator] | None`
+  keyword. Each entry is rendered through `Query.where(...)`, matching
+  the exact shape that `query_records` already accepts; multiple
+  conditions combine with AND. Pre-1.6.0 these helpers emitted bare
+  `SELECT ... FETCH ...` with no WHERE hook, forcing any caller that
+  needed row-level isolation (multi-tenant filtering, archived-flag
+  exclusion, etc.) to roll a custom walker. The parameter is purely
+  additive — defaulting `None` leaves the emitted SurrealQL byte-for-byte
+  identical to 1.5.15. As part of the refactor, the four helpers that
+  previously emitted hand-rolled f-string SQL now route through the
+  `Query` builder so the WHERE composition is identical to the typed
+  CRUD helpers' path. Regression coverage:
+  `tests/test_query_graph.py::TestTraverseConditions` plus per-helper
+  sibling classes (46 new tests).
+
+### Fixed
+
+- **Transaction commits silently swallowed mid-batch failures.** Prior
+  to 1.6.0 `Transaction.commit()` flushed buffered statements as a
+  single `BEGIN TRANSACTION; ...; COMMIT TRANSACTION;` request through
+  the SDK's `query` method. SurrealDB v3 collapses that response to
+  `None` regardless of whether the batch succeeded OR was rolled back
+  server-side — verified against `surrealdb/surrealdb:v3.0.5` with
+  `surrealdb==2.0.0a1`. The commit helper read `None` as success, so a
+  single bad statement that triggered a rollback (type mismatch on a
+  SCHEMAFULL field, assertion failure, FK violation) was
+  indistinguishable from a clean commit. Callers saw "transaction
+  committed", looked for their writes, and found nothing.
+
+  Fix: inject a sentinel `RETURN '__txn_ok__';` statement immediately
+  before the `COMMIT TRANSACTION` line, then route the commit RPC
+  through the SDK's `query_raw` method instead of `query`. `query_raw`
+  preserves the per-statement `{status, result}` envelope; the sentinel
+  surfaces as `{'result': '__txn_ok__', 'status': 'OK'}` on success and
+  is absent on rollback (the COMMIT entry is replaced with
+  `status: 'ERR'`, `details.kind: 'Cancelled'`). The commit method now
+  inspects the envelope and raises `TransactionError` with the
+  server's per-statement explanation when any statement has
+  `status == 'ERR'` OR the sentinel is missing. State machine
+  transitions to `CANCELLED` (not `COMMITTED`) on this path.
+
+  Defensive fallback: when the underlying SDK does not expose
+  `query_raw` (older alpha versions, vendored forks), the commit falls
+  through to the prior `execute` path and logs a warning — silent
+  swallow is preserved only on SDK versions we cannot probe. The
+  module docstring and this entry document the limitation; the
+  warning string names the cause so operators can correlate it with
+  an SDK pin.
+
+  Regression coverage:
+  `tests/test_connection.py::TestTransaction::test_commit_returns_user_statement_results`,
+  `test_commit_raises_on_mid_batch_failure`,
+  `test_commit_raises_when_sentinel_absent`, and
+  `test_commit_falls_back_when_query_raw_unavailable` (8 new tests
+  across two anyio backends).
+
+### Changed
+
+- **Typed-vs-untyped CRUD documentation clarified.** Investigation
+  revealed the typed (`create_typed`, `update_typed`, `upsert_typed`,
+  `get_typed`, `query_typed`) and untyped (`create_record`,
+  `update_record`, `upsert_record`, `get_record`, `query_records`)
+  surfaces are partial duplicates with deliberate asymmetries, not
+  full aliases:
+
+  - `create_typed` / `update_typed` / `upsert_typed` differ from their
+    untyped siblings in return type only — untyped returns
+    `dict[str, Any]`, typed revalidates the response into the model
+    instance's class and returns `T`.
+  - `get_typed` is a thin alias of `get_record` (the untyped helper
+    already returns `T | None` when given a `model: type[T]`).
+  - `query_typed` is NOT a typed variant of `query_records`: the
+    former runs hand-written SurrealQL, the latter uses the `Query`
+    builder. They serve different use cases.
+
+  Module-level docstrings in both `src/surql/query/crud.py` and
+  `src/surql/query/typed.py` now carry a "when to use which" section
+  pointing at the canonical sibling and naming the asymmetries
+  explicitly. Per-function docstrings cross-reference the alternative
+  helper. No code change — both surfaces remain supported.
+
+### Verified
+
+- **Sentinel-probe assumption verified against live SurrealDB v3.0.5.**
+  Direct HTTP `/sql` shows the sentinel surfaces as
+  `{'result': '__txn_ok__', 'status': 'OK'}` on success and the
+  statement list contains `status: 'ERR'` rows on rollback. The Python
+  SDK's `query` method collapses both shapes to `None`; the SDK's
+  `query_raw` method preserves the full envelope. The commit path
+  routes through `query_raw` and is therefore observationally
+  equivalent to direct HTTP for the purposes of mid-batch error
+  detection.
+- `ruff check src tests` + `ruff format --check src tests` — clean.
+- `mypy src --strict` — no issues, 81 source files.
+- `uv run pytest --no-cov --ignore=tests/integration` — **2601 passed,
+  9 skipped, 2 xfailed** (was 2547 in 1.5.15; +54 new regression tests
+  covering the three items above).
+
 ## [1.5.15] - 2026-05-17
 
 ### Fixed

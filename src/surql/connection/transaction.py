@@ -28,6 +28,34 @@ Consequences of option (b):
   (the SDK exposes a single ``vars`` dict per request). Callers must
   choose unique parameter keys across their queued statements inside
   the same transaction block.
+
+Mid-batch error detection (1.6.0)
+=================================
+
+SurrealDB v3 collapses the SDK ``query`` method's return value to
+``None`` for batched ``BEGIN TRANSACTION; ...; COMMIT TRANSACTION;``
+requests regardless of whether the batch succeeded or any statement
+inside it rolled back the transaction. Prior to 1.6.0, the commit
+helper read that ``None`` as a success — silently swallowing
+mid-batch failures (type mismatches, assertion failures, FK violations,
+etc.). To restore observability without dropping the single-RPC
+strategy, ``commit`` now:
+
+1. Injects a sentinel ``RETURN '__txn_ok__';`` statement immediately
+   before ``COMMIT TRANSACTION`` so the server emits a recognisable
+   marker in the response envelope on success.
+2. Sends the batched statement via the SDK's ``query_raw`` method
+   instead of ``query``. ``query_raw`` preserves the per-statement
+   ``{status, result}`` envelope; ``query`` collapses it.
+3. Inspects the returned envelope: if any statement has
+   ``status == 'ERR'`` OR the sentinel value is absent from the result
+   set, the batch is considered failed, the state moves to
+   ``CANCELLED`` (not ``COMMITTED``), and a ``TransactionError`` is
+   raised with a message pointing at the per-statement error and
+   server-log inspection guidance.
+
+The sentinel and ``query_raw`` behaviours were verified against
+SurrealDB v3.0.5 (see ``CHANGES`` 1.6.0 ``### Verified``).
 """
 
 from collections.abc import AsyncIterator
@@ -43,6 +71,13 @@ from surql.connection.client import DatabaseClient
 logger = structlog.get_logger(__name__)
 
 _active_transaction: ContextVar[bool] = ContextVar('_active_transaction', default=False)
+
+# Sentinel emitted via ``RETURN '<SENTINEL>'`` immediately before the
+# ``COMMIT TRANSACTION`` line. On success SurrealDB v3 surfaces it as
+# ``{'result': '__txn_ok__', 'status': 'OK'}`` in the per-statement
+# envelope; on rollback no statement returns this value (the COMMIT
+# entry's status is ``'ERR'`` with ``details.kind == 'Cancelled'``).
+_TRANSACTION_SENTINEL: str = '__txn_ok__'
 
 
 class TransactionState(Enum):
@@ -115,14 +150,25 @@ class Transaction:
     """Commit the transaction.
 
     Flushes buffered statements as a single
-    ``BEGIN TRANSACTION; ...; COMMIT TRANSACTION;`` request.
+    ``BEGIN TRANSACTION; ...; <sentinel>; COMMIT TRANSACTION;`` request.
+
+    The sentinel (``RETURN '__txn_ok__';``) is injected immediately
+    before the ``COMMIT TRANSACTION`` line so the response envelope
+    carries a recognisable success marker. On rollback the server
+    returns per-statement ``status == 'ERR'`` entries and the sentinel
+    is absent, allowing this method to raise instead of silently
+    swallowing mid-batch failures (the pre-1.6.0 regression — see
+    module docstring).
 
     Returns:
-      The aggregate result of the batched query, or ``None`` when no
-      statements were queued.
+      The list of user-statement results extracted from the batched
+      response envelope (the ``BEGIN TRANSACTION``, sentinel, and
+      ``COMMIT TRANSACTION`` entries are stripped), or ``None`` when
+      no statements were queued.
 
     Raises:
-      TransactionError: If transaction is not active or commit fails
+      TransactionError: If transaction is not active, the commit RPC
+        raised, or the batch was rolled back server-side.
     """
     if self._state != TransactionState.ACTIVE:
       raise TransactionError(f'Cannot commit transaction in {self._state.value} state')
@@ -134,23 +180,102 @@ class Transaction:
       _active_transaction.set(False)
       return None
 
+    queued_count = len(self._statements)
     batched = 'BEGIN TRANSACTION;\n'
     for stmt in self._statements:
       batched += stmt.rstrip(';') + ';\n'
+    # Sentinel must precede COMMIT — it is the marker we look for in
+    # the response envelope to confirm success. See module docstring.
+    batched += f"RETURN '{_TRANSACTION_SENTINEL}';\n"
     batched += 'COMMIT TRANSACTION;'
 
     try:
-      self._log.info('committing_transaction', statement_count=len(self._statements))
-      result = await self._client.execute(batched, self._params or None)
-      self._state = TransactionState.COMMITTED
-      _active_transaction.set(False)
-      self._log.info('transaction_committed')
-      return result
+      self._log.info('committing_transaction', statement_count=queued_count)
+      envelope, envelope_inspectable = await self._raw_query(batched, self._params or None)
     except Exception as e:
       self._log.error('transaction_commit_failed', error=str(e))
       self._state = TransactionState.CANCELLED
       _active_transaction.set(False)
       raise TransactionError(f'Failed to commit transaction: {e}') from e
+
+    if not envelope_inspectable:
+      # Fallback path: SDK lacks ``query_raw`` so sentinel detection
+      # is impossible. Preserve the pre-1.6.0 silent-success behaviour
+      # rather than break the commit on SDK versions we cannot probe.
+      # The module docstring + CHANGES 1.6.0 ``### Verified`` warn
+      # operators that this mode is observationally weaker.
+      self._state = TransactionState.COMMITTED
+      _active_transaction.set(False)
+      self._log.warning(
+        'transaction_committed_without_sentinel_inspection',
+        statement_count=queued_count,
+        reason='SDK ``query_raw`` unavailable; mid-batch failures cannot be detected',
+      )
+      return envelope
+
+    statements = _extract_envelope_statements(envelope)
+    error_messages = _collect_envelope_errors(statements)
+    sentinel_present = any(_is_sentinel_entry(entry) for entry in statements)
+
+    if error_messages or not sentinel_present:
+      self._state = TransactionState.CANCELLED
+      _active_transaction.set(False)
+      detail = '; '.join(error_messages) if error_messages else 'sentinel marker absent'
+      self._log.error(
+        'transaction_rolled_back',
+        error_count=len(error_messages),
+        sentinel_present=sentinel_present,
+        first_error=error_messages[0] if error_messages else None,
+      )
+      raise TransactionError(
+        'Transaction failed — SurrealDB rolled back the batch; one or more '
+        'statements rejected. SurrealDB v3 batched transactions do not surface '
+        "per-statement errors via the SDK's ``query`` method, so the server "
+        'envelope was inspected directly. '
+        f'Detail: {detail}. Check server logs for the full statement trace.'
+      )
+
+    self._state = TransactionState.COMMITTED
+    _active_transaction.set(False)
+    self._log.info('transaction_committed', statement_count=queued_count)
+    # Strip the BEGIN (always first), sentinel, and COMMIT (always last)
+    # framing entries before returning, so callers see only their own
+    # statements' results.
+    return _strip_framing(statements)
+
+  async def _raw_query(self, batched: str, params: dict[str, Any] | None) -> tuple[Any, bool]:
+    """Send the batched statement via the SDK and return the raw envelope.
+
+    The SDK's ``query`` method collapses batched-transaction responses
+    to ``None`` regardless of success or failure (verified against
+    SurrealDB v3.0.5 + ``surrealdb==2.0.0a1``), so we route through
+    ``query_raw``, which preserves the per-statement
+    ``{status, result}`` envelope required for sentinel inspection.
+    Falls back to the public ``DatabaseClient.execute`` path when the
+    underlying SDK does not expose ``query_raw`` — preserves the prior
+    silent-swallow behaviour on unsupported SDK versions rather than
+    breaking the commit path.
+
+    Args:
+      batched: The full ``BEGIN ... <stmts> ... RETURN '<sentinel>'; COMMIT;``
+        string.
+      params: Optional flat ``vars`` dict shared across all queued
+        statements.
+
+    Returns:
+      ``(envelope, inspectable)`` tuple. ``inspectable=True`` means
+      the envelope came from ``query_raw`` and carries the per-statement
+      ``{status, result}`` rows the sentinel logic needs.
+      ``inspectable=False`` means we used the legacy ``execute`` path;
+      callers must skip sentinel inspection in that case (the SDK has
+      already collapsed the envelope and there is nothing to probe).
+    """
+    sdk_client = getattr(self._client, '_client', None)
+    query_raw = getattr(sdk_client, 'query_raw', None) if sdk_client is not None else None
+    if query_raw is None:
+      self._log.debug('query_raw_unavailable_falling_back_to_execute')
+      return await self._client.execute(batched, params), False
+    return await query_raw(batched, params or {}), True
 
   async def cancel(self) -> None:
     """Cancel/rollback the transaction.
@@ -262,3 +387,86 @@ async def transaction(client: DatabaseClient) -> AsyncIterator[Transaction]:
     if txn.is_active:
       await txn.cancel()
     raise
+
+
+# ---------------------------------------------------------------------------
+# Envelope inspection helpers (Item 2 — 1.6.0)
+# ---------------------------------------------------------------------------
+
+
+def _extract_envelope_statements(envelope: Any) -> list[Any]:
+  """Normalise the SDK ``query_raw`` envelope into a flat statement list.
+
+  SurrealDB v3 returns the result envelope in one of two shapes:
+
+  - ``{'id': <req-id>, 'result': [<per-stmt>, ...]}`` — the standard
+    WebSocket-RPC shape returned by ``surrealdb.AsyncSurreal.query_raw``.
+  - ``[<per-stmt>, ...]`` — the HTTP ``/sql`` shape (used by some
+    mocks and older SDK paths).
+
+  Returns an empty list when the envelope is anything else (e.g.
+  ``None`` from the SDK-fallback path on an unsupported SDK version).
+  Empty list disables sentinel detection and matches the pre-1.6.0
+  behaviour for that edge case.
+  """
+  if isinstance(envelope, dict) and isinstance(envelope.get('result'), list):
+    return list(envelope['result'])
+  if isinstance(envelope, list):
+    return list(envelope)
+  return []
+
+
+def _collect_envelope_errors(statements: list[Any]) -> list[str]:
+  """Return human-readable error messages for any ``status == 'ERR'`` entries.
+
+  Each error entry is expected to be a dict with a ``'result'`` field
+  carrying the server-supplied error string (e.g.
+  ``"Couldn't coerce value for field `age` of `bar:2`..."``). The
+  ``COMMIT TRANSACTION`` entry's ``Cancelled`` status is intentionally
+  surfaced here as well — it tells the caller the rollback fired.
+  """
+  errors: list[str] = []
+  for entry in statements:
+    if not isinstance(entry, dict):
+      continue
+    if entry.get('status') != 'ERR':
+      continue
+    message = entry.get('result')
+    if isinstance(message, str) and message:
+      errors.append(message)
+    else:
+      errors.append(repr(entry))
+  return errors
+
+
+def _is_sentinel_entry(entry: Any) -> bool:
+  """Check whether a per-statement envelope entry carries the sentinel value."""
+  if not isinstance(entry, dict):
+    return False
+  if entry.get('status') != 'OK':
+    return False
+  return entry.get('result') == _TRANSACTION_SENTINEL
+
+
+def _strip_framing(statements: list[Any]) -> list[Any]:
+  """Strip the BEGIN, sentinel, and COMMIT framing entries from the envelope.
+
+  The leading entry is always the ``BEGIN TRANSACTION`` ack, the
+  trailing entry is the ``COMMIT TRANSACTION`` ack, and the
+  second-to-last entry is the sentinel ``RETURN '__txn_ok__'`` result.
+  Callers should see only the results of their own queued statements.
+  Defensively handles short envelopes (mocks may return a shorter list).
+  """
+  filtered = [entry for entry in statements if not _is_sentinel_entry(entry)]
+  # Drop a leading no-op (BEGIN) entry: ``{'result': None, 'status': 'OK'}``
+  # or any None-result OK row at index 0. Same for the trailing COMMIT ack.
+  if filtered and _is_framing_ack(filtered[0]):
+    filtered = filtered[1:]
+  if filtered and _is_framing_ack(filtered[-1]):
+    filtered = filtered[:-1]
+  return filtered
+
+
+def _is_framing_ack(entry: Any) -> bool:
+  """An ack row is ``{'status': 'OK', 'result': None}``."""
+  return isinstance(entry, dict) and entry.get('status') == 'OK' and entry.get('result') is None

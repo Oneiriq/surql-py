@@ -1588,3 +1588,451 @@ class TestComputeDegree:
 
     assert degree['total'] == 2
     assert mock_db_client.execute.call_count == 2
+
+
+# =============================================================================
+# 1.6.0 — `conditions=` parameter on graph helpers
+# =============================================================================
+#
+# These tests cover the additive ``conditions=`` keyword added to:
+#   - traverse
+#   - traverse_with_depth
+#   - get_outgoing_edges
+#   - get_incoming_edges
+#   - get_related_records
+#   - shortest_path
+#
+# Each helper is validated for three properties:
+#   (a) default behaviour unchanged when ``conditions`` is omitted or None
+#       (no WHERE clause appears in the emitted SurrealQL),
+#   (b) a single condition is appended verbatim as ``WHERE (...)`` via
+#       ``Query.where(...)``,
+#   (c) multiple conditions combine with AND (mirrors how
+#       ``query_records`` accepts the same shape).
+#
+# Why this matters: pre-1.6.0 the graph helpers emitted bare
+# ``SELECT ... FETCH ...`` with no WHERE hook, so multi-tenant
+# consumers couldn't use them without rolling a custom walker.
+
+
+def _emitted_sql(mock_client) -> str:
+  """Return the SurrealQL string passed to the most recent ``execute`` call."""
+  assert mock_client.execute.await_count > 0
+  return mock_client.execute.await_args.args[0]
+
+
+class TestTraverseConditions:
+  """1.6.0: ``conditions=`` on traverse()."""
+
+  @pytest.mark.anyio
+  async def test_default_no_where_clause(self, mock_db_client):
+    """Default (no conditions) emits the same SurrealQL as before."""
+    mock_db_client.execute = AsyncMock(return_value=[{'result': []}])
+
+    await traverse('user:alice', '->likes->post', Post, client=mock_db_client)
+
+    sql = _emitted_sql(mock_db_client)
+    assert 'WHERE' not in sql
+
+  @pytest.mark.anyio
+  async def test_single_operator_appends_where(self, mock_db_client):
+    """Single ``eq(...)`` operator appends a WHERE clause."""
+    from surql.types.operators import eq
+
+    mock_db_client.execute = AsyncMock(return_value=[{'result': []}])
+
+    await traverse(
+      'user:alice',
+      '->likes->post',
+      Post,
+      conditions=[eq('tenant_id', 'acme')],
+      client=mock_db_client,
+    )
+
+    sql = _emitted_sql(mock_db_client)
+    assert "WHERE (tenant_id = 'acme')" in sql
+
+  @pytest.mark.anyio
+  async def test_multiple_conditions_combine_with_and(self, mock_db_client):
+    """Multiple conditions chain as ``WHERE (a) AND (b)``."""
+    from surql.types.operators import eq, gt
+
+    mock_db_client.execute = AsyncMock(return_value=[{'result': []}])
+
+    await traverse(
+      'user:alice',
+      '->likes->post',
+      Post,
+      conditions=[eq('tenant_id', 'acme'), gt('score', 5)],
+      client=mock_db_client,
+    )
+
+    sql = _emitted_sql(mock_db_client)
+    assert "tenant_id = 'acme'" in sql
+    assert 'score > 5' in sql
+    assert ' AND ' in sql
+
+  @pytest.mark.anyio
+  async def test_raw_string_condition_passthrough(self, mock_db_client):
+    """Raw SurrealQL strings are passed through unchanged."""
+    mock_db_client.execute = AsyncMock(return_value=[{'result': []}])
+
+    await traverse(
+      'user:alice',
+      '->likes->post',
+      Post,
+      conditions=['archived = false'],
+      client=mock_db_client,
+    )
+
+    sql = _emitted_sql(mock_db_client)
+    assert 'WHERE (archived = false)' in sql
+
+
+class TestTraverseWithDepthConditions:
+  """1.6.0: ``conditions=`` on traverse_with_depth()."""
+
+  @pytest.mark.anyio
+  async def test_default_no_where_clause_typed(self, mock_db_client):
+    mock_db_client.execute = AsyncMock(return_value=[{'result': []}])
+
+    await traverse_with_depth(
+      'user:alice',
+      'likes',
+      'post',
+      direction='out',
+      depth=1,
+      model=Post,
+      client=mock_db_client,
+    )
+
+    assert 'WHERE' not in _emitted_sql(mock_db_client)
+
+  @pytest.mark.anyio
+  async def test_default_no_where_clause_untyped(self, mock_db_client):
+    """No-model code path (returns raw dicts) also stays clean by default."""
+    mock_db_client.execute = AsyncMock(return_value=[{'result': []}])
+
+    await traverse_with_depth(
+      'user:alice',
+      'likes',
+      'post',
+      direction='out',
+      depth=1,
+      model=None,
+      client=mock_db_client,
+    )
+
+    assert 'WHERE' not in _emitted_sql(mock_db_client)
+
+  @pytest.mark.anyio
+  async def test_single_condition_typed(self, mock_db_client):
+    from surql.types.operators import eq
+
+    mock_db_client.execute = AsyncMock(return_value=[{'result': []}])
+
+    await traverse_with_depth(
+      'user:alice',
+      'likes',
+      'post',
+      direction='out',
+      depth=1,
+      model=Post,
+      conditions=[eq('tenant_id', 'acme')],
+      client=mock_db_client,
+    )
+
+    assert "WHERE (tenant_id = 'acme')" in _emitted_sql(mock_db_client)
+
+  @pytest.mark.anyio
+  async def test_single_condition_untyped(self, mock_db_client):
+    """Conditions also flow through the no-model code path."""
+    from surql.types.operators import eq
+
+    mock_db_client.execute = AsyncMock(return_value=[{'result': []}])
+
+    await traverse_with_depth(
+      'user:alice',
+      'likes',
+      'post',
+      direction='out',
+      depth=1,
+      model=None,
+      conditions=[eq('tenant_id', 'acme')],
+      client=mock_db_client,
+    )
+
+    assert "WHERE (tenant_id = 'acme')" in _emitted_sql(mock_db_client)
+
+  @pytest.mark.anyio
+  async def test_multiple_conditions_combine_with_and(self, mock_db_client):
+    from surql.types.operators import eq, gt
+
+    mock_db_client.execute = AsyncMock(return_value=[{'result': []}])
+
+    await traverse_with_depth(
+      'user:alice',
+      'likes',
+      'post',
+      direction='out',
+      depth=1,
+      model=Post,
+      conditions=[eq('tenant_id', 'acme'), gt('score', 5)],
+      client=mock_db_client,
+    )
+
+    sql = _emitted_sql(mock_db_client)
+    assert "tenant_id = 'acme'" in sql
+    assert 'score > 5' in sql
+    assert ' AND ' in sql
+
+
+class TestGetOutgoingEdgesConditions:
+  """1.6.0: ``conditions=`` on get_outgoing_edges()."""
+
+  @pytest.mark.anyio
+  async def test_default_no_where_clause(self, mock_db_client):
+    mock_db_client.execute = AsyncMock(return_value=[{'result': []}])
+
+    await get_outgoing_edges('user:alice', 'likes', client=mock_db_client)
+
+    assert 'WHERE' not in _emitted_sql(mock_db_client)
+
+  @pytest.mark.anyio
+  async def test_single_condition(self, mock_db_client):
+    from surql.types.operators import eq
+
+    mock_db_client.execute = AsyncMock(return_value=[{'result': []}])
+
+    await get_outgoing_edges(
+      'user:alice',
+      'likes',
+      conditions=[eq('tenant_id', 'acme')],
+      client=mock_db_client,
+    )
+
+    assert "WHERE (tenant_id = 'acme')" in _emitted_sql(mock_db_client)
+
+  @pytest.mark.anyio
+  async def test_multiple_conditions_combine_with_and(self, mock_db_client):
+    from surql.types.operators import eq, gt
+
+    mock_db_client.execute = AsyncMock(return_value=[{'result': []}])
+
+    await get_outgoing_edges(
+      'user:alice',
+      'likes',
+      conditions=[eq('tenant_id', 'acme'), gt('weight', 0)],
+      client=mock_db_client,
+    )
+
+    sql = _emitted_sql(mock_db_client)
+    assert "tenant_id = 'acme'" in sql
+    assert 'weight > 0' in sql
+    assert ' AND ' in sql
+
+
+class TestGetIncomingEdgesConditions:
+  """1.6.0: ``conditions=`` on get_incoming_edges()."""
+
+  @pytest.mark.anyio
+  async def test_default_no_where_clause(self, mock_db_client):
+    mock_db_client.execute = AsyncMock(return_value=[{'result': []}])
+
+    await get_incoming_edges('user:alice', 'follows', client=mock_db_client)
+
+    sql = _emitted_sql(mock_db_client)
+    assert 'WHERE' not in sql
+    # The v3-safe form (record-anchored) is preserved.
+    assert 'user:alice<-follows' in sql
+
+  @pytest.mark.anyio
+  async def test_single_condition(self, mock_db_client):
+    from surql.types.operators import eq
+
+    mock_db_client.execute = AsyncMock(return_value=[{'result': []}])
+
+    await get_incoming_edges(
+      'user:alice',
+      'follows',
+      conditions=[eq('tenant_id', 'acme')],
+      client=mock_db_client,
+    )
+
+    assert "WHERE (tenant_id = 'acme')" in _emitted_sql(mock_db_client)
+
+  @pytest.mark.anyio
+  async def test_multiple_conditions_combine_with_and(self, mock_db_client):
+    from surql.types.operators import eq
+
+    mock_db_client.execute = AsyncMock(return_value=[{'result': []}])
+
+    await get_incoming_edges(
+      'user:alice',
+      'follows',
+      conditions=[eq('tenant_id', 'acme'), eq('role', 'admin')],
+      client=mock_db_client,
+    )
+
+    sql = _emitted_sql(mock_db_client)
+    assert "tenant_id = 'acme'" in sql
+    assert "role = 'admin'" in sql
+    assert ' AND ' in sql
+
+
+class TestGetRelatedRecordsConditions:
+  """1.6.0: ``conditions=`` on get_related_records()."""
+
+  @pytest.mark.anyio
+  async def test_default_no_where_clause_typed(self, mock_db_client):
+    """Model code path stays clean by default."""
+    mock_db_client.execute = AsyncMock(return_value=[{'result': []}])
+
+    await get_related_records(
+      'user:alice',
+      'likes',
+      'post',
+      direction='out',
+      model=Post,
+      client=mock_db_client,
+    )
+
+    assert 'WHERE' not in _emitted_sql(mock_db_client)
+
+  @pytest.mark.anyio
+  async def test_default_no_where_clause_untyped(self, mock_db_client):
+    """No-model code path (returns raw dicts) also stays clean."""
+    mock_db_client.execute = AsyncMock(return_value=[{'result': []}])
+
+    await get_related_records(
+      'user:alice',
+      'likes',
+      'post',
+      direction='out',
+      client=mock_db_client,
+    )
+
+    assert 'WHERE' not in _emitted_sql(mock_db_client)
+
+  @pytest.mark.anyio
+  async def test_single_condition_typed(self, mock_db_client):
+    from surql.types.operators import eq
+
+    mock_db_client.execute = AsyncMock(return_value=[{'result': []}])
+
+    await get_related_records(
+      'user:alice',
+      'likes',
+      'post',
+      direction='out',
+      model=Post,
+      conditions=[eq('tenant_id', 'acme')],
+      client=mock_db_client,
+    )
+
+    assert "WHERE (tenant_id = 'acme')" in _emitted_sql(mock_db_client)
+
+  @pytest.mark.anyio
+  async def test_single_condition_untyped(self, mock_db_client):
+    """Conditions also flow through the no-model code path."""
+    from surql.types.operators import eq
+
+    mock_db_client.execute = AsyncMock(return_value=[{'result': []}])
+
+    await get_related_records(
+      'user:alice',
+      'likes',
+      'post',
+      direction='in',
+      conditions=[eq('tenant_id', 'acme')],
+      client=mock_db_client,
+    )
+
+    assert "WHERE (tenant_id = 'acme')" in _emitted_sql(mock_db_client)
+
+  @pytest.mark.anyio
+  async def test_multiple_conditions_combine_with_and(self, mock_db_client):
+    from surql.types.operators import eq, gt
+
+    mock_db_client.execute = AsyncMock(return_value=[{'result': []}])
+
+    await get_related_records(
+      'user:alice',
+      'likes',
+      'post',
+      direction='out',
+      model=Post,
+      conditions=[eq('tenant_id', 'acme'), gt('score', 0)],
+      client=mock_db_client,
+    )
+
+    sql = _emitted_sql(mock_db_client)
+    assert "tenant_id = 'acme'" in sql
+    assert 'score > 0' in sql
+    assert ' AND ' in sql
+
+
+class TestShortestPathConditions:
+  """1.6.0: ``conditions=`` on shortest_path()."""
+
+  @pytest.mark.anyio
+  async def test_default_emits_only_id_predicate(self, mock_db_client):
+    """Default behaviour: only the mandatory ``id = <to>`` predicate."""
+    # Return non-empty on first iteration so the loop exits quickly.
+    mock_db_client.execute = AsyncMock(return_value=[{'id': 'user:bob'}])
+
+    await shortest_path(
+      'user:alice',
+      'user:bob',
+      'follows',
+      max_depth=2,
+      client=mock_db_client,
+    )
+
+    sql = _emitted_sql(mock_db_client)
+    assert 'WHERE (id = user:bob)' in sql
+    assert ' AND ' not in sql
+
+  @pytest.mark.anyio
+  async def test_single_condition_appended(self, mock_db_client):
+    """User-supplied conditions widen the WHERE clause without dropping ``id =``."""
+    from surql.types.operators import eq
+
+    mock_db_client.execute = AsyncMock(return_value=[{'id': 'user:bob'}])
+
+    await shortest_path(
+      'user:alice',
+      'user:bob',
+      'follows',
+      max_depth=2,
+      conditions=[eq('tenant_id', 'acme')],
+      client=mock_db_client,
+    )
+
+    sql = _emitted_sql(mock_db_client)
+    # Both predicates must be present and AND-joined.
+    assert 'id = user:bob' in sql
+    assert "tenant_id = 'acme'" in sql
+    assert ' AND ' in sql
+
+  @pytest.mark.anyio
+  async def test_multiple_conditions_combine_with_and(self, mock_db_client):
+    from surql.types.operators import eq, gt
+
+    mock_db_client.execute = AsyncMock(return_value=[{'id': 'user:bob'}])
+
+    await shortest_path(
+      'user:alice',
+      'user:bob',
+      'follows',
+      max_depth=2,
+      conditions=[eq('tenant_id', 'acme'), gt('weight', 0)],
+      client=mock_db_client,
+    )
+
+    sql = _emitted_sql(mock_db_client)
+    assert 'id = user:bob' in sql
+    assert "tenant_id = 'acme'" in sql
+    assert 'weight > 0' in sql
+    # Three AND-joined predicates.
+    assert sql.count(' AND ') == 2
