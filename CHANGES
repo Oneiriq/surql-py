@@ -5,6 +5,88 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.6.3] - 2026-05-18
+
+### Fixed
+
+- **`diff_tables` still reported false-positive drift on typed record-link
+  fields whose code-side declaration carried the canonical
+  `type::record("<target>", $value)` coercion alongside `target_table=`.**
+  The 1.5.14 emitter (`schema/sql.py::_record_type_clause`) already drops
+  this redundant VALUE on write — once `target_table` is set the typed
+  `record<X>` declaration constrains the column on its own — but the
+  in-memory `FieldDefinition` returned by the `field()` constructor still
+  held the coercion string. A live DB introspected after `migrate_up`
+  therefore reported `value=None` while the code-side definition reported
+  `value="type::record(...)"`, and every diff produced a spurious
+  `MODIFY_FIELD` entry. Fix: in `surql.schema.fields.field()`, once
+  `target_table` is set (whether passed explicitly or auto-detected from
+  the coercion pattern) and the supplied `value=` round-trips through
+  `_detect_target_table_from_value` to the same target, clear `value` to
+  `None` before constructing the `FieldDefinition`. The mismatch case
+  (`target_table='X'` plus `value='type::record("Y", $value)'`) is left
+  untouched — silently dropping a value that targets a different table
+  would be a footgun.
+
+- **`parse_table_info` silently lost table-level mode + PERMISSIONS on
+  SurrealDB v3.** Pre-1.6.3 the parser read `info.get('tb', '')` as the
+  source of the `DEFINE TABLE` statement string, which is correct for the
+  v2 `INFO FOR TABLE` shape but **does not exist** in v3 — v3 returns
+  `{events, fields, indexes, lives, tables}` and surfaces the
+  `DEFINE TABLE` string only via `INFO FOR DB`'s `tables.<name>` dict.
+  The result: on v3, the parsed `TableDefinition` always had
+  `permissions=None` and `mode=SCHEMALESS`, and every consumer that
+  declared table-level PERMISSIONS saw a false-positive
+  `MODIFY_PERMISSIONS` diff on every call. Fix: `parse_table_info` accepts
+  a new optional `define_table: str | None = None` parameter that, when
+  passed, is used as the source of `tb_definition` for mode + PERMISSIONS
+  parsing. Callers fetch `INFO FOR DB` once and pass
+  `db_info['tables'][<name>]` alongside the per-table info dict. Behaviour
+  is fully backwards-compatible: when `define_table` is `None`, the parser
+  falls back to the legacy `info.get('tb', '')` and the v2 shape continues
+  to round-trip unchanged.
+
+- **`_parse_table_permissions` failed to match the comma-joined action-list
+  shape SurrealDB v3 emits when multiple actions share a single rule.**
+  v3's serialiser collapses
+  `PERMISSIONS FOR select WHERE r FOR create WHERE r FOR update WHERE r FOR delete WHERE r`
+  down to the compact
+  `PERMISSIONS FOR select, create, update, delete WHERE r` form. The
+  pre-1.6.3 regex
+  `\bFOR\s+(select|create|update|delete)\s+WHERE\s+...` only captured a
+  single bare action keyword, so the comma-list form matched nothing and
+  the parser returned `None` — feeding straight into the same false-positive
+  `MODIFY_PERMISSIONS` diff on every consumer with collapsed per-action
+  rules. Fix: the regex now captures
+  `((?:action)(?:\s*,\s*(?:action))*)` as a list, the parser splits on
+  commas, and each per-action key in the returned dict gets the same rule
+  string. Both the expanded form (one rule per `FOR ... WHERE` clause) and
+  the comma-joined form (one rule shared across an action list) parse
+  into the same `dict[str, str]` shape that
+  `table_schema(permissions=...)` accepts. Mixed forms — some actions
+  grouped via comma, others split into separate clauses — also work
+  because each `FOR <list> WHERE <rule>` clause is parsed independently
+  and exploded.
+
+  Regression coverage: 4 new tests in `tests/test_diff_round_trip.py`:
+  `test_record_field_with_target_table_drops_canonical_value`,
+  `test_parse_table_info_uses_define_table_for_permissions`,
+  `test_parse_table_permissions_handles_comma_joined_actions`, and an
+  end-to-end `test_round_trip_typed_record_field_with_table_permissions_is_empty`
+  that builds a code-side `TableDefinition` with both a typed-record field
+  and table-level PERMISSIONS, serialises via `generate_table_sql`, and
+  feeds the result back through `parse_table_info(define_table=...)`
+  asserting `diff_tables(live, code) == []`. Each test fails on 1.6.2 and
+  passes on 1.6.3.
+
+### Verified
+
+- `ruff check src tests` + `ruff format --check src tests` — clean.
+- `mypy src --strict` — no issues.
+- `uv run pytest --no-cov --ignore=tests/integration` — **2620 passed,
+  9 skipped, 2 xfailed** (was 2616 in 1.6.2; +4 new regression tests
+  covering the fixes above).
+
 ## [1.6.2] - 2026-05-17
 
 ### Fixed

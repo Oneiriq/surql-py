@@ -84,12 +84,20 @@ _ARRAY_SUBFIELD_PATTERN = re.compile(r'(?:\[\*\]|\.\*)\s*$')
 def parse_table_info(
   table_name: str,
   info: dict[str, Any],
+  define_table: str | None = None,
 ) -> TableDefinition:
   """Parse SurrealDB INFO FOR TABLE response into TableDefinition.
 
   Args:
     table_name: Name of the table
     info: Raw INFO FOR TABLE response dictionary
+    define_table: Optional ``DEFINE TABLE <name> ...`` statement string. When
+      provided, used as the source of table-level mode + PERMISSIONS. Pass this
+      when introspecting against SurrealDB v3, which does NOT include the
+      table-level DEFINE statement in ``INFO FOR TABLE`` (only ``INFO FOR DB``'s
+      ``tables.<name>`` dict carries it). Without this, table-level PERMISSIONS
+      are silently lost on round-trip and every consumer that declares them
+      sees a false-positive ``MODIFY_PERMISSIONS`` diff.
 
   Returns:
     Parsed TableDefinition
@@ -98,13 +106,26 @@ def parse_table_info(
     SchemaParseError: If parsing fails
 
   Examples:
+    >>> # SurrealDB v2 — tb is inside INFO FOR TABLE
     >>> info = await client.execute(f'INFO FOR TABLE {table_name};')
     >>> table_def = parse_table_info(table_name, info[0]['result'])
+
+    >>> # SurrealDB v3 — fetch the DEFINE TABLE string from INFO FOR DB and
+    >>> # pass it alongside the per-table info dict.
+    >>> db_info = await client.execute('INFO FOR DB;')
+    >>> info = await client.execute(f'INFO FOR TABLE {table_name};')
+    >>> table_def = parse_table_info(
+    ...     table_name,
+    ...     info[0]['result'],
+    ...     define_table=db_info[0]['result']['tables'].get(table_name),
+    ... )
   """
   try:
     logger.debug('parsing_table_info', table=table_name)
 
-    tb_definition = info.get('tb', '')
+    # Caller-supplied DEFINE TABLE statement wins; fall back to the
+    # legacy `tb` key inside the INFO FOR TABLE response (SurrealDB v2 shape).
+    tb_definition = define_table if define_table is not None else info.get('tb', '')
 
     # Parse table mode from tb field
     mode = _parse_table_mode(tb_definition)
@@ -179,9 +200,15 @@ def _parse_table_permissions(tb_definition: str) -> dict[str, str] | None:
     helper has no representation for "all actions = full"; this normalisation
     avoids a permanent false-positive `MODIFY_PERMISSIONS` diff on every table
     whose code declaration omitted permissions).
-  - ``PERMISSIONS FOR select WHERE <r1> FOR create WHERE <r2> ...`` →
-    returns ``{'select': '<r1>', 'create': '<r2>', ...}`` matching the
-    code-side `dict[str, str]` shape.
+  - ``PERMISSIONS FOR select WHERE <r1> FOR create WHERE <r2> ...`` (expanded
+    form) → returns ``{'select': '<r1>', 'create': '<r2>', ...}``.
+  - ``PERMISSIONS FOR select, create, update, delete WHERE <rule>`` (compact
+    comma-joined form — what SurrealDB v3's emitter actually produces when
+    multiple actions share a single rule) → returns
+    ``{'select': '<rule>', 'create': '<rule>', 'update': '<rule>', 'delete': '<rule>'}``.
+  - Mixed forms (some actions grouped via comma, others split) are handled
+    by parsing each ``FOR <action-list> WHERE <rule>`` clause independently
+    and exploding the action list into per-action entries.
 
   Returns ``None`` when no PERMISSIONS clause is present.
   """
@@ -207,17 +234,19 @@ def _parse_table_permissions(tb_definition: str) -> dict[str, str] | None:
   if body.upper() in ('NONE', 'FULL'):
     return None
 
-  # Per-action form: collect all `FOR <action> WHERE <rule>` clauses.
-  # Capture each rule up to the next `FOR`, end-of-string, or semicolon.
+  # Per-action form: each clause is `FOR <action-list> WHERE <rule>` where
+  # `<action-list>` is one or more comma-separated `select|create|update|delete`
+  # keywords. Capture both list-of-actions and rule, then explode.
   rules: dict[str, str] = {}
   for action_match in re.finditer(
-    r'\bFOR\s+(select|create|update|delete)\s+WHERE\s+(.*?)(?=\s+FOR\s+(?:select|create|update|delete)\b|\s*;|\s*$)',
+    r'\bFOR\s+((?:select|create|update|delete)(?:\s*,\s*(?:select|create|update|delete))*)\s+WHERE\s+(.*?)(?=\s+FOR\s+(?:select|create|update|delete)\b|\s*;|\s*$)',
     body,
     re.IGNORECASE | re.DOTALL,
   ):
-    action = action_match.group(1).lower()
+    actions_raw = action_match.group(1)
     rule = action_match.group(2).strip()
-    rules[action] = rule
+    for action in re.split(r'\s*,\s*', actions_raw):
+      rules[action.lower()] = rule
 
   return rules or None
 
