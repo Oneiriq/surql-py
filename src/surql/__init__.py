@@ -106,7 +106,7 @@ from surql.types import (
   type_thing,
 )
 
-__version__ = '1.5.15'
+__version__ = '1.6.0'
 
 __all__ = [
   # Configuration

@@ -115,6 +115,9 @@ def mock_surreal_client() -> Mock:
   client.use = AsyncMock()
   client.close = AsyncMock()
   client.query = AsyncMock(return_value=[{'result': []}])
+  # query_raw returns the full envelope; default to an empty success so
+  # transaction commits in unrelated tests don't trip the sentinel check.
+  client.query_raw = AsyncMock(return_value={'result': [{'result': '__txn_ok__', 'status': 'OK'}]})
   client.select = AsyncMock(return_value=[])
   client.create = AsyncMock(return_value={'id': 'user:123'})
   client.update = AsyncMock(return_value={'id': 'user:123'})

@@ -596,13 +596,18 @@ class TestTransaction:
     assert txn.is_active is False
 
     # Buffered statements must be flushed as a single batched query
-    # wrapped in BEGIN TRANSACTION ... COMMIT TRANSACTION.
-    mock_db_client._client.query.assert_called_once()
-    batched = mock_db_client._client.query.call_args.args[0]
+    # wrapped in BEGIN TRANSACTION ... COMMIT TRANSACTION. As of 1.6.0
+    # the commit RPC is routed via the SDK's ``query_raw`` method
+    # (preserves the per-statement envelope required for sentinel
+    # inspection — see ``transaction.py`` module docstring).
+    mock_db_client._client.query_raw.assert_called_once()
+    batched = mock_db_client._client.query_raw.call_args.args[0]
     assert batched.startswith('BEGIN TRANSACTION;')
     assert batched.rstrip().endswith('COMMIT TRANSACTION;')
     assert 'CREATE user:alice' in batched
     assert 'CREATE user:bob' in batched
+    # Sentinel marker is injected immediately before COMMIT.
+    assert "RETURN '__txn_ok__';" in batched
 
   @pytest.mark.anyio
   async def test_commit_not_active(self, mock_db_client: DatabaseClient) -> None:
@@ -616,12 +621,14 @@ class TestTransaction:
 
   @pytest.mark.anyio
   async def test_commit_failure(self, mock_db_client: DatabaseClient) -> None:
-    """Test transaction commit failure."""
+    """Test transaction commit failure when the RPC itself raises."""
     txn = Transaction(mock_db_client)
     await txn.begin()
     await txn.execute('CREATE user:alice')
 
-    mock_db_client._client.query = AsyncMock(side_effect=Exception('Commit failed'))
+    # The 1.6.0 commit path routes through ``query_raw``; patch that
+    # mock to simulate a network/RPC failure.
+    mock_db_client._client.query_raw = AsyncMock(side_effect=Exception('Commit failed'))
 
     with pytest.raises(TransactionError):
       await txn.commit()
@@ -702,9 +709,11 @@ class TestTransaction:
       await txn.execute('UPDATE user:alice SET x = 1')
       await txn.execute('UPDATE user:bob   SET x = 2')
 
-    # Exactly one RPC on the wire, wrapped in BEGIN/COMMIT.
-    assert mock_db_client._client.query.call_count == 1
-    batched = mock_db_client._client.query.call_args.args[0]
+    # Exactly one RPC on the wire, wrapped in BEGIN/COMMIT. The
+    # commit path uses ``query_raw`` (1.6.0+) instead of ``query`` so
+    # the SDK does not collapse the per-statement envelope.
+    assert mock_db_client._client.query_raw.call_count == 1
+    batched = mock_db_client._client.query_raw.call_args.args[0]
     assert batched.count('BEGIN TRANSACTION') == 1
     assert batched.count('COMMIT TRANSACTION') == 1
 
@@ -719,8 +728,160 @@ class TestTransaction:
     await txn.execute('UPDATE user:bob   SET name = $n2', {'n2': 'Bob'})
     await txn.commit()
 
-    params = mock_db_client._client.query.call_args.args[1]
+    params = mock_db_client._client.query_raw.call_args.args[1]
     assert params == {'n1': 'Alice', 'n2': 'Bob'}
+
+  @pytest.mark.anyio
+  async def test_commit_returns_user_statement_results(
+    self, mock_db_client: DatabaseClient
+  ) -> None:
+    """1.6.0: commit returns per-statement user results, framing stripped.
+
+    The SDK envelope is shaped
+    ``{'result': [BEGIN-ack, stmt1, stmt2, sentinel, COMMIT-ack]}``.
+    Callers should see only ``[stmt1, stmt2]`` — the BEGIN, sentinel,
+    and COMMIT entries are framing.
+    """
+    txn = Transaction(mock_db_client)
+    mock_db_client._client.query_raw = AsyncMock(
+      return_value={
+        'id': 'req-1',
+        'result': [
+          {'result': None, 'status': 'OK'},  # BEGIN ack
+          {'result': [{'id': 'user:alice'}], 'status': 'OK'},
+          {'result': [{'id': 'user:bob'}], 'status': 'OK'},
+          {'result': '__txn_ok__', 'status': 'OK'},  # sentinel
+          {'result': None, 'status': 'OK'},  # COMMIT ack
+        ],
+      }
+    )
+
+    await txn.begin()
+    await txn.execute('CREATE user:alice')
+    await txn.execute('CREATE user:bob')
+    result = await txn.commit()
+
+    assert txn.state == TransactionState.COMMITTED
+    assert isinstance(result, list)
+    assert len(result) == 2
+    assert result[0]['result'] == [{'id': 'user:alice'}]
+    assert result[1]['result'] == [{'id': 'user:bob'}]
+
+  @pytest.mark.anyio
+  async def test_commit_raises_on_mid_batch_failure(self, mock_db_client: DatabaseClient) -> None:
+    """1.6.0: mid-batch errors no longer silently succeed.
+
+    Pre-1.6.0, the SDK's ``query`` method collapsed both success and
+    failure to ``None`` for batched ``BEGIN ... COMMIT`` requests, so
+    a single bad statement that triggered a server-side rollback was
+    indistinguishable from a clean commit. ``commit`` now inspects
+    the per-statement envelope returned by ``query_raw`` and raises
+    ``TransactionError`` when the rollback marker (``status == 'ERR'``)
+    appears.
+    """
+    txn = Transaction(mock_db_client)
+    # Simulate the v3.0.5 envelope for a batch that failed because
+    # statement 2 violated a SCHEMAFULL type constraint.
+    mock_db_client._client.query_raw = AsyncMock(
+      return_value={
+        'id': 'req-2',
+        'result': [
+          {'result': None, 'status': 'OK'},  # BEGIN ack
+          {
+            'details': {'kind': 'NotExecuted'},
+            'kind': 'Query',
+            'result': 'The query was not executed due to a failed transaction',
+            'status': 'ERR',
+          },
+          {
+            'kind': 'Internal',
+            'result': (
+              "Couldn't coerce value for field `age` of `bar:2`: "
+              "Expected `int` but found `'not_an_int'`"
+            ),
+            'status': 'ERR',
+          },
+          {
+            'details': {'kind': 'Cancelled'},
+            'kind': 'Query',
+            'result': 'The query was not executed due to a cancelled transaction',
+            'status': 'ERR',
+          },
+        ],
+      }
+    )
+
+    await txn.begin()
+    await txn.execute('CREATE bar:1 SET age = 10')
+    await txn.execute("CREATE bar:2 SET age = 'not_an_int'")
+
+    with pytest.raises(TransactionError) as exc_info:
+      await txn.commit()
+
+    # The error must mention the server's per-statement explanation
+    # so operators can act on it directly.
+    msg = str(exc_info.value)
+    assert 'SurrealDB rolled back the batch' in msg
+    assert 'Couldn' in msg and 'coerce value' in msg
+    # State machine transitions to CANCELLED (not COMMITTED) on rollback.
+    assert txn.state == TransactionState.CANCELLED
+
+  @pytest.mark.anyio
+  async def test_commit_raises_when_sentinel_absent(self, mock_db_client: DatabaseClient) -> None:
+    """Sentinel-absent envelope is treated as a failure even with no ERR rows.
+
+    Defensive: if a future SurrealDB version emits a degenerate
+    envelope (no ERR rows AND no sentinel), the commit must not be
+    treated as a silent success. The error message names the missing
+    marker so operators know what to inspect.
+    """
+    txn = Transaction(mock_db_client)
+    mock_db_client._client.query_raw = AsyncMock(
+      return_value={
+        'id': 'req-3',
+        'result': [
+          {'result': None, 'status': 'OK'},
+          {'result': [{'id': 'user:x'}], 'status': 'OK'},
+          # No sentinel, no ERR — should still be flagged.
+          {'result': None, 'status': 'OK'},
+        ],
+      }
+    )
+
+    await txn.begin()
+    await txn.execute('CREATE user:x')
+
+    with pytest.raises(TransactionError) as exc_info:
+      await txn.commit()
+
+    assert 'sentinel marker absent' in str(exc_info.value)
+    assert txn.state == TransactionState.CANCELLED
+
+  @pytest.mark.anyio
+  async def test_commit_falls_back_when_query_raw_unavailable(
+    self, mock_db_client: DatabaseClient
+  ) -> None:
+    """Older SDKs lacking ``query_raw`` fall through to ``execute``.
+
+    The commit path checks for ``query_raw`` on the SDK client; when
+    absent it routes through ``DatabaseClient.execute`` (the
+    pre-1.6.0 path). In that mode sentinel inspection is skipped —
+    the prior silent-swallow behaviour is preserved rather than
+    breaking the commit. This guards against pinning surql-py to an
+    SDK upgrade that lags.
+    """
+    # Strip ``query_raw`` from the SDK mock to simulate an SDK that
+    # hasn't shipped the method yet.
+    del mock_db_client._client.query_raw
+
+    txn = Transaction(mock_db_client)
+    await txn.begin()
+    await txn.execute('CREATE user:alice')
+    # Should not raise; falls through to execute and returns its
+    # collapsed result (the default mock returns ``[{'result': []}]``).
+    await txn.commit()
+
+    assert txn.state == TransactionState.COMMITTED
 
   @pytest.mark.anyio
   async def test_duplicate_param_keys_rejected(self, mock_db_client: DatabaseClient) -> None:
@@ -741,11 +902,13 @@ class TestTransaction:
     await txn.begin()
     await txn.execute('CREATE user:alice')
     mock_db_client._client.query.reset_mock()
+    mock_db_client._client.query_raw.reset_mock()
 
     await txn.cancel()
 
     # Nothing was sent to the server, and the buffer is empty.
     mock_db_client._client.query.assert_not_called()
+    mock_db_client._client.query_raw.assert_not_called()
     assert txn._statements == []
     assert txn.state == TransactionState.CANCELLED
 
