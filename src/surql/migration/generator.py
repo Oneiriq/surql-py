@@ -215,7 +215,6 @@ def _generate_migration_content(
   # Generate file content
   content = f'''"""Migration: {description}
 
-Generated: {datetime.now(UTC).isoformat()}
 Author: {author}
 """
 
@@ -349,7 +348,6 @@ def create_blank_migration(
     # Generate blank template
     content = f'''"""Migration: {description}
 
-Generated: {datetime.now(UTC).isoformat()}
 Author: {author}
 """
 

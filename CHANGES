@@ -5,6 +5,33 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.5.15] - 2026-05-17
+
+### Fixed
+
+- **Migration generator emitted a wall-clock timestamp in the file docstring (#93).**
+  `generate_initial_migration` and `create_blank_migration` wrote
+  `Generated: {datetime.now(UTC).isoformat()}` into the docstring header of
+  every generated file. Sub-second precision meant regenerating an unchanged
+  schema produced a byte-different file every time — any "regen + diff against
+  the checked-in migration" CI gate (the standard reproducibility check)
+  reported spurious diffs even when no schema had changed.
+
+  Fix: drop the `Generated:` line entirely. The information was redundant —
+  the version-derived filename (`YYYYMMDD_HHMMSS_*.py`) already encodes when
+  the migration was generated, and `_migration_history.applied_at` records
+  when it was actually applied. The squash code path (`generate_squashed_migration`)
+  keeps its `Generated:` line; it's a single-purpose op whose timestamp is
+  genuinely meaningful audit data, not background CI noise.
+
+  Regression coverage: `test_generate_initial_migration_is_deterministic`.
+
+### Verified
+
+- `ruff check src tests` + `ruff format --check src tests` — clean.
+- `mypy src --strict` — no issues.
+- `uv run pytest --no-cov --ignore=tests/integration` — **2547 passed, 9 skipped, 2 xfailed**.
+
 ## [1.5.14] - 2026-05-17
 
 ### Added

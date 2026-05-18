@@ -391,6 +391,36 @@ class TestGenerateInitialMigration:
     content = filepath.read_text()
     assert 'Custom initial setup' in content
 
+  def test_generate_initial_migration_is_deterministic(
+    self, temp_migration_dir: Path, tmp_path: Path
+  ) -> None:
+    """Regenerating the same schema twice produces byte-identical files (#93).
+
+    The version-derived filename is forced equal across the two runs via the
+    `_generate_version` patch — that's just a stable id for comparison. With
+    that pinned, the only remaining source of non-determinism is the file
+    body, which we assert is byte-identical. Pre-#93, the docstring header
+    embedded `Generated: {datetime.now(UTC).isoformat()}` so the two files
+    differed by sub-second precision on every regen.
+    """
+    tables = {
+      'user': TableDefinition(
+        name='user',
+        mode=TableMode.SCHEMAFULL,
+        fields=[FieldDefinition(name='name', type=FieldType.STRING)],
+      )
+    }
+    dir_b = tmp_path / 'b'
+    dir_b.mkdir()
+
+    with patch('surql.migration.generator._generate_version', return_value='20260102_120000'):
+      filepath_a = generate_initial_migration(temp_migration_dir, tables)
+      filepath_b = generate_initial_migration(dir_b, tables)
+
+    assert filepath_a.read_text() == filepath_b.read_text(), (
+      'migration generator emits a different file body across regens — non-deterministic header'
+    )
+
 
 class TestGenerateMigration:
   """Test suite for generate_migration function."""
