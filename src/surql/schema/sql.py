@@ -7,7 +7,7 @@ directly from surql schema definitions without using the migration system.
 
 from surql.schema.access import AccessDefinition, AccessType
 from surql.schema.edge import EdgeDefinition, EdgeMode
-from surql.schema.fields import FieldDefinition
+from surql.schema.fields import FieldDefinition, FieldType, _detect_target_table_from_value
 from surql.schema.table import (
   EventDefinition,
   IndexDefinition,
@@ -64,7 +64,8 @@ def _generate_field_sql(
     SurrealQL DEFINE FIELD statement
   """
   ine = _ine_clause(if_not_exists)
-  type_clause = f'option<{field_def.type.value}>' if field_def.nullable else field_def.type.value
+  base_type, drop_value = _resolve_type_clause(field_def)
+  type_clause = f'option<{base_type}>' if field_def.nullable else base_type
   sql = f'DEFINE FIELD{ine} {field_def.name} ON TABLE {table_name} TYPE {type_clause}'
 
   if field_def.assertion:
@@ -73,7 +74,7 @@ def _generate_field_sql(
   if field_def.default:
     sql += f' DEFAULT {field_def.default}'
 
-  if field_def.value:
+  if field_def.value and not drop_value:
     sql += f' VALUE {field_def.value}'
 
   if field_def.readonly:
@@ -84,6 +85,23 @@ def _generate_field_sql(
 
   sql += ';'
   return sql
+
+
+def _resolve_type_clause(field_def: FieldDefinition) -> tuple[str, bool]:
+  """Return `(base_type_clause, drop_value)` honoring RECORD target_table.
+
+  For RECORD fields with a `target_table`, emit `record<target>` instead of
+  bare `record` so SurrealDB's introspection (and Surrealist's graph designer)
+  can render cross-table relationships. If the value arg was the canonical
+  `type::record("target", $value)` coercion, it's now redundant — the type
+  parameter enforces the same thing — so signal back to drop it.
+  """
+  if field_def.type == FieldType.RECORD and field_def.target_table:
+    drop_value = bool(
+      field_def.value and _detect_target_table_from_value(field_def.value) == field_def.target_table
+    )
+    return f'record<{field_def.target_table}>', drop_value
+  return field_def.type.value, False
 
 
 def _generate_index_sql(

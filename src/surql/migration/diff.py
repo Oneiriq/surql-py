@@ -10,7 +10,7 @@ import structlog
 
 from surql.migration.models import DiffOperation, SchemaDiff
 from surql.schema.edge import EdgeDefinition
-from surql.schema.fields import FieldDefinition
+from surql.schema.fields import FieldDefinition, FieldType, _detect_target_table_from_value
 from surql.schema.table import (
   EventDefinition,
   IndexDefinition,
@@ -634,7 +634,18 @@ def _field_to_sql(table_name: str, field: FieldDefinition) -> str:
   Returns:
     SQL statement string
   """
-  type_clause = f'option<{field.type.value}>' if field.nullable else field.type.value
+  # Mirror schema/sql.py: RECORD fields with target_table emit `record<X>`
+  # and drop the redundant `VALUE type::record("X", $value)` coercion.
+  if field.type == FieldType.RECORD and field.target_table:
+    base_type = f'record<{field.target_table}>'
+    drop_value = bool(
+      field.value and _detect_target_table_from_value(field.value) == field.target_table
+    )
+  else:
+    base_type = field.type.value
+    drop_value = False
+
+  type_clause = f'option<{base_type}>' if field.nullable else base_type
   sql = f'DEFINE FIELD {field.name} ON TABLE {table_name} TYPE {type_clause}'
 
   if field.assertion:
@@ -644,7 +655,7 @@ def _field_to_sql(table_name: str, field: FieldDefinition) -> str:
     _validate_default_value(field.default)
     sql += f' DEFAULT {field.default}'
 
-  if field.value:
+  if field.value and not drop_value:
     _validate_default_value(field.value)
     sql += f' VALUE {field.value}'
 
