@@ -32,7 +32,8 @@ from surql.schema.fields import (
   field,
   object_field,
 )
-from surql.schema.parser import parse_table_info
+from surql.schema.parser import _parse_table_permissions, parse_table_info
+from surql.schema.sql import generate_table_sql
 from surql.schema.table import table_schema
 
 
@@ -349,6 +350,148 @@ def test_diff_real_consumer_shape_round_trip_is_empty() -> None:
   diffs = diff_tables(live_table, code_table)
   assert diffs == [], (
     f'expected zero drift for end-to-end shape; got: {[d.description for d in diffs]}'
+  )
+
+
+# ---------- 1.6.3 regression tests ----------
+
+
+def test_record_field_with_target_table_drops_canonical_value() -> None:
+  """1.6.3 Fix A: when a RECORD field has both `target_table` set AND a `value=`
+  that matches the canonical `type::record("<target_table>", $value)` coercion,
+  the `field()` constructor must clear `value` on the resulting
+  `FieldDefinition`.
+
+  The emitter (`schema/sql.py::_record_type_clause`) already drops the VALUE on
+  write when `target_table` is set; pre-1.6.3 the in-memory `FieldDefinition`
+  still carried the redundant coercion, so `diff_tables` saw a false-positive
+  `MODIFY_FIELD` between code-side `value="type::record(...)"` and live-side
+  `value=None`.
+  """
+  fd = field(
+    'spec',
+    FieldType.RECORD,
+    target_table='other',
+    value='type::record("other", $value)',
+  )
+  assert fd.target_table == 'other'
+  assert fd.value is None, (
+    f'expected canonical type::record coercion to be cleared when target_table is set; '
+    f'got value={fd.value!r}'
+  )
+
+  # Sanity: when the coercion targets a DIFFERENT table than `target_table`, do
+  # NOT silently drop it — that would be a behavioural footgun. The auto-clear
+  # only fires when the two are consistent.
+  fd_mismatch = field(
+    'spec',
+    FieldType.RECORD,
+    target_table='other',
+    value='type::record("different", $value)',
+  )
+  assert fd_mismatch.value == 'type::record("different", $value)'
+
+
+def test_parse_table_info_uses_define_table_for_permissions() -> None:
+  """1.6.3 Fix B: when the caller passes `define_table=...`, `parse_table_info`
+  must source table-level mode + PERMISSIONS from that string rather than
+  `info['tb']`.
+
+  SurrealDB v3's `INFO FOR TABLE` returns `{events, fields, indexes, lives,
+  tables}` — there is no `tb` key. Without the `define_table` parameter
+  introduced in 1.6.3, table-level PERMISSIONS were silently dropped on every
+  v3 round-trip, producing a false-positive `MODIFY_PERMISSIONS` diff on every
+  consumer that declared them.
+  """
+  # Synthetic v3-shaped INFO FOR TABLE: deliberately omits `tb`.
+  info: dict[str, object] = {
+    'events': {},
+    'fields': {
+      'name': 'DEFINE FIELD name ON community TYPE string PERMISSIONS FULL',
+    },
+    'indexes': {},
+    'lives': {},
+    'tables': {},
+  }
+  define_table = (
+    'DEFINE TABLE community SCHEMAFULL '
+    'PERMISSIONS FOR select WHERE true FOR create WHERE $auth.id != NONE'
+  )
+
+  table = parse_table_info('community', info, define_table=define_table)
+
+  assert table.permissions == {
+    'select': 'true',
+    'create': '$auth.id != NONE',
+  }, f'expected per-action permissions parsed from define_table; got: {table.permissions!r}'
+
+
+def test_parse_table_permissions_handles_comma_joined_actions() -> None:
+  """1.6.3 Fix C: `_parse_table_permissions` must recognise the comma-joined
+  `FOR <action-list> WHERE <rule>` shape SurrealDB v3 emits when multiple
+  actions share a single rule, and explode it into per-action entries with
+  the same rule string on every key.
+
+  Pre-1.6.3 the regex `\\bFOR\\s+(select|create|update|delete)\\s+WHERE\\s+...`
+  would not match the comma form at all, so every consumer with collapsed
+  per-action permissions saw a false-positive `MODIFY_PERMISSIONS` diff.
+  """
+  define_table = (
+    'DEFINE TABLE foo SCHEMAFULL '
+    'PERMISSIONS FOR select, create, update, delete WHERE tenant_id = $auth.tenant'
+  )
+  rules = _parse_table_permissions(define_table)
+  assert rules == {
+    'select': 'tenant_id = $auth.tenant',
+    'create': 'tenant_id = $auth.tenant',
+    'update': 'tenant_id = $auth.tenant',
+    'delete': 'tenant_id = $auth.tenant',
+  }, f'expected comma-joined action list exploded into four equal entries; got: {rules!r}'
+
+
+def test_round_trip_typed_record_field_with_table_permissions_is_empty() -> None:
+  """1.6.3 end-to-end: build a code-side `TableDefinition` with one typed-record
+  field AND table-level PERMISSIONS, emit it via `generate_table_sql`, feed
+  the DEFINE TABLE + DEFINE FIELD strings back through `parse_table_info`
+  (passing the DEFINE TABLE as `define_table` to simulate the v3 shape), and
+  assert `diff_tables(live, code) == []`.
+
+  This exercises Fix A (the typed-record code-side value is never emitted),
+  Fix B (`define_table` carries the table-level permissions), and Fix C
+  indirectly (the per-action emitter form is what we round-trip here).
+  """
+  code_table = table_schema(
+    'community',
+    fields=[
+      field('spec', FieldType.RECORD, target_table='data_capture_spec', nullable=True),
+    ],
+    permissions={'select': 'true', 'create': '$auth.id != NONE'},
+  )
+
+  statements = generate_table_sql(code_table)
+  # Index 0 is the DEFINE TABLE; subsequent entries are DEFINE FIELDs.
+  define_table_stmt = statements[0].rstrip(';')
+  fields_dict = {}
+  for stmt in statements[1:]:
+    body = stmt.rstrip(';')
+    # `DEFINE FIELD <name> ON [TABLE] <table> ...` — extract <name>.
+    parts = body.split()
+    # parts[0]='DEFINE', parts[1]='FIELD', parts[2]=<name>
+    field_name = parts[2]
+    fields_dict[field_name] = body
+
+  live_info: dict[str, object] = {
+    'events': {},
+    'fields': fields_dict,
+    'indexes': {},
+    'lives': {},
+    'tables': {},
+  }
+  live_table = parse_table_info('community', live_info, define_table=define_table_stmt)
+  diffs = diff_tables(live_table, code_table)
+  assert diffs == [], (
+    f'expected zero drift for typed-record + table-permissions round-trip; '
+    f'got: {[d.description for d in diffs]}'
   )
 
 

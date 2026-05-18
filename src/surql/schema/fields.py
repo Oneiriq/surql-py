@@ -167,6 +167,21 @@ def field(
   if field_type == FieldType.RECORD and target_table is None:
     target_table = _detect_target_table_from_value(value)
 
+  # Once `target_table` is set on a RECORD field, the canonical
+  # `type::record("<target_table>", $value)` coercion is redundant — the typed
+  # `record<X>` already constrains the column. The emitter drops it on write
+  # (see schema/sql.py::_record_type_clause), so drop it from the in-memory
+  # FieldDefinition too. Otherwise consumers built against a live DB (which
+  # never stores the VALUE) see a phantom mismatch in `diff_tables` between
+  # code-side `value="type::record(...)"` and live-side `value=None`.
+  if (
+    field_type == FieldType.RECORD
+    and target_table is not None
+    and value is not None
+    and _detect_target_table_from_value(value) == target_table
+  ):
+    value = None
+
   return FieldDefinition(
     name=name,
     type=field_type,
