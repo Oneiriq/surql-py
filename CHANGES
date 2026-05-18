@@ -5,6 +5,83 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.6.2] - 2026-05-17
+
+### Fixed
+
+- **`diff_tables` reported false-positive drift on every consumer schema
+  that uses 1.5.14's typed record-link fields, FLEXIBLE fields, PERMISSIONS
+  clauses, or array sub-fields.** `surql.schema.parser.parse_table_info`
+  and `surql.migration.diff.diff_tables` were not round-trip-symmetric
+  with the emitter. After `migrate_up`, SurrealDB v3 reformats the stored
+  DEFINE statements before returning them via `INFO FOR TABLE` — `option<X>`
+  is unfolded to `none | X`, `FLEXIBLE` moves to the head of the clause
+  list, every per-field `PERMISSIONS FULL` default is materialised, and
+  array fields get a companion `<field>[*]` or `<field>.*` entry holding
+  the per-element type spec. The pre-1.6.2 parser captured only the first
+  word after `TYPE` (so `TYPE none | record<X>` parsed as `FieldType.ANY`,
+  losing both `RECORD` and `target_table=X`), did not parse table
+  PERMISSIONS at all, and surfaced array sub-field entries as standalone
+  fields — every one of which the diff then misclassified.
+
+  Concrete patterns the consumer hit, all of which now round-trip clean:
+
+  - Typed record-link fields (`field(name, FieldType.RECORD, target_table='X', nullable=True)`)
+    emitted as `TYPE option<record<X>>`, stored as `TYPE none | record<X>`,
+    used to report `Modify field X` on every diff. The parser now lifts
+    the `none |` union into `nullable=True`, extracts the target table
+    out of `record<X>`, and `_fields_equal` now compares `nullable` and
+    `target_table` alongside the other field attributes.
+  - FLEXIBLE object fields (`TYPE option<object> FLEXIBLE` emitted,
+    `FLEXIBLE TYPE none | object` returned) used to report a spurious
+    `Modify field` per call. The clause-keyword slicer recognises FLEXIBLE
+    in either position and the type-clause parser handles the union form.
+  - Table-level PERMISSIONS clauses round-trip via a new
+    `_parse_table_permissions` extractor. `PERMISSIONS NONE` and
+    `PERMISSIONS FULL` (the SurrealDB default-deny / default-allow shapes
+    a table gets when no per-action rules were declared) normalise to
+    `None`, matching the code-side default; per-action rules
+    (`PERMISSIONS FOR select WHERE ...`) parse into the same `dict[str, str]`
+    shape `table_schema(permissions=...)` accepts. `diff_permissions`
+    additionally treats `None` and `{}` as equivalent so the dict
+    comparison never trips on the asymmetry.
+  - Array sub-field entries (`unresolved_refs[*]`, `jurisdiction.*`,
+    `embedding.*`, `nodes.*`) — the per-element type annotation that
+    `INFO FOR TABLE` returns alongside the parent `array` field — are
+    now skipped at parse time so the diff doesn't emit `Drop field X.*`
+    for them.
+
+- **`diff_tables` crashed with `Unsafe default value expression: 'ON ... TYPE ...'`
+  on tables with a field named `default` (or any field whose name
+  contains DEFAULT as a substring).** The pre-1.6.2 clause-extraction
+  regexes (`DEFAULT\s+(.+?)...`, `VALUE\s+(.+?)...`, `ASSERT\s+(.+?)...`)
+  had no word-boundary anchoring, so the field NAME `default` matched
+  the DEFAULT clause keyword and the extractor captured the field-type
+  slice (`ON data_capture_spec TYPE none | string`) as the alleged
+  default value. That string then failed the safety check in
+  `_field_to_sql._validate_default_value` and `diff_tables` raised
+  instead of returning a diff. Fix: the parser now slices the DEFINE
+  FIELD statement into clause-keyword-delimited bodies up-front
+  (`_split_field_clauses`), skipping past the `DEFINE FIELD <name> ON
+  [TABLE] <table>` prefix first so the field name is never scanned for
+  clause keywords. Each extractor reads its own clause body verbatim
+  rather than running its own ad-hoc regex over the full statement.
+
+  Regression coverage: 11 new tests in `tests/test_diff_round_trip.py`
+  covering every false-positive pattern named above plus the
+  non-function-call DEFAULT crash, the typed-record non-nullable variant,
+  the nullable-string variant, and an end-to-end consumer-shape test
+  mixing typed records, FLEXIBLE objects, array sub-fields, and
+  PERMISSIONS in one table. Each test fails on 1.6.1 and passes on 1.6.2.
+
+### Verified
+
+- `ruff check src tests` + `ruff format --check src tests` — clean.
+- `mypy src --strict` — no issues.
+- `uv run pytest --no-cov --ignore=tests/integration` — **2616 passed,
+  9 skipped, 2 xfailed** (was 2605 in 1.6.1; +11 new regression tests
+  covering the fixes above).
+
 ## [1.6.1] - 2026-05-17
 
 ### Fixed
