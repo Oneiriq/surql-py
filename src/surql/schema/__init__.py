@@ -43,6 +43,7 @@ from surql.schema.fields import (
 from surql.schema.parser import (
   SchemaParseError,
   parse_db_info,
+  parse_edge_info,
   parse_table_info,
 )
 from surql.schema.registry import (
@@ -154,6 +155,7 @@ __all__ = [
   # Parser
   'SchemaParseError',
   'parse_table_info',
+  'parse_edge_info',
   'parse_db_info',
   # Themes
   'ColorScheme',

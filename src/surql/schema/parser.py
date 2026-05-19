@@ -30,6 +30,7 @@ from typing import Any
 
 import structlog
 
+from surql.schema.edge import EdgeDefinition, EdgeMode
 from surql.schema.fields import FieldDefinition, FieldType
 from surql.schema.table import (
   EventDefinition,
@@ -162,6 +163,135 @@ def parse_table_info(
   except Exception as e:
     logger.error('parse_table_info_failed', table=table_name, error=str(e))
     raise SchemaParseError(f'Failed to parse table {table_name}: {e}') from e
+
+
+def parse_edge_info(
+  edge_name: str,
+  info: dict[str, Any],
+  define_table: str | None = None,
+) -> EdgeDefinition:
+  """Parse an edge table's ``INFO FOR TABLE`` response into an EdgeDefinition.
+
+  Counterpart to :func:`parse_table_info` for graph-edge tables defined via
+  ``edge_schema`` / :class:`~surql.schema.edge.EdgeDefinition`. Edges round-trip
+  through SurrealDB as regular tables in ``INFO FOR DB.tables``; the only thing
+  that makes them edges is the ``TYPE RELATION FROM <x> TO <y>`` clause on the
+  ``DEFINE TABLE`` statement. Without an edge-aware parser, a drift detector
+  using :func:`parse_table_info` against an edge table would see it as a
+  SCHEMALESS table missing every field-level diff signal an edge expects (mode,
+  from/to constraints, auto ``in``/``out`` proxies).
+
+  Args:
+    edge_name: Edge table name.
+    info: Raw ``INFO FOR TABLE`` response dictionary (same shape as the
+      ``parse_table_info`` input — typically the inner result dict).
+    define_table: Optional ``DEFINE TABLE <name> ...`` statement string. When
+      provided, the source of edge mode + FROM/TO + PERMISSIONS. Pass this on
+      SurrealDB v3, where ``INFO FOR TABLE`` does not include the table-level
+      DEFINE — only ``INFO FOR DB``'s ``tables.<name>`` dict does.
+
+  Returns:
+    Parsed EdgeDefinition with mode, from_table, to_table, fields, indexes,
+    events, and permissions populated. For ``RELATION``-mode edges the auto
+    ``in`` and ``out`` fields SurrealDB emits are skipped (they are implicit
+    when ``TYPE RELATION`` is set, so the code-side EdgeDefinition does not
+    declare them either).
+
+  Raises:
+    SchemaParseError: If parsing fails.
+
+  Examples:
+    >>> db_info = await client.execute('INFO FOR DB;')
+    >>> info = await client.execute(f'INFO FOR TABLE {edge_name};')
+    >>> edge_def = parse_edge_info(
+    ...     edge_name,
+    ...     info[0]['result'],
+    ...     define_table=db_info[0]['result']['tables'].get(edge_name),
+    ... )
+  """
+  try:
+    logger.debug('parsing_edge_info', edge=edge_name)
+
+    tb_definition = define_table if define_table is not None else info.get('tb', '')
+
+    mode = _parse_edge_mode(tb_definition)
+    from_table, to_table = _parse_edge_from_to(tb_definition)
+    permissions = _parse_table_permissions(tb_definition)
+
+    fields_dict = info.get('fields') or info.get('fd') or {}
+    fields = _parse_fields(fields_dict)
+    # `in` and `out` are auto-emitted by SurrealDB for TYPE RELATION edges and
+    # are not part of the code-side EdgeDefinition's `fields` list. Strip them
+    # so round-trip diffs do not flag them as orphan additions.
+    if mode == EdgeMode.RELATION:
+      fields = [f for f in fields if f.name not in ('in', 'out')]
+
+    indexes_dict = info.get('indexes') or info.get('ix') or {}
+    indexes = _parse_indexes(indexes_dict)
+
+    events_dict = info.get('events') or info.get('ev') or {}
+    events = _parse_events(events_dict)
+
+    return EdgeDefinition(
+      name=edge_name,
+      mode=mode,
+      from_table=from_table,
+      to_table=to_table,
+      fields=fields,
+      indexes=indexes,
+      events=events,
+      permissions=permissions,
+    )
+
+  except Exception as e:
+    logger.error('parse_edge_info_failed', edge=edge_name, error=str(e))
+    raise SchemaParseError(f'Failed to parse edge {edge_name}: {e}') from e
+
+
+# Pattern matching `TYPE RELATION` (case-insensitive, word-boundary anchored).
+_TYPE_RELATION_PATTERN = re.compile(r'\bTYPE\s+RELATION\b', re.IGNORECASE)
+
+# Pattern matching `FROM <ident>` and `TO <ident>` in a DEFINE TABLE statement.
+# Identifier characters mirror SurrealDB's table-name grammar (letter/digit/_).
+_EDGE_FROM_PATTERN = re.compile(r'\bFROM\s+([A-Za-z_][A-Za-z0-9_]*)', re.IGNORECASE)
+_EDGE_TO_PATTERN = re.compile(r'\bTO\s+([A-Za-z_][A-Za-z0-9_]*)', re.IGNORECASE)
+
+
+def _parse_edge_mode(tb_definition: str) -> EdgeMode:
+  """Return EdgeMode for an edge `DEFINE TABLE` string.
+
+  `TYPE RELATION` wins. If absent, fall back to the same SCHEMAFULL/SCHEMALESS
+  keyword check `_parse_table_mode` uses; SCHEMALESS is the default when no
+  keyword is present.
+  """
+  if not tb_definition:
+    return EdgeMode.SCHEMALESS
+
+  if _TYPE_RELATION_PATTERN.search(tb_definition):
+    return EdgeMode.RELATION
+
+  definition_upper = tb_definition.upper()
+  if 'SCHEMAFULL' in definition_upper:
+    return EdgeMode.SCHEMAFULL
+  return EdgeMode.SCHEMALESS
+
+
+def _parse_edge_from_to(tb_definition: str) -> tuple[str | None, str | None]:
+  """Extract `FROM <table>` and `TO <table>` from an edge DEFINE TABLE string.
+
+  Returns ``(None, None)`` for non-RELATION edges or if either clause is
+  missing. The emitter requires both for RELATION mode, but this parser stays
+  permissive on read so a malformed live definition surfaces as missing-clause
+  drift instead of a parse failure.
+  """
+  if not tb_definition:
+    return (None, None)
+  from_match = _EDGE_FROM_PATTERN.search(tb_definition)
+  to_match = _EDGE_TO_PATTERN.search(tb_definition)
+  return (
+    from_match.group(1) if from_match else None,
+    to_match.group(1) if to_match else None,
+  )
 
 
 def _parse_table_mode(tb_definition: str) -> TableMode:
