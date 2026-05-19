@@ -5,6 +5,39 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.6.4] - 2026-05-18
+
+### Added
+
+- **`parse_edge_info(edge_name, info, define_table=None)` in
+  `surql.schema.parser`.** Counterpart to `parse_table_info` for graph-edge
+  tables defined via `edge_schema` / `EdgeDefinition`. Round-trips the three
+  edge modes (`RELATION`, `SCHEMAFULL`, `SCHEMALESS`), the
+  `FROM <table> TO <table>` clauses on `TYPE RELATION` edges, and the
+  per-action `PERMISSIONS` clause SurrealDB v3 emits on the table-level
+  `DEFINE TABLE` statement. Reuses the existing `_parse_fields`,
+  `_parse_indexes`, `_parse_events`, and `_parse_table_permissions` helpers
+  so every per-field shape the table parser handles (typed record links,
+  `option<X>`, FLEXIBLE, sub-fields, fields named `default`) round-trips
+  the same way on edges. For `RELATION`-mode edges the auto-emitted `in`
+  and `out` fields are stripped on parse so they do not show up as orphan
+  diffs against a code-side `EdgeDefinition` that (correctly) does not
+  declare them. Exported from `surql.schema` alongside `parse_table_info`.
+
+  Before 1.6.4, drift detectors could check edges' presence/absence by
+  cross-referencing `ALL_EDGES.keys()` against `INFO FOR DB.tables` but had
+  no way to diff edge MODE, FROM/TO endpoints, or per-edge fields/indexes
+  against the live DB — `parse_table_info` returned a `TableDefinition`
+  with `mode=SCHEMALESS` and no edge metadata. With `parse_edge_info` plus
+  the existing `diff_edges`, edge round-trip parity is now on the same
+  footing as table parity.
+
+### Changed
+
+- `surql.schema.__init__` re-exports `parse_edge_info` so downstream
+  packages can `from surql.schema import parse_edge_info` next to the
+  existing `parse_table_info` / `parse_db_info`.
+
 ## [1.6.3] - 2026-05-18
 
 ### Fixed
