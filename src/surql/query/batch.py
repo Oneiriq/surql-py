@@ -13,6 +13,7 @@ import structlog
 from pydantic import BaseModel
 
 from surql.connection.context import get_db
+from surql.connection.transaction import Transaction
 from surql.types.operators import _quote_value, _validate_identifier
 
 if TYPE_CHECKING:
@@ -76,7 +77,7 @@ def _build_upsert_target(_table: str, raw: str) -> str:
 
 
 async def upsert_many(
-  client: DatabaseClient | None,
+  client: DatabaseClient | Transaction | None,
   table: str,
   items: list[dict[str, Any] | BaseModel],
   conflict_fields: list[str] | None = None,
@@ -86,25 +87,67 @@ async def upsert_many(
   Inserts records if they don't exist, or updates them if they do.
   Uses SurrealDB's UPSERT statement for efficient batch operations.
 
+  Atomicity (1.7.0)
+  =================
+
+  ``client`` may be either a connected
+  :class:`~surql.connection.client.DatabaseClient` or an active
+  :class:`~surql.connection.transaction.Transaction`. The two modes
+  behave differently:
+
+  - **DatabaseClient (or ``None`` → context client) — autocommit.**
+    The batch is sent as a single multi-statement query. If one
+    record fails schema validation mid-batch, *earlier records may
+    have already committed* (SurrealDB v3 autocommits per statement
+    unless wrapped in ``BEGIN … COMMIT``). This is the legacy
+    behaviour and is preserved for backwards compatibility.
+
+  - **Transaction — atomic.** The same per-record ``UPSERT`` statements
+    are queued on the supplied transaction via ``trx.execute``. They
+    inherit the surrounding ``BEGIN TRANSACTION``/``COMMIT TRANSACTION``
+    framing, so a single bad record rolls back the *entire* batch on
+    commit (no half-seeded tables). Results are not available at call
+    time — ``Transaction.execute`` buffers statements — so this mode
+    returns ``[]``. Callers who need the per-row results should
+    inspect the value returned by :meth:`Transaction.commit`.
+
+  Use the transaction-bound form when seeding multiple tables in one
+  atomic step or when partial-success would leave the database in a
+  shape downstream code can't recover from. The mode is auto-detected
+  from ``client`` so no API call-site rewrite is needed beyond passing
+  the transaction handle.
+
   Args:
-    client: SurrealDB client instance. If None, uses context client.
+    client: SurrealDB client instance, active transaction, or ``None``
+      (in which case the context client is used in autocommit mode).
     table: Target table name
     items: List of records to upsert (Pydantic models or dicts)
     conflict_fields: Optional fields to check for conflicts (used in WHERE clause)
 
   Returns:
-    List of upserted records
+    List of upserted records (autocommit mode), or ``[]`` when called
+    inside a transaction (results land in ``Transaction.commit`` instead).
 
   Raises:
     ValueError: If items list is empty or table name is invalid
+    TransactionError: If a ``Transaction`` is passed but is not in the
+      ``ACTIVE`` state (e.g. already committed or cancelled).
     QueryError: If the database operation fails
 
   Examples:
-    Basic upsert:
+    Basic autocommit upsert (legacy behaviour):
     >>> results = await upsert_many(client, "users", [
     ...     {"id": "user:1", "name": "Alice", "age": 30},
     ...     {"id": "user:2", "name": "Bob", "age": 25}
     ... ])
+
+    Atomic batch — rolls back if any record fails validation:
+    >>> async with surql.transaction(db) as trx:
+    ...     await upsert_many(trx, "users", users_batch)
+    ...     await upsert_many(trx, "posts", posts_batch)
+    ...     # Commits both batches atomically on context exit; cancels
+    ...     # both if either upsert_many raises (or if the surrounding
+    ...     # block raises before exit).
 
     With conflict handling:
     >>> results = await upsert_many(
@@ -112,8 +155,6 @@ async def upsert_many(
     ...     conflict_fields=["email"]
     ... )
   """
-  db = client or get_db()
-
   if not items:
     logger.debug('upsert_many_empty_list', table=table)
     return []
@@ -129,7 +170,22 @@ async def upsert_many(
     for field in conflict_fields:
       _validate_identifier(field, 'conflict field name')
 
-  logger.info('upsert_many_start', table=table, count=len(items))
+  # Resolve the executor exactly once. Transaction handles bypass the
+  # context-client lookup — passing a transaction signals that the
+  # caller wants atomicity, so we must not silently downgrade to the
+  # autocommit context client even if ``client`` was ``None`` after
+  # some unrelated check elsewhere.
+  txn: Transaction | None = client if isinstance(client, Transaction) else None
+  executor: DatabaseClient | Transaction = (
+    txn if txn is not None else (client if client is not None else get_db())
+  )
+
+  logger.info(
+    'upsert_many_start',
+    table=table,
+    count=len(items),
+    mode='transaction' if txn is not None else 'autocommit',
+  )
 
   # Convert Pydantic models to dicts
   item_dicts: list[dict[str, Any]] = []
@@ -157,11 +213,29 @@ async def upsert_many(
     else:
       statements.append(f'UPSERT {target_clean} CONTENT ${bind};')
 
-  query = '\n'.join(statements)
+  # In transaction mode, queue each statement individually so the
+  # transaction's per-statement param bookkeeping (duplicate-key
+  # detection in ``Transaction.execute``) works correctly. The full
+  # batch then flushes as a single ``BEGIN … COMMIT`` RPC on
+  # ``Transaction.commit``, inheriting v3's rollback-on-any-error
+  # semantics.
+  if txn is not None:
+    for stmt, bind in zip(statements, params, strict=True):
+      await txn.execute(stmt, {bind: params[bind]})
+    logger.info(
+      'upsert_many_queued_on_transaction',
+      table=table,
+      queued=len(statements),
+    )
+    # Results aren't available until the transaction commits — return
+    # an empty list and let callers inspect ``Transaction.commit``'s
+    # return value if they need per-row data.
+    return []
 
+  query = '\n'.join(statements)
   logger.debug('upsert_many_query', query=query)
 
-  result = await db.execute(query, params)
+  result = await executor.execute(query, params)
 
   # Extract results from execute response
   records: list[dict[str, Any]] = []

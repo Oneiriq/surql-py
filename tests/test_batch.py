@@ -10,6 +10,7 @@ import pytest
 from pydantic import BaseModel
 
 from surql.connection.client import DatabaseClient
+from surql.connection.transaction import Transaction, TransactionError, TransactionState
 from surql.query.batch import (
   build_relate_query,
   build_upsert_query,
@@ -182,6 +183,236 @@ class TestUpsertMany:
     results = await upsert_many(mock_db_client, 'users', [{'name': 'Test'}])
 
     assert results == []
+
+
+# ============================================================================
+# TRANSACTION-BOUND UPSERT_MANY TESTS (1.7.0)
+#
+# These pin the atomicity contract: when ``upsert_many`` is given a
+# ``Transaction`` instead of a ``DatabaseClient``, the per-record
+# UPSERT statements are buffered onto the transaction and inherit the
+# surrounding BEGIN/COMMIT/CANCEL framing. A mid-batch failure rolls
+# the *entire* batch back instead of leaving earlier records committed
+# (the autocommit-per-statement behaviour pre-1.7.0).
+# ============================================================================
+
+
+class TestUpsertManyOnTransaction:
+  """Atomic batch contract — upsert_many inside ``async with transaction(db)``."""
+
+  @pytest.mark.anyio
+  async def test_upsert_many_with_transaction_queues_statements(
+    self, mock_db_client: DatabaseClient
+  ) -> None:
+    """Records flow through ``txn.execute``, not ``client.execute`` directly.
+
+    Pre-1.7.0 the helper called ``db.execute`` directly which v3
+    autocommits per statement — earlier records would persist even if
+    a later one rolled back. The transaction-bound path queues each
+    statement on the txn buffer so the whole batch lands as a single
+    BEGIN/COMMIT RPC at commit time.
+    """
+    txn = Transaction(mock_db_client)
+    await txn.begin()
+
+    items = [
+      {'id': 'user:1', 'name': 'Alice'},
+      {'id': 'user:2', 'name': 'Bob'},
+    ]
+    result = await upsert_many(txn, 'users', items)
+
+    # In transaction mode results aren't available until commit, so the
+    # helper returns ``[]`` — callers inspect ``Transaction.commit`` if
+    # they need per-row data.
+    assert result == []
+    # Each record's UPSERT statement is buffered on the transaction.
+    assert len(txn._statements) == 2
+    assert all('UPSERT user:1' in s for s in [txn._statements[0]])
+    assert all('UPSERT user:2' in s for s in [txn._statements[1]])
+    # Per-record payloads are bound under stable ``item_<idx>`` keys.
+    assert set(txn._params) == {'item_0', 'item_1'}
+    assert txn._params['item_0'] == {'name': 'Alice'}
+    assert txn._params['item_1'] == {'name': 'Bob'}
+    # No autocommit RPC was issued — the buffer is the only thing
+    # that moved.
+    mock_db_client._client.query.assert_not_called()
+    mock_db_client._client.query_raw.assert_not_called()
+
+  @pytest.mark.anyio
+  async def test_upsert_many_with_transaction_commits_atomically(
+    self, mock_db_client: DatabaseClient
+  ) -> None:
+    """Happy path: all records reach the server in one BEGIN/COMMIT RPC.
+
+    The async-context entry/exit auto-flushes the queued batch as a
+    single ``BEGIN TRANSACTION; UPSERT…; UPSERT…; RETURN sentinel; COMMIT TRANSACTION;``
+    request. Verified by inspecting the batched query the SDK saw.
+    """
+    items = [
+      {'id': 'user:1', 'name': 'Alice', 'age': 30},
+      {'id': 'user:2', 'name': 'Bob', 'age': 25},
+    ]
+
+    async with Transaction(mock_db_client) as txn:
+      await upsert_many(txn, 'users', items)
+
+    # One commit RPC fired on context exit.
+    mock_db_client._client.query_raw.assert_called_once()
+    batched = mock_db_client._client.query_raw.call_args.args[0]
+    assert batched.startswith('BEGIN TRANSACTION;')
+    assert batched.rstrip().endswith('COMMIT TRANSACTION;')
+    assert 'UPSERT user:1 CONTENT $item_0' in batched
+    assert 'UPSERT user:2 CONTENT $item_1' in batched
+    # Sentinel marker confirms post-1.6.0 commit-path inspection.
+    assert "RETURN '__txn_ok__';" in batched
+    # Per-record payloads round-trip through the params dict the SDK
+    # receives.
+    params = mock_db_client._client.query_raw.call_args.args[1]
+    assert params['item_0'] == {'name': 'Alice', 'age': 30}
+    assert params['item_1'] == {'name': 'Bob', 'age': 25}
+
+  @pytest.mark.anyio
+  async def test_upsert_many_with_transaction_rollback_on_mid_batch_error(
+    self, mock_db_client: DatabaseClient
+  ) -> None:
+    """Schema-validation failure on a single record rolls back the whole batch.
+
+    Simulates the v3.0.5 envelope SurrealDB returns when one UPSERT
+    inside ``BEGIN … COMMIT`` violates a SCHEMAFULL field assertion.
+    The 1.6.0 sentinel-probe must surface that as a
+    ``TransactionError`` instead of silently swallowing the rollback,
+    and the transaction state must transition to ``CANCELLED`` (not
+    ``COMMITTED``).
+    """
+    # v3 envelope for a batch where statement #2 violated a typed-int field.
+    mock_db_client._client.query_raw = AsyncMock(
+      return_value={
+        'id': 'req-mid-fail',
+        'result': [
+          {'result': None, 'status': 'OK'},  # BEGIN ack
+          {
+            'details': {'kind': 'NotExecuted'},
+            'kind': 'Query',
+            'result': 'The query was not executed due to a failed transaction',
+            'status': 'ERR',
+          },
+          {
+            'kind': 'Internal',
+            'result': (
+              "Couldn't coerce value for field `age` of `users:bob`: "
+              "Expected `int` but found `'not_an_int'`"
+            ),
+            'status': 'ERR',
+          },
+          {
+            'details': {'kind': 'Cancelled'},
+            'kind': 'Query',
+            'result': 'The query was not executed due to a cancelled transaction',
+            'status': 'ERR',
+          },
+        ],
+      }
+    )
+
+    items = [
+      {'id': 'users:alice', 'name': 'Alice', 'age': 30},
+      {'id': 'users:bob', 'name': 'Bob', 'age': 'not_an_int'},  # bad row
+    ]
+
+    txn = Transaction(mock_db_client)
+    await txn.begin()
+    await upsert_many(txn, 'users', items)
+
+    with pytest.raises(TransactionError) as exc_info:
+      await txn.commit()
+
+    # The error pinpoints the rejected field — operators can act on it.
+    msg = str(exc_info.value)
+    assert 'SurrealDB rolled back the batch' in msg
+    assert 'coerce value for field `age`' in msg
+    # The state machine flips to CANCELLED so callers know nothing
+    # was persisted.
+    assert txn.state == TransactionState.CANCELLED
+
+  @pytest.mark.anyio
+  async def test_upsert_many_with_transaction_async_context_cancels_on_raise(
+    self, mock_db_client: DatabaseClient
+  ) -> None:
+    """``async with transaction(...)`` cancels on exception — no commit RPC fired.
+
+    Verifies the consumer-pattern path: when business logic between
+    the queued ``upsert_many`` and the implicit commit raises, the
+    ``__aexit__`` cancels the transaction. Pre-1.7.0 the autocommit
+    ``upsert_many`` could not participate in this — earlier records
+    would have already landed before the raise.
+    """
+    items = [{'id': 'user:1', 'name': 'Alice'}]
+
+    txn = Transaction(mock_db_client)
+    try:
+      async with txn:
+        await upsert_many(txn, 'users', items)
+        # Simulate business-logic failure after the queue, before commit.
+        raise RuntimeError('business invariant violated')
+    except RuntimeError:
+      pass
+
+    # Cancel ran via __aexit__, so no commit RPC was issued.
+    mock_db_client._client.query_raw.assert_not_called()
+    assert txn.state == TransactionState.CANCELLED
+
+  @pytest.mark.anyio
+  async def test_upsert_many_with_transaction_empty_list_is_noop(
+    self, mock_db_client: DatabaseClient
+  ) -> None:
+    """Empty batches don't pollute the transaction buffer."""
+    txn = Transaction(mock_db_client)
+    await txn.begin()
+
+    result = await upsert_many(txn, 'users', [])
+
+    assert result == []
+    assert txn._statements == []
+    assert txn._params == {}
+
+  @pytest.mark.anyio
+  async def test_upsert_many_with_transaction_conflict_fields(
+    self, mock_db_client: DatabaseClient
+  ) -> None:
+    """``conflict_fields`` carries through to the buffered statements."""
+    items = [{'email': 'alice@example.com', 'name': 'Alice'}]
+
+    txn = Transaction(mock_db_client)
+    await txn.begin()
+    await upsert_many(txn, 'users', items, conflict_fields=['email'])
+
+    # The buffered UPSERT carries the per-record WHERE clause that
+    # references the bound payload.
+    assert len(txn._statements) == 1
+    assert 'WHERE' in txn._statements[0]
+    assert 'email = $item_0.email' in txn._statements[0]
+
+  @pytest.mark.anyio
+  async def test_upsert_many_with_transaction_mixes_with_other_execute(
+    self, mock_db_client: DatabaseClient
+  ) -> None:
+    """Other ``txn.execute`` calls can interleave with ``upsert_many`` cleanly.
+
+    Models the real-world flow where ``upsert_many`` queues a batch
+    onto a transaction that *also* has a bespoke ``DELETE`` or
+    ``UPDATE`` issued via ``txn.execute`` directly. Both flush in the
+    same BEGIN/COMMIT.
+    """
+    async with Transaction(mock_db_client) as txn:
+      await txn.execute("DELETE users WHERE status = 'deleted'")
+      await upsert_many(txn, 'users', [{'id': 'user:1', 'name': 'Alice'}])
+      await txn.execute("UPDATE users SET updated_at = time::now() WHERE id = 'user:1'")
+
+    mock_db_client._client.query_raw.assert_called_once()
+    batched = mock_db_client._client.query_raw.call_args.args[0]
+    assert 'DELETE users' in batched
+    assert 'UPSERT user:1 CONTENT' in batched
+    assert 'UPDATE users SET updated_at' in batched
 
 
 # ============================================================================
