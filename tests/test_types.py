@@ -237,6 +237,110 @@ class TestRecordID:
 
     assert str(record_id) == 'post:12345'
 
+  # -------------------------------------------------------------------------
+  # Auto-bracket normalisation (1.7.0 — Oneiriq/surql-py upstream feature)
+  #
+  # Consumers of returned RecordIDs / wire-format id strings previously had
+  # to call ``.replace('⟨', '').replace('⟩', '')`` themselves to get a clean
+  # id back. These tests pin down the round-trip and the construction-side
+  # detection so that contract no longer leaks to downstream code.
+  # -------------------------------------------------------------------------
+
+  def test_leading_digit_id_gets_brackets(self) -> None:
+    """IDs starting with a digit need brackets even if otherwise alphanumeric.
+
+    SurrealDB v3 lexes ``1abc`` as ``<number> <ident>`` and rejects the
+    record id with a parse error. The serializer must escape that to
+    ``⟨1abc⟩`` so the v3 parser treats it as an opaque key. Pre-1.7.0
+    the alphanumeric-only check let ``1abc`` through bare.
+    """
+    record_id = RecordID(table='chunk', id='1abc')
+    assert str(record_id) == 'chunk:⟨1abc⟩'
+
+  def test_leading_digit_hyphenated_id_gets_brackets(self) -> None:
+    """Composite ``<n>-<word>`` ids likewise need brackets."""
+    record_id = RecordID(table='chunk', id='123-abc')
+    assert str(record_id) == 'chunk:⟨123-abc⟩'
+
+  def test_pure_digit_string_does_not_misroute_to_brackets(self) -> None:
+    """A pure-digit *string* is parseable as int and should not get brackets.
+
+    ``RecordID(table='x', id='123')`` keeps the string id (no implicit
+    int coercion at construction time), and the serializer emits it
+    bare — SurrealDB happily parses bare digits as the integer record
+    key shape. The leading-digit escape rule only kicks in when there
+    are *non-digit* trailing characters that would confuse the lexer.
+    """
+    record_id = RecordID(table='post', id='123')
+    assert str(record_id) == 'post:123'
+
+  def test_underscore_prefix_id_emits_bare(self) -> None:
+    """``_legal`` is a valid SurrealDB record-id key shape."""
+    record_id = RecordID(table='user', id='_internal')
+    assert str(record_id) == 'user:_internal'
+
+  def test_real_world_plan_chunk_id_round_trip(self) -> None:
+    """End-to-end pin for the consumer pattern that motivated this fix.
+
+    The data-plane builder graph project constructs chunk ids like
+    ``plan_chunk:demo-plan-ff3d5981-7654-4321-abcd-deadbeef0000`` and
+    previously had to wrap them in ``⟨ … ⟩`` by hand. After the auto-
+    bracket fix, the round-trip
+    ``RecordID(table, id) → str(...) → RecordID.parse(...)`` recovers
+    the clean ``.id`` value with no manual ``.replace`` calls.
+    """
+    raw_id = 'demo-plan-ff3d5981-7654-4321-abcd-deadbeef0000'
+    rid = RecordID(table='plan_chunk', id=raw_id)
+    wire = str(rid)
+    assert wire == f'plan_chunk:⟨{raw_id}⟩'
+
+    parsed = RecordID.parse(wire)
+    assert parsed.table == 'plan_chunk'
+    # The clean id is recovered; no brackets remain in ``.id``.
+    assert parsed.id == raw_id
+    assert '⟨' not in str(parsed.id)
+    assert '⟩' not in str(parsed.id)
+    # And the wire form round-trips bit-for-bit.
+    assert str(parsed) == wire
+
+  def test_strip_brackets_unicode(self) -> None:
+    """``strip_brackets`` removes v3 unicode brackets from a wire string."""
+    assert RecordID.strip_brackets('outlet:⟨alaska.com⟩') == 'outlet:alaska.com'
+    assert (
+      RecordID.strip_brackets('plan_chunk:⟨demo-plan-ff3d5981⟩') == 'plan_chunk:demo-plan-ff3d5981'
+    )
+
+  def test_strip_brackets_ascii(self) -> None:
+    """``strip_brackets`` also handles the legacy ASCII bracket form."""
+    assert RecordID.strip_brackets('outlet:<legacy.com>') == 'outlet:legacy.com'
+
+  def test_strip_brackets_no_brackets_passthrough(self) -> None:
+    """Bracket-less strings round-trip untouched."""
+    assert RecordID.strip_brackets('user:alice') == 'user:alice'
+    assert RecordID.strip_brackets('post:123') == 'post:123'
+
+  def test_strip_brackets_none(self) -> None:
+    """``None`` is passed through; lets callers chain without nil checks."""
+    assert RecordID.strip_brackets(None) is None  # type: ignore[arg-type]
+
+  def test_strip_brackets_non_string(self) -> None:
+    """Non-string inputs are coerced via ``str()`` first."""
+    rid = RecordID(table='outlet', id='alaska.com')
+    # ``str(rid)`` carries brackets; ``strip_brackets`` removes them.
+    assert RecordID.strip_brackets(rid) == 'outlet:alaska.com'
+
+  def test_parse_bracketed_wire_form_clean_id(self) -> None:
+    """``parse`` on a bracketed wire form yields a bracket-free ``.id``.
+
+    Consumers that previously did
+    ``parse('plan_chunk:⟨demo-...⟩').id.replace('⟨', '').replace('⟩', '')``
+    can drop the manual strip — ``.id`` is already clean.
+    """
+    rid = RecordID.parse('plan_chunk:⟨demo-plan-ff3d5981⟩')
+    assert rid.id == 'demo-plan-ff3d5981'
+    assert '⟨' not in str(rid.id)
+    assert '⟩' not in str(rid.id)
+
 
 class TestQuoteValue:
   """Test suite for _quote_value helper function."""
