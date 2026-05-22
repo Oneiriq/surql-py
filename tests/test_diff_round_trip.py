@@ -495,5 +495,110 @@ def test_round_trip_typed_record_field_with_table_permissions_is_empty() -> None
   )
 
 
+# ---------- 1.7.1 regression tests ----------
+
+
+def test_float_default_with_f_suffix_parses_without_raising() -> None:
+  """SurrealDB v3 normalises `DEFAULT 1.0` on a `TYPE float` field to
+  `DEFAULT 1f` when reflected back via `INFO FOR TABLE`. Pre-1.7.1 the
+  `_SAFE_DEFAULT_PATTERN` regex only accepted `-?\\d+(?:\\.\\d+)?`, so the
+  trailing `f` failed validation and `_validate_default_value` raised
+  `Unsafe default value expression: '1f'`. Consumers running
+  `schema validate` saw "parse failures, N table(s) couldn't be
+  introspected" for any table with a float default.
+
+  The fix extends the numeric-literal alternative to `[fd]?` (covering
+  SurrealDB's float and double storage-type suffixes).
+  """
+  code_table = table_schema(
+    'ai_memory',
+    fields=[
+      field('strength', FieldType.FLOAT, default='1.0', nullable=True),
+    ],
+  )
+  live_info = {
+    'tb': 'DEFINE TABLE ai_memory SCHEMALESS PERMISSIONS NONE',
+    'fields': {
+      'strength': 'DEFINE FIELD strength ON ai_memory TYPE none | float DEFAULT 1f PERMISSIONS FULL',
+    },
+    'indexes': {},
+    'events': {},
+  }
+  # Must not raise.
+  live_table = parse_table_info('ai_memory', live_info)
+  diffs = diff_tables(live_table, code_table)
+  assert diffs == [], (
+    f'expected zero drift between code DEFAULT 1.0 and live DEFAULT 1f; '
+    f'got: {[d.description for d in diffs]}'
+  )
+
+
+def test_double_default_with_d_suffix_round_trips() -> None:
+  """Same as the `f` case but for SurrealDB's `d` (double) suffix."""
+  code_table = table_schema(
+    'measurement',
+    fields=[
+      field('reading', FieldType.FLOAT, default='3.14', nullable=True),
+    ],
+  )
+  live_info = {
+    'tb': 'DEFINE TABLE measurement SCHEMALESS PERMISSIONS NONE',
+    'fields': {
+      'reading': 'DEFINE FIELD reading ON measurement TYPE none | float DEFAULT 3.14d PERMISSIONS FULL',
+    },
+    'indexes': {},
+    'events': {},
+  }
+  live_table = parse_table_info('measurement', live_info)
+  diffs = diff_tables(live_table, code_table)
+  assert diffs == [], (
+    f'expected zero drift between code DEFAULT 3.14 and live DEFAULT 3.14d; '
+    f'got: {[d.description for d in diffs]}'
+  )
+
+
+def test_integer_default_normalises_against_float_suffix() -> None:
+  """A code-side integer-valued float default `1` should compare equal to a
+  live-side `1f` reflection. Tests the canonicalisation path, not just the
+  regex extension."""
+  code_table = table_schema(
+    'ai_memory_edge',
+    fields=[
+      field('weight', FieldType.FLOAT, default='1', nullable=True),
+    ],
+  )
+  live_info = {
+    'tb': 'DEFINE TABLE ai_memory_edge SCHEMALESS PERMISSIONS NONE',
+    'fields': {
+      'weight': 'DEFINE FIELD weight ON ai_memory_edge TYPE none | float DEFAULT 1f PERMISSIONS FULL',
+    },
+    'indexes': {},
+    'events': {},
+  }
+  live_table = parse_table_info('ai_memory_edge', live_info)
+  diffs = diff_tables(live_table, code_table)
+  assert diffs == [], (
+    f'expected zero drift between code DEFAULT 1 and live DEFAULT 1f; '
+    f'got: {[d.description for d in diffs]}'
+  )
+
+
+def test_canonicalise_default_leaves_non_numeric_alone() -> None:
+  """Function calls / boolean / parameter references must not be touched
+  by the numeric canonicalisation step."""
+  from surql.migration.diff import _canonicalise_default
+
+  assert _canonicalise_default('time::now()') == 'time::now()'
+  assert _canonicalise_default('true') == 'true'
+  assert _canonicalise_default('false') == 'false'
+  assert _canonicalise_default("'hello'") == "'hello'"
+  assert _canonicalise_default('$tenant') == '$tenant'
+  # Numeric forms collapse:
+  assert _canonicalise_default('1') == _canonicalise_default('1f')
+  assert _canonicalise_default('1.0') == _canonicalise_default('1f')
+  assert _canonicalise_default('0.5') == _canonicalise_default('0.5d')
+  assert _canonicalise_default('-1') == _canonicalise_default('-1f')
+
+
 # Avoid pyflakes "imported but unused" for pytest fixture conventions
 _ = pytest

@@ -29,13 +29,37 @@ logger = structlog.get_logger(__name__)
 _SAFE_DEFAULT_PATTERN = re.compile(
   r'^('
   r'[a-zA-Z_][a-zA-Z0-9_]*(?:::[a-zA-Z_][a-zA-Z0-9_]*)*\([^;]*\)'  # function calls
-  r'|-?\d+(?:\.\d+)?'  # numeric literals
+  r'|-?\d+(?:\.\d+)?[fd]?'  # numeric literals (optional f/d suffix: SurrealDB v3 normalises float/double defaults to `1f` / `0.5f` / `1d` via INFO FOR TABLE round-trip)
   r'|true|false'  # boolean literals
   r'|NONE|NULL'  # null values
   r"|'(?:[^'\\]|\\.)*'"  # single-quoted strings
   r'|\$[a-zA-Z_][a-zA-Z0-9_]*'  # parameter references
   r')$'
 )
+
+
+# Matches a numeric literal with optional sign + decimal + f/d suffix.
+# Used to recognise default values that round-trip through SurrealDB v3's
+# `INFO FOR TABLE` as `1f` / `0.5f` / `-1d` (the suffix flags float/double
+# storage type) but compare semantically equal to their plain `1.0` / `0.5`
+# / `-1` form on the in-code side.
+_NUMERIC_DEFAULT_RE = re.compile(r'^-?\d+(?:\.\d+)?[fd]?$')
+
+
+def _canonicalise_default(expr: str) -> str:
+  """Normalise a numeric default value to a single canonical string form.
+
+  `1.0` ≡ `1f` ≡ `1.0f` all canonicalise to `1.0`. Non-numeric expressions
+  pass through unchanged so function calls / boolean literals / parameter
+  references compare via their raw form.
+  """
+  stripped = expr.strip()
+  if not _NUMERIC_DEFAULT_RE.match(stripped):
+    return stripped
+  # Strip trailing f/d suffix and re-format as a float string so `1`, `1.0`,
+  # `1f`, `1.0f` all become `1.0`. This loses no precision because the
+  # suffix is a storage-type flag, not a value qualifier.
+  return repr(float(stripped.rstrip('fd')))
 
 
 def _validate_event_expression(expr: str, label: str) -> None:
@@ -752,8 +776,11 @@ def _fields_equal(field1: FieldDefinition, field2: FieldDefinition) -> bool:
 def _expressions_equal(left: str | None, right: str | None) -> bool:
   """Compare two SurrealQL expressions for semantic equality.
 
-  Normalises both sides through whitespace collapsing so cosmetic
-  differences (extra spaces, trailing whitespace) don't trip the diff.
+  Normalises both sides through:
+    - whitespace collapsing (cosmetic differences in spacing don't trip the diff)
+    - numeric-default canonicalisation (`1.0` ≡ `1f` ≡ `1.0f`, since
+      SurrealDB v3 round-trips float defaults through `INFO FOR TABLE` with
+      a `f`/`d` storage-type suffix that's not present on the in-code side)
   This mirrors the same normalisation `surql.schema.validator` applies
   to expression comparisons, so the two code paths agree on what counts
   as "drift".
@@ -762,7 +789,9 @@ def _expressions_equal(left: str | None, right: str | None) -> bool:
     return True
   if left is None or right is None:
     return False
-  return ' '.join(left.split()) == ' '.join(right.split())
+  left_norm = _canonicalise_default(' '.join(left.split()))
+  right_norm = _canonicalise_default(' '.join(right.split()))
+  return left_norm == right_norm
 
 
 def _mtree_index_to_sql(table_name: str, index: IndexDefinition) -> str:
