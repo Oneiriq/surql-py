@@ -28,10 +28,12 @@ permissions:
 jobs:
   audit:
     name: pip-audit
-    # aur0 self-hosted for push/schedule/dispatch + same-repo PRs.
-    # Fork PRs fall back to ubuntu-latest — `uv sync` runs install
-    # hooks from PR code, so it must never touch aur0.
-    runs-on: ${{ github.event.pull_request.head.repo.fork && 'ubuntu-latest' || fromJSON('["self-hosted", "aur0"]') }}
+    # Always GitHub-hosted: this is a fully offline scan (pip-audit
+    # --disable-pip --no-deps against an exported requirements file), so it
+    # has no reason to occupy the aur0 self-hosted runner. Keeping the nightly
+    # off aur0 stops a failing/repeated audit from accumulating state on the
+    # shared containerd runner (which also serves oniq / kushtakas / sigilbuzz).
+    runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v6
 
