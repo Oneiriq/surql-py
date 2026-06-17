@@ -30,6 +30,9 @@ class IndexType(Enum):
 
   UNIQUE = 'UNIQUE'
   SEARCH = 'SEARCH'
+  """Full-text index. Renders the SurrealDB 3.x ``FULLTEXT`` keyword (the v1/v2
+  ``SEARCH`` spelling was renamed in 3.0); pair with an analyzer + BM25 via
+  :func:`bm25_index` for scorable lexical recall."""
   STANDARD = 'INDEX'
   MTREE = 'MTREE'
   HNSW = 'HNSW'
@@ -108,6 +111,17 @@ class IndexDefinition(BaseModel):
   hnsw_distance: HnswDistanceType | None = None
   efc: int | None = None
   m: int | None = None
+  # Full-text (FULLTEXT) parameters
+  analyzer: str | None = None
+  """Full-text analyzer name. ``None`` renders the historical default (``ascii``)."""
+  bm25: bool = False
+  """Whether a full-text index emits the ``BM25`` relevance-scoring clause.
+
+  Required for :meth:`~surql.query.builder.Query.search_score` to return a
+  value. Uses the engine's default ``(k1, b)`` parameters."""
+  highlights: bool = False
+  """Whether a full-text index stores positional ``HIGHLIGHTS`` data (enables
+  ``search::highlight`` / ``search::offsets``)."""
 
   model_config = ConfigDict(frozen=True)
 
@@ -274,14 +288,26 @@ def unique_index(
 def search_index(
   name: str,
   columns: list[str],
+  *,
+  analyzer: str | None = None,
+  bm25: bool = False,
+  highlights: bool = False,
 ) -> IndexDefinition:
-  """Create a search index definition.
+  """Create a full-text (``FULLTEXT``) search index definition.
 
-  Convenience function for creating full-text search indexes.
+  With no analyzer set it renders the historical ``ascii`` default; set
+  ``analyzer`` / ``bm25`` / ``highlights`` for a scorable index, or use
+  :func:`bm25_index`.
 
   Args:
     name: Index name
     columns: List of column names to index
+    analyzer: Full-text analyzer name (e.g. one defined via
+      :func:`~surql.schema.analyzer.analyzer`). When ``None`` the index renders
+      the historical ``ascii`` analyzer.
+    bm25: Emit the ``BM25`` relevance-scoring clause (engine defaults). Required
+      for :meth:`~surql.query.builder.Query.search_score`.
+    highlights: Store positional ``HIGHLIGHTS`` data.
 
   Returns:
     Immutable IndexDefinition with SEARCH type
@@ -290,7 +316,50 @@ def search_index(
     >>> search_index('content_search', ['title', 'content'])
     IndexDefinition(name='content_search', columns=['title', 'content'], type=IndexType.SEARCH)
   """
-  return index(name, columns, IndexType.SEARCH)
+  return IndexDefinition(
+    name=name,
+    columns=columns,
+    type=IndexType.SEARCH,
+    analyzer=analyzer,
+    bm25=bm25,
+    highlights=highlights,
+  )
+
+
+def bm25_index(
+  name: str,
+  columns: list[str],
+  analyzer: str,
+) -> IndexDefinition:
+  """Create a BM25-scored full-text (``FULLTEXT``) index over ``columns``.
+
+  Analyzed by ``analyzer``. This is the index to pair with
+  :meth:`~surql.query.builder.Query.full_text_search` and
+  :meth:`~surql.query.builder.Query.search_score` for lexical recall -- BM25 is
+  what makes ``search::score`` return a relevance value.
+
+  Args:
+    name: Index name
+    columns: List of column names to index
+    analyzer: Full-text analyzer name (define it separately via
+      :func:`~surql.schema.analyzer.analyzer` /
+      :func:`~surql.schema.sql.generate_analyzer_sql`).
+
+  Returns:
+    Immutable IndexDefinition with SEARCH type, the analyzer set, and BM25 on.
+
+  Examples:
+    >>> idx = bm25_index('content_bm25', ['content'], 'text_en')
+    >>> idx.type == IndexType.SEARCH and idx.bm25
+    True
+  """
+  return IndexDefinition(
+    name=name,
+    columns=columns,
+    type=IndexType.SEARCH,
+    analyzer=analyzer,
+    bm25=True,
+  )
 
 
 def mtree_index(

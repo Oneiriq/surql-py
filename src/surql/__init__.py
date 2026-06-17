@@ -46,6 +46,7 @@ from surql.query import (
   fetch_many,
   fetch_one,
   first,
+  fulltext_search_query,
   get_record,
   get_related_records,
   get_typed,
@@ -106,7 +107,7 @@ from surql.types import (
   type_thing,
 )
 
-__version__ = '1.7.0'
+__version__ = '1.8.0'
 
 __all__ = [
   # Configuration
@@ -135,6 +136,7 @@ __all__ = [
   'Query',
   'select',
   'similarity_search_query',
+  'fulltext_search_query',
   'insert',
   'update',
   'delete',

@@ -288,8 +288,8 @@ class TestDiffIndexesWithMTree:
 
     assert len(diffs) == 2
 
-    # Check for search index
-    search_diffs = [d for d in diffs if 'SEARCH' in d.forward_sql]
+    # Check for search index (SurrealDB 3.x renders the keyword as FULLTEXT).
+    search_diffs = [d for d in diffs if 'FULLTEXT' in d.forward_sql]
     assert len(search_diffs) == 1
 
     # Check for MTREE index

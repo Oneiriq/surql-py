@@ -13,6 +13,20 @@ from surql.schema.access import (
   jwt_access,
   record_access,
 )
+from surql.schema.analyzer import (
+  AnalyzerDefinition,
+  TokenFilter,
+  TokenFilterType,
+  Tokenizer,
+  analyzer,
+  ascii_filter,
+  edge_ngram,
+  lowercase,
+  ngram,
+  snowball,
+  standard_analyzer,
+  uppercase,
+)
 from surql.schema.edge import (
   EdgeDefinition,
   EdgeMode,
@@ -57,6 +71,8 @@ from surql.schema.registry import (
 )
 from surql.schema.sql import (
   generate_access_sql,
+  generate_analyzer_sql,
+  generate_analyzer_sql_with_options,
   generate_edge_sql,
   generate_schema_sql,
   generate_table_sql,
@@ -70,6 +86,7 @@ from surql.schema.table import (
   MTreeVectorType,
   TableDefinition,
   TableMode,
+  bm25_index,
   event,
   hnsw_index,
   index,
@@ -124,6 +141,7 @@ __all__ = [
   'index',
   'unique_index',
   'search_index',
+  'bm25_index',
   'mtree_index',
   'hnsw_index',
   'event',
@@ -132,6 +150,19 @@ __all__ = [
   'with_events',
   'with_permissions',
   'set_mode',
+  # Full-text analyzers
+  'AnalyzerDefinition',
+  'Tokenizer',
+  'TokenFilter',
+  'TokenFilterType',
+  'analyzer',
+  'standard_analyzer',
+  'ascii_filter',
+  'lowercase',
+  'uppercase',
+  'edge_ngram',
+  'ngram',
+  'snowball',
   # Edge schema
   'EdgeMode',
   'EdgeDefinition',
@@ -181,5 +212,7 @@ __all__ = [
   'generate_table_sql',
   'generate_edge_sql',
   'generate_access_sql',
+  'generate_analyzer_sql',
+  'generate_analyzer_sql_with_options',
   'generate_schema_sql',
 ]

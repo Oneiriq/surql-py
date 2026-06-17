@@ -6,6 +6,7 @@ directly from surql schema definitions without using the migration system.
 """
 
 from surql.schema.access import AccessDefinition, AccessType
+from surql.schema.analyzer import AnalyzerDefinition
 from surql.schema.edge import EdgeDefinition, EdgeMode
 from surql.schema.fields import FieldDefinition, FieldType, _detect_target_table_from_value
 from surql.schema.table import (
@@ -158,7 +159,15 @@ def _generate_index_sql(
   if index_def.type == IndexType.UNIQUE:
     sql += ' UNIQUE'
   elif index_def.type == IndexType.SEARCH:
-    sql += ' SEARCH ANALYZER ascii'
+    # SurrealDB 3.x renamed the full-text keyword from SEARCH to FULLTEXT (the
+    # v1/v2 `SEARCH ANALYZER ascii` form is a parse error on v3). An unset
+    # analyzer renders the historical `ascii` default. See docs/v3-patterns.md.
+    analyzer = index_def.analyzer or 'ascii'
+    sql += f' FULLTEXT ANALYZER {analyzer}'
+    if index_def.bm25:
+      sql += ' BM25'
+    if index_def.highlights:
+      sql += ' HIGHLIGHTS'
 
   sql += ';'
   return sql
@@ -332,17 +341,69 @@ def generate_access_sql(access: AccessDefinition) -> list[str]:
   return [sql]
 
 
+def generate_analyzer_sql(
+  analyzer: AnalyzerDefinition,
+  *,
+  if_not_exists: bool = False,
+) -> list[str]:
+  """Generate the ``DEFINE ANALYZER`` statement for an analyzer.
+
+  Validation runs first; an invalid definition raises ``ValueError``.
+
+  Args:
+    analyzer: Analyzer definition to generate SQL for
+    if_not_exists: When True, adds IF NOT EXISTS for idempotent re-application
+
+  Returns:
+    List containing the single DEFINE ANALYZER statement
+
+  Examples:
+    >>> from surql.schema.analyzer import standard_analyzer
+    >>> stmts = generate_analyzer_sql(standard_analyzer('text_en'))
+    >>> stmts[0]
+    'DEFINE ANALYZER text_en TOKENIZERS class FILTERS lowercase,ascii;'
+  """
+  analyzer.validate_definition()
+  return [analyzer.to_surql_with_options(if_not_exists=if_not_exists)]
+
+
+def generate_analyzer_sql_with_options(
+  analyzer: AnalyzerDefinition,
+  *,
+  if_not_exists: bool = False,
+) -> list[str]:
+  """Generate the ``DEFINE ANALYZER`` statement, optionally with ``IF NOT EXISTS``.
+
+  Alias of :func:`generate_analyzer_sql` kept for parity with the sibling ports
+  (e.g. a persistent store applying its schema on every connect).
+
+  Args:
+    analyzer: Analyzer definition to generate SQL for
+    if_not_exists: When True, adds IF NOT EXISTS for idempotent re-application
+
+  Returns:
+    List containing the single DEFINE ANALYZER statement
+  """
+  return generate_analyzer_sql(analyzer, if_not_exists=if_not_exists)
+
+
 def generate_schema_sql(
   tables: dict[str, TableDefinition] | None = None,
   edges: dict[str, EdgeDefinition] | None = None,
+  analyzers: dict[str, AnalyzerDefinition] | None = None,
   *,
   if_not_exists: bool = False,
 ) -> str:
-  """Generate complete SurrealQL schema from table and edge definitions.
+  """Generate complete SurrealQL schema from analyzer, table, and edge definitions.
+
+  Analyzers render first (a full-text index can only reference an analyzer that
+  already exists), then tables, then edges. Each definition block is separated
+  by a blank line for readability.
 
   Args:
     tables: Dict of table name to TableDefinition
     edges: Dict of edge name to EdgeDefinition
+    analyzers: Dict of analyzer name to AnalyzerDefinition (emitted before tables)
     if_not_exists: When True, adds IF NOT EXISTS to all DEFINE statements
 
   Returns:
@@ -352,6 +413,11 @@ def generate_schema_sql(
     >>> sql = generate_schema_sql(tables={'user': user_table}, edges={'likes': likes_edge})
   """
   all_statements: list[str] = []
+
+  if analyzers:
+    for analyzer in analyzers.values():
+      all_statements.extend(generate_analyzer_sql(analyzer, if_not_exists=if_not_exists))
+      all_statements.append('')  # blank line between analyzers
 
   if tables:
     for table in tables.values():

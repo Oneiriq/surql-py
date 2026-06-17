@@ -498,13 +498,7 @@ def _generate_add_index_diff(table_name: str, index: IndexDefinition) -> SchemaD
   elif index.type == IndexType.HNSW:
     forward_sql = _hnsw_index_to_sql(table_name, index)
   else:
-    columns_str = ', '.join(index.columns)
-    forward_sql = f'DEFINE INDEX {index.name} ON TABLE {table_name} COLUMNS {columns_str}'
-
-    if index.type.value != 'INDEX':
-      forward_sql += f' {index.type.value}'
-
-    forward_sql += ';'
+    forward_sql = _index_to_sql(table_name, index)
 
   backward_sql = f'REMOVE INDEX {index.name} ON TABLE {table_name};'
 
@@ -530,8 +524,7 @@ def _generate_drop_index_diff(table_name: str, index: IndexDefinition) -> Schema
   elif index.type == IndexType.HNSW:
     backward_sql = _hnsw_index_to_sql(table_name, index)
   else:
-    columns_str = ', '.join(index.columns)
-    backward_sql = f'DEFINE INDEX {index.name} ON TABLE {table_name} COLUMNS {columns_str};'
+    backward_sql = _index_to_sql(table_name, index)
 
   return SchemaDiff(
     operation=DiffOperation.DROP_INDEX,
@@ -792,6 +785,40 @@ def _expressions_equal(left: str | None, right: str | None) -> bool:
   left_norm = _canonicalise_default(' '.join(left.split()))
   right_norm = _canonicalise_default(' '.join(right.split()))
   return left_norm == right_norm
+
+
+def _index_to_sql(table_name: str, index: IndexDefinition) -> str:
+  """Convert a non-vector index definition (UNIQUE / STANDARD / FULLTEXT) to SQL.
+
+  Full-text (``SEARCH``) indexes render the SurrealDB 3.x ``FULLTEXT`` keyword
+  plus their analyzer and optional ``BM25`` / ``HIGHLIGHTS`` clauses; the v1/v2
+  ``SEARCH`` spelling was renamed in 3.0 and is a parse error there. See
+  ``docs/v3-patterns.md``.
+
+  Args:
+    table_name: Name of the table the index belongs to
+    index: Index definition (must not be MTREE/HNSW)
+
+  Returns:
+    SQL statement string ending in a semicolon
+  """
+  from surql.schema.table import IndexType
+
+  columns_str = ', '.join(index.columns)
+  sql = f'DEFINE INDEX {index.name} ON TABLE {table_name} COLUMNS {columns_str}'
+
+  if index.type == IndexType.UNIQUE:
+    sql += ' UNIQUE'
+  elif index.type == IndexType.SEARCH:
+    analyzer = index.analyzer or 'ascii'
+    sql += f' FULLTEXT ANALYZER {analyzer}'
+    if index.bm25:
+      sql += ' BM25'
+    if index.highlights:
+      sql += ' HIGHLIGHTS'
+
+  sql += ';'
+  return sql
 
 
 def _mtree_index_to_sql(table_name: str, index: IndexDefinition) -> str:

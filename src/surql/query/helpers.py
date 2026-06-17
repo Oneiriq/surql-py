@@ -308,3 +308,47 @@ def similarity_search_query(
     .similarity_score(field, vector, distance, alias)
     .vector_search(field, vector, k, distance, threshold)
   )
+
+
+def fulltext_search_query(
+  table: str,
+  field: str,
+  reference: int,
+  query: str,
+  fields: list[str] | None = None,
+  score_alias: str = 'score',
+) -> Query[Any]:
+  """Create a full-text (BM25) search query -- the lexical leg of hybrid retrieval.
+
+  Wraps :meth:`~surql.query.builder.Query.full_text_search` +
+  :meth:`~surql.query.builder.Query.search_score` into
+  ``SELECT ..., search::score(reference) AS <score_alias> FROM <table>
+  WHERE <field> @reference@ <query>``. Pair with a
+  :func:`~surql.schema.table.bm25_index` on ``field``, then ``ORDER BY
+  <score_alias> DESC`` to rank by relevance.
+
+  Args:
+    table: Table name to search.
+    field: The indexed text field to match against.
+    reference: Match reference number (``@n@``) tying the predicate to the score.
+    query: Free-text query string (inlined as an escaped single-quoted literal).
+    fields: List of fields to select (default: all fields).
+    score_alias: Column alias for the BM25 score (default: ``'score'``).
+
+  Returns:
+    Query instance configured for full-text search with score projection.
+
+  Examples:
+    >>> query = fulltext_search_query('memory', 'content', 1, 'insider buying')
+    >>> # SELECT *, search::score(1) AS score FROM memory
+    >>> #   WHERE content @1@ 'insider buying'
+  """
+  from surql.query.builder import Query
+
+  return (
+    Query()
+    .select(fields)
+    .search_score(reference, score_alias)
+    .from_table(table)
+    .full_text_search(field, reference, query)
+  )

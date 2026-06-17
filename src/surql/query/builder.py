@@ -19,6 +19,7 @@ from surql.query.helpers import (
   VectorDistanceType,
   delete,
   from_table,
+  fulltext_search_query,
   insert,
   limit,
   offset,
@@ -47,6 +48,7 @@ __all__ = [
   'VectorDistanceType',
   'delete',
   'from_table',
+  'fulltext_search_query',
   'insert',
   'limit',
   'offset',
@@ -104,6 +106,10 @@ class Query[T: BaseModel](BaseModel):
   vector_k: int | None = None
   vector_distance: VectorDistanceType | None = None
   vector_threshold: float | None = None
+  # Full-text (BM25) search fields
+  fulltext_field: str | None = None
+  fulltext_reference: int | None = None
+  fulltext_query: str | None = None
   # Query optimization hints
   hints: list[Any] = Field(default_factory=list)
 
@@ -599,6 +605,74 @@ class Query[T: BaseModel](BaseModel):
     score_expr = f'vector::similarity::{metric.lower()}({field}, {vector_str}) AS {alias}'
     return self.model_copy(update={'fields': [*self.fields, score_expr]})
 
+  def full_text_search(self, field: str, reference: int, query: str) -> Query[T]:
+    """Add a full-text (``FULLTEXT``) search predicate to the WHERE clause.
+
+    Renders as ``<field> @<reference>@ <query>`` in the ``WHERE`` clause. The
+    ``reference`` integer ties the match to a :meth:`search_score` (or
+    ``search::highlight``) call, so a row's BM25 relevance can be projected and
+    ordered on. Requires a BM25 full-text index on ``field`` (see
+    :func:`~surql.schema.table.bm25_index`). The query text is inlined as a
+    quoted, escaped literal.
+
+    Args:
+      field: The indexed text field to match against.
+      reference: Match reference number (``@n@``), tying this predicate to
+        ``search::score(n)``.
+      query: Free-text query string (inlined as an escaped single-quoted literal).
+
+    Returns:
+      New Query instance with the full-text predicate configured.
+
+    Raises:
+      ValueError: If ``field`` or ``query`` is empty.
+
+    Examples:
+      >>> query = (
+      ...   Query()
+      ...   .select()
+      ...   .search_score(1, 'score')
+      ...   .from_table('memory')
+      ...   .full_text_search('content', 1, 'insider buying')
+      ...   .order_by('score', 'DESC')
+      ...   .limit(10)
+      ... )
+      >>> # SELECT *, search::score(1) AS score FROM memory
+      >>> #   WHERE content @1@ 'insider buying' ORDER BY score DESC LIMIT 10
+    """
+    if not field:
+      raise ValueError('Full-text search field cannot be empty')
+    if not query:
+      raise ValueError('Full-text search query cannot be empty')
+
+    return self.model_copy(
+      update={
+        'fulltext_field': field,
+        'fulltext_reference': reference,
+        'fulltext_query': query,
+      }
+    )
+
+  def search_score(self, reference: int, alias: str = 'score') -> Query[T]:
+    """Add ``search::score(<reference>) AS <alias>`` to the SELECT fields.
+
+    The BM25 relevance for the match registered at ``reference`` by
+    :meth:`full_text_search`. Order by ``alias`` to rank.
+
+    Args:
+      reference: Match reference number registered by :meth:`full_text_search`.
+      alias: Column alias for the score (default: ``'score'``).
+
+    Returns:
+      New Query instance with the score projection field added.
+
+    Examples:
+      >>> Query().select().search_score(1, 'score').from_table('memory')
+      >>> # Adds: search::score(1) AS score
+    """
+    score_expr = f'search::score({reference}) AS {alias}'
+    return self.model_copy(update={'fields': [*self.fields, score_expr]})
+
   def return_none(self) -> Query[T]:
     """Set RETURN NONE for the query.
 
@@ -909,6 +983,15 @@ class Query[T: BaseModel](BaseModel):
         operator = f'<|{self.vector_k},{self.vector_distance}|>'
       vector_condition = f'{self.vector_field} {operator} {vector_str}'
       where_conditions.append(vector_condition)
+
+    # Add full-text (BM25) search condition if present
+    if (
+      self.fulltext_field
+      and self.fulltext_reference is not None
+      and self.fulltext_query is not None
+    ):
+      quoted = _quote_value(self.fulltext_query)
+      where_conditions.append(f'{self.fulltext_field} @{self.fulltext_reference}@ {quoted}')
 
     # Add regular conditions
     for condition in self.conditions:

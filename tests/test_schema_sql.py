@@ -2,14 +2,17 @@
 
 import pytest
 
+from surql.schema.analyzer import standard_analyzer
 from surql.schema.edge import EdgeMode, edge_schema
 from surql.schema.fields import FieldType, datetime_field, field, int_field, string_field
 from surql.schema.sql import generate_edge_sql, generate_schema_sql, generate_table_sql
 from surql.schema.table import (
   IndexType,
   TableMode,
+  bm25_index,
   event,
   index,
+  search_index,
   table_schema,
   unique_index,
 )
@@ -116,6 +119,31 @@ class TestGenerateTableSql:
     stmts = generate_table_sql(table)
 
     assert any('DEFINE INDEX title_idx ON TABLE post COLUMNS title' in s for s in stmts)
+
+  def test_table_with_search_index_renders_fulltext(self) -> None:
+    """A full-text index renders the SurrealDB 3.x FULLTEXT keyword, not SEARCH."""
+    table = table_schema('post', indexes=[search_index('content_search', ['content'])])
+
+    stmts = generate_table_sql(table)
+
+    assert any(
+      s == 'DEFINE INDEX content_search ON TABLE post COLUMNS content FULLTEXT ANALYZER ascii;'
+      for s in stmts
+    )
+    # Regression guard: the v1/v2 `SEARCH ANALYZER` spelling must not appear.
+    assert not any('SEARCH ANALYZER' in s for s in stmts)
+
+  def test_table_with_bm25_index(self) -> None:
+    """A BM25 index renders the analyzer and the BM25 clause."""
+    table = table_schema('memory', indexes=[bm25_index('content_bm25', ['content'], 'text_en')])
+
+    stmts = generate_table_sql(table)
+
+    assert any(
+      s
+      == 'DEFINE INDEX content_bm25 ON TABLE memory COLUMNS content FULLTEXT ANALYZER text_en BM25;'
+      for s in stmts
+    )
 
   def test_table_with_event(self) -> None:
     """Generates DEFINE EVENT statement."""
@@ -382,6 +410,30 @@ class TestGenerateSchemaSql:
 
     lines = sql.split('\n')
     assert any(line == '' for line in lines)
+
+  def test_analyzers_render_before_tables(self) -> None:
+    """DEFINE ANALYZER statements precede the tables that reference them."""
+    memory = table_schema('memory', indexes=[bm25_index('content_bm25', ['content'], 'text_en')])
+    sql = generate_schema_sql(
+      tables={'memory': memory}, analyzers={'text_en': standard_analyzer('text_en')}
+    )
+
+    assert 'DEFINE ANALYZER text_en TOKENIZERS class FILTERS lowercase,ascii;' in sql
+    assert sql.index('DEFINE ANALYZER text_en') < sql.index('DEFINE TABLE memory')
+
+  def test_analyzers_only(self) -> None:
+    """Analyzers can be generated without any tables or edges."""
+    sql = generate_schema_sql(analyzers={'text_en': standard_analyzer('text_en')})
+
+    assert sql == 'DEFINE ANALYZER text_en TOKENIZERS class FILTERS lowercase,ascii;'
+
+  def test_analyzers_forward_if_not_exists(self) -> None:
+    """if_not_exists flows through to analyzer DDL too."""
+    sql = generate_schema_sql(
+      analyzers={'text_en': standard_analyzer('text_en')}, if_not_exists=True
+    )
+
+    assert 'DEFINE ANALYZER IF NOT EXISTS text_en' in sql
 
 
 class TestIfNotExists:

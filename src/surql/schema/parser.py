@@ -661,6 +661,17 @@ def _parse_index_definition(index_name: str, definition: str) -> IndexDefinition
     efc = _extract_hnsw_efc(definition)
     m = _extract_hnsw_m(definition)
 
+  # For full-text (FULLTEXT / SEARCH) indexes, extract analyzer + flags.
+  analyzer = None
+  bm25 = False
+  highlights = False
+
+  if index_type == IndexType.SEARCH:
+    analyzer = _extract_index_analyzer(definition)
+    definition_upper = definition.upper()
+    bm25 = 'BM25' in definition_upper
+    highlights = 'HIGHLIGHTS' in definition_upper
+
   return IndexDefinition(
     name=index_name,
     columns=columns,
@@ -671,6 +682,9 @@ def _parse_index_definition(index_name: str, definition: str) -> IndexDefinition
     hnsw_distance=hnsw_distance,
     efc=efc,
     m=m,
+    analyzer=analyzer,
+    bm25=bm25,
+    highlights=highlights,
   )
 
 
@@ -684,7 +698,7 @@ def _extract_index_columns(definition: str) -> list[str]:
     List of column names
   """
   # Match COLUMNS followed by comma-separated column names
-  columns_pattern = r'COLUMNS\s+([^;]+?)(?:UNIQUE|SEARCH|HNSW|MTREE|\s*;|\s*$)'
+  columns_pattern = r'COLUMNS\s+([^;]+?)(?:UNIQUE|FULLTEXT|SEARCH|HNSW|MTREE|\s*;|\s*$)'
   match = re.search(columns_pattern, definition, re.IGNORECASE)
 
   if match:
@@ -705,7 +719,7 @@ def _extract_index_fields(definition: str) -> list[str]:
     List of field names
   """
   # Match FIELDS followed by comma-separated field names
-  fields_pattern = r'FIELDS\s+([^;]+?)(?:UNIQUE|SEARCH|HNSW|MTREE|\s*;|\s*$)'
+  fields_pattern = r'FIELDS\s+([^;]+?)(?:UNIQUE|FULLTEXT|SEARCH|HNSW|MTREE|\s*;|\s*$)'
   match = re.search(fields_pattern, definition, re.IGNORECASE)
 
   if match:
@@ -729,7 +743,8 @@ def _extract_index_type(definition: str) -> IndexType:
 
   if 'UNIQUE' in definition_upper:
     return IndexType.UNIQUE
-  if 'SEARCH' in definition_upper:
+  # SurrealDB 3.x renamed `SEARCH` to `FULLTEXT`; accept both spellings.
+  if 'FULLTEXT' in definition_upper or 'SEARCH' in definition_upper:
     return IndexType.SEARCH
   if 'HNSW' in definition_upper:
     return IndexType.HNSW
@@ -737,6 +752,28 @@ def _extract_index_type(definition: str) -> IndexType:
     return IndexType.MTREE
 
   return IndexType.STANDARD
+
+
+def _extract_index_analyzer(definition: str) -> str | None:
+  """Extract the ``ANALYZER <name>`` from a full-text index definition.
+
+  The historical ``ascii`` default (what a plain :func:`search_index` renders)
+  normalises back to ``None`` so a round-trip of the default form is an
+  identity, leaving an explicit non-``ascii`` analyzer as a string.
+
+  Args:
+    definition: DEFINE INDEX statement
+
+  Returns:
+    Analyzer name, or ``None`` when absent or equal to the ``ascii`` default
+  """
+  match = re.search(r'ANALYZER\s+(\w+)', definition, re.IGNORECASE)
+  if not match:
+    return None
+  analyzer = match.group(1)
+  if analyzer.lower() == 'ascii':
+    return None
+  return analyzer
 
 
 def _extract_mtree_dimension(definition: str) -> int | None:
