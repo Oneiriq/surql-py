@@ -468,7 +468,7 @@ index('name_idx', ['name'], IndexType.STANDARD)
 # Unique index
 unique_index('email_idx', ['email'])
 
-# Full-text search index
+# Full-text search index (renders the SurrealDB 3.x FULLTEXT keyword)
 search_index('content_search', ['title', 'description', 'content'])
 ```
 
@@ -510,6 +510,62 @@ product_table = table_schema(
   ],
 )
 ```
+
+### Full-Text Search (BM25)
+
+Full-text indexes render the SurrealDB 3.x `FULLTEXT` keyword (the v1/v2 `SEARCH`
+spelling was renamed in 3.0). For relevance-ranked lexical recall — the sparse leg
+of hybrid retrieval — pair a `DEFINE ANALYZER` with a BM25-scored index.
+
+```python
+from surql.schema import (
+  bm25_index,
+  generate_schema_sql,
+  search_index,
+  snowball,
+  standard_analyzer,
+  string_field,
+  table_schema,
+)
+
+# class tokenizer + lowercase + ascii filters. Add a stemmer for better recall.
+analyzer = standard_analyzer('text_en').with_filter(snowball('english'))
+
+memory = table_schema(
+  'memory',
+  fields=[string_field('content')],
+  indexes=[
+    # BM25-scored full-text index over `content`, analyzed by `text_en`.
+    bm25_index('content_bm25', ['content'], 'text_en'),
+  ],
+)
+
+# Analyzers render BEFORE the tables that reference them.
+sql = generate_schema_sql(tables={'memory': memory}, analyzers={'text_en': analyzer})
+```
+
+`search_index(name, columns)` with no analyzer renders the historical `ascii`
+default; pass `analyzer=`, `bm25=True`, and/or `highlights=True` for a scorable
+index, or use `bm25_index(name, columns, analyzer)` which sets the analyzer and
+turns BM25 on for you.
+
+Query it with `Query.full_text_search(field, reference, query)` +
+`Query.search_score(reference, alias)`, or the `fulltext_search_query` helper:
+
+```python
+from surql import fulltext_search_query
+
+# SELECT *, search::score(1) AS score FROM memory
+#   WHERE content @1@ 'insider buying' LIMIT 100
+query = fulltext_search_query('memory', 'content', 1, 'insider buying').limit(100)
+```
+
+> **Note**
+> On SurrealDB 3.0.x the streaming executor returns full-text matches already in
+> BM25 relevance order, but `search::score(<ref>)` is not plumbed through it
+> (returns `0`). Rank by the scan's natural order — sufficient for Reciprocal Rank
+> Fusion, which fuses ranks rather than raw scores. See
+> [SurrealDB v3 Patterns](v3-patterns.md#full-text-index-renamed-search---fulltext).
 
 ### Vector Indexes (HNSW)
 

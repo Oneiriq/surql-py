@@ -5,6 +5,43 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.8.0] - 2026-06-17
+
+### Added
+
+- **Full-text search (BM25) is now first-class — the sparse leg of hybrid
+  retrieval.** Define a `DEFINE ANALYZER` in code with `analyzer(name)` /
+  `standard_analyzer(name)` (`AnalyzerDefinition` + `Tokenizer` + `TokenFilter`,
+  with `ascii_filter` / `lowercase` / `uppercase` / `edge_ngram` / `ngram` /
+  `snowball` filter constructors, rendered via `generate_analyzer_sql` /
+  `generate_analyzer_sql_with_options`); build a BM25-scored full-text index
+  with `bm25_index(name, columns, analyzer)` (or
+  `search_index(name, columns, analyzer=..., bm25=True, highlights=True)`); and
+  run the lexical query with `Query.full_text_search(field, reference, query)` +
+  `Query.search_score(reference, alias)`, or the `fulltext_search_query(...)`
+  helper. `generate_schema_sql` gained an `analyzers=` argument and emits
+  `DEFINE ANALYZER` statements before the tables that reference them. The
+  `INFO FOR TABLE` index parser reads the analyzer / `BM25` / `HIGHLIGHTS` clauses
+  back (normalising the historical `ascii` default to `None`). Pair it with
+  `vector_search` and fuse the two result orders by rank (Reciprocal Rank
+  Fusion). New exports: `AnalyzerDefinition`, `Tokenizer`, `TokenFilter`,
+  `analyzer`, `standard_analyzer`, `bm25_index`, `generate_analyzer_sql`,
+  `generate_analyzer_sql_with_options`, and `fulltext_search_query`.
+
+### Fixed
+
+- **Full-text index now emits the SurrealDB 3.x `FULLTEXT` keyword.** The full-
+  text index keyword was renamed from `SEARCH` to `FULLTEXT` in SurrealDB 3.0, so
+  the previous output (`... SEARCH ANALYZER ascii`) was a parse error on v3.
+  `IndexType.SEARCH` / `search_index` / `generate_table_sql` /
+  `generate_schema_sql` and the migration diff now emit `FULLTEXT` (plus the
+  analyzer and optional `BM25` / `HIGHLIGHTS` clauses), and the `INFO FOR TABLE`
+  index parser recognises both spellings. See `docs/v3-patterns.md` "Full-text
+  index renamed SEARCH -> FULLTEXT" — including the note that the v3 streaming
+  executor's full-text scan returns rows in BM25 relevance order but
+  `search::score` is not plumbed through it (returns 0), so rank by the scan's
+  natural order for RRF.
+
 ## [1.6.4] - 2026-05-18
 
 ### Added

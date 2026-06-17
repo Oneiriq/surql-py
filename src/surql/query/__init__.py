@@ -115,6 +115,7 @@ from surql.query.helpers import (  # Query builder helpers and shared types
   VectorDistanceType,
   delete,
   from_table,
+  fulltext_search_query,
   insert,
   limit,
   offset,
@@ -184,6 +185,7 @@ __all__ = [
   'relate',
   'vector_search_query',
   'similarity_search_query',
+  'fulltext_search_query',
   'VectorDistanceType',
   # Query hints
   'QueryHint',

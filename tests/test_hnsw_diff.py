@@ -318,7 +318,8 @@ class TestDiffIndexesWithHnsw:
 
     assert len(diffs) == 2
 
-    search_diffs = [d for d in diffs if 'SEARCH' in d.forward_sql]
+    # SurrealDB 3.x renders the full-text keyword as FULLTEXT, not SEARCH.
+    search_diffs = [d for d in diffs if 'FULLTEXT' in d.forward_sql]
     assert len(search_diffs) == 1
 
     hnsw_diffs = [d for d in diffs if 'HNSW' in d.forward_sql]

@@ -140,6 +140,82 @@ from surql import traverse
 await traverse('user:alice', '->follows->user', depth=(1, 3), client=client)
 ```
 
+## Full-text index renamed `SEARCH` -> `FULLTEXT`
+
+SurrealDB 3.0 renamed the full-text index keyword. The v1/v2 form is a parse error on v3 (`Unexpected token, expected Eof` at `SEARCH`):
+
+```surql
+DEFINE INDEX idx ON TABLE t COLUMNS content SEARCH ANALYZER ascii BM25;  -- parse error on v3
+```
+
+v3 spells it `FULLTEXT`:
+
+```surql
+DEFINE INDEX idx ON TABLE t COLUMNS content FULLTEXT ANALYZER ascii BM25 HIGHLIGHTS;
+```
+
+surql emits the `FULLTEXT` keyword from `IndexType.SEARCH` / `search_index` / `bm25_index` and the migration diff; the `INFO FOR TABLE` index parser recognises **both** spellings (so live databases created under either version round-trip). `COLUMNS` and `FIELDS` are interchangeable in this statement.
+
+The analyzer is defined separately with a `DEFINE ANALYZER` statement, which **must run before** the index that references it. Define it in code rather than hand-authoring SurrealQL:
+
+```python
+from surql.schema import (
+  bm25_index,
+  generate_schema_sql,
+  standard_analyzer,
+  string_field,
+  table_schema,
+)
+
+# class tokenizer + lowercase + ascii filters; add .with_filter(snowball('english'))
+# for stemming.
+analyzer = standard_analyzer('text_en')
+
+memory = table_schema(
+  'memory',
+  fields=[string_field('content')],
+  indexes=[bm25_index('content_bm25', ['content'], 'text_en')],
+)
+
+# Analyzers render before the tables that reference them.
+sql = generate_schema_sql(tables={'memory': memory}, analyzers={'text_en': analyzer})
+# DEFINE ANALYZER text_en TOKENIZERS class FILTERS lowercase,ascii;
+#
+# DEFINE TABLE memory SCHEMAFULL;
+# DEFINE FIELD content ON TABLE memory TYPE string;
+# DEFINE INDEX content_bm25 ON TABLE memory COLUMNS content FULLTEXT ANALYZER text_en BM25;
+```
+
+Bare `BM25` uses the engine defaults (`k1 = 1.2`, `b = 0.75`); a `search_index(...)` without an analyzer renders the historical `ascii` default (define + name one explicitly for real lexical recall).
+
+Run the lexical query with the builder or the `fulltext_search_query` helper:
+
+```python
+from surql import fulltext_search_query
+
+# SELECT *, search::score(1) AS score FROM memory
+#   WHERE content @1@ 'insider buying' LIMIT 100
+query = fulltext_search_query('memory', 'content', 1, 'insider buying').limit(100)
+```
+
+### `search::score` and scan ordering
+
+The v3 streaming executor's full-text scan yields matching rows **already in BM25 relevance order**, but in 3.0.x it does **not** plumb the per-row score through to `search::score(<ref>)`, which returns `0` there. So **rank by the scan's natural order** rather than `ORDER BY search::score(...)`. This is sufficient for Reciprocal Rank Fusion (RRF), which fuses *ranks*, not raw scores:
+
+```python
+from surql import fulltext_search_query, vector_search_query
+
+# Sparse leg: rows come back in relevance order — take the order, not the score.
+sparse = fulltext_search_query('memory', 'content', 1, 'insider buying').limit(100)
+
+# Dense leg: vector KNN.
+dense = vector_search_query('memory', 'embedding', query_vector, k=100, distance='COSINE')
+
+# Fuse the two returned orders by rank (RRF) client-side.
+```
+
+`search::score(<ref>)` is still projected via `Query.search_score(ref, alias)` / the `score_alias` argument so the column exists for callers (and for future engine versions that populate it); just don't depend on its magnitude on 3.0.x.
+
 ## v3 integration CI
 
 The `v3-integration.yml` workflow spins up `surrealdb/surrealdb:v3.0.5` and runs the integration suite on every push. The same suite runs nightly against the latest `surrealdb/surrealdb:latest` image to flag upstream drift early. Opt into the local v3 container via:

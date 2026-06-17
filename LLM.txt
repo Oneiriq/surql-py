@@ -8,6 +8,7 @@
 - Integrates Pydantic for runtime validation and type safety
 - Supports SurrealDB's graph features including edge relationships and graph traversal
 - Supports vector similarity search through HNSW and MTREE indexes for AI/ML embeddings
+- Supports full-text (BM25) search via `DEFINE ANALYZER` + BM25-scored `FULLTEXT` indexes -- the lexical leg of hybrid retrieval
 - Includes query result caching with Redis and in-memory backends
 - Provides real-time streaming and live query support via WebSocket
 - Supports multiple named database connections with connection registry
@@ -217,10 +218,11 @@
 - `IndexType.SEARCH`: Full-text search index
 
 ### Creating Indexes
-- Import: `from surql.schema.table import index, unique_index, search_index`
+- Import: `from surql.schema.table import index, unique_index, search_index, bm25_index`
 - Generic index: `index('name_idx', ['name'], IndexType.STANDARD)`
 - Unique index: `unique_index('email_idx', ['email'])`
-- Search index: `search_index('content_search', ['title', 'body'])`
+- Search index: `search_index('content_search', ['title', 'body'])` (renders the SurrealDB 3.x `FULLTEXT` keyword; the v1/v2 `SEARCH` spelling was renamed in 3.0)
+- BM25 full-text index: `bm25_index('content_bm25', ['content'], 'text_en')` -- pairs with a `DEFINE ANALYZER` defined via `standard_analyzer('text_en')` / `generate_analyzer_sql(...)`, which must run before the index
 - Multi-column: `unique_index('user_email_idx', ['user_id', 'email'])`
 - Nested field: `index('city_idx', ['address.city'])`
 
@@ -452,6 +454,15 @@
 - Distance types: `COSINE`, `EUCLIDEAN`, `MANHATTAN`, `HAMMING`, `MINKOWSKI`, `CHEBYSHEV`, `PEARSON`, `JACCARD`, `DOT`
 - Helper function: `from surql.query.builder import vector_search_query; query = vector_search_query('documents', 'embedding', vector, k=10)`
 - Generates: `SELECT * FROM documents WHERE embedding <|k,DISTANCE|> [vector]`
+
+### Full-Text (BM25) Search
+- Import: `from surql import Query, fulltext_search_query`
+- Predicate: `Query().select().from_table('memory').full_text_search('content', 1, 'insider buying')`
+- Score projection: `.search_score(1, 'score')` adds `search::score(1) AS score` to the SELECT list
+- Helper: `query = fulltext_search_query('memory', 'content', 1, 'insider buying')`
+- Generates: `SELECT *, search::score(1) AS score FROM memory WHERE content @1@ 'insider buying'`
+- Requires a `bm25_index(...)` on the field plus its `DEFINE ANALYZER`
+- On SurrealDB 3.0.x the full-text scan returns rows in BM25 relevance order but `search::score` is not plumbed through it (returns 0) -- rank by scan order (sufficient for Reciprocal Rank Fusion)
 
 ### INSERT Operations
 - Import: `from surql.query.builder import insert`
@@ -2816,7 +2827,7 @@ def downgrade():
 
 ### src.schema.table
 - Table schema composition
-- Exports: `TableMode`, `TableDefinition`, `IndexDefinition`, `EventDefinition`, `table_schema`, `index`, `unique_index`, `search_index`, `mtree_index`, `hnsw_index`, `HnswDistanceType`, `event`
+- Exports: `TableMode`, `TableDefinition`, `IndexDefinition`, `EventDefinition`, `table_schema`, `index`, `unique_index`, `search_index`, `bm25_index`, `mtree_index`, `hnsw_index`, `HnswDistanceType`, `event`
 - Functional composition helpers: `with_fields`, `with_indexes`, etc.
 
 ### src.schema.edge
