@@ -5,6 +5,69 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.9.0] - 2026-07-29
+
+### Added
+
+- **SurrealDB v3 object storage (files/buckets) is now first-class and
+  code-first.** Define buckets with `bucket_schema` / `memory_bucket` /
+  `file_bucket` (frozen `BucketDefinition`); emit
+  `DEFINE BUCKET [IF NOT EXISTS|OVERWRITE]` (BACKEND / READONLY / PERMISSIONS /
+  COMMENT), `REMOVE BUCKET [IF EXISTS]`, and only-changed-clauses
+  `ALTER BUCKET [IF EXISTS]` DDL — buckets render before tables in
+  `generate_schema_sql`. Migrations gained `diff_buckets` plus the
+  `ADD_BUCKET` / `DROP_BUCKET` / `MODIFY_BUCKET` diff operations, wired into
+  the schema registry (`register_bucket` / `get_registered_buckets`) and the
+  migration generator; `parse_bucket_info` / `parse_db_buckets` read buckets
+  back from `INFO FOR DB`. New field types `FieldType.FILE` /
+  `FieldType.BYTES` with `file_field` / `bytes_field` builders round-trip
+  through schema SQL, the parser, and migration diffs. Requires the server to
+  enable the experimental capability (`SURREAL_CAPS_ALLOW_EXPERIMENTAL=files`).
+
+- **Runtime file operations: `DatabaseClient.bucket(name)` returns an async
+  `Bucket` handle** with `put` / `put_if_not_exists` / `get` / `get_text` /
+  `exists` / `head` / `delete` / `copy` / `copy_if_not_exists` / `rename` /
+  `rename_if_not_exists` / `list`. Every operation binds the parameterised
+  `type::file($bucket, $key)` constructor (mirroring `type::record`) — nothing
+  is string-interpolated. `head()` and `list()` project the file pointer
+  through `file::bucket()` / `file::key()` because the installed `surrealdb`
+  SDK (2.0.0a1) ships no decoder for the `file` CBOR tag; keys are reported in
+  SurrealDB's canonical leading-slash form (`/key`). The new `FileRef` value
+  type (frozen `bucket` + `key`, `bucket:/key` rendering, SQON round-trip) is
+  recognised on both sides of the client's normalise/denormalise boundary, and
+  raw `bytes` pass through untouched. A `surql bucket` CLI group ships the
+  same surface (define/list/rm + put/get/delete/exists/files).
+
+- **Multiple sessions over one WebSocket connection.**
+  `DatabaseClient.new_session()` returns a `Session` that mirrors
+  `execute` / `select` / `create` / `update` / `merge` / `delete` plus
+  `use` / `signin` / `invalidate` (and live-query passthrough), reusing the
+  client's normalise/denormalise pipeline and connection semaphore. Sessions
+  close via async context manager or `close_session()` / `aclose()`. They are
+  WebSocket-only and start unauthenticated; on HTTP/embedded connections the
+  SDK's `UnsupportedFeatureError` surfaces as a clear `ConnectionError`.
+
+- `surql.types.record_id.is_record_id_string()` and the `RECORD_ID_PATTERN` /
+  `RECORD_ID_BRACKETED_PATTERN` constants — the shared record-id-string
+  heuristic (bare `table:id`, or bracketed `table:<id>` / `table:⟨id⟩`; prose,
+  URLs, and composite-unbracketed `a:b:c` are rejected). Pass an explicit
+  `RecordID` to force an unusual shape.
+
+### Fixed
+
+- **The query builder now renders record-id strings and `datetime` values as
+  typed literals instead of quoted strings.** `_quote_value` (used by every
+  operator — `eq` / `ne` / `gt` / … — and by `INSERT` / `UPDATE` / `UPSERT` /
+  `RELATE` CONTENT) treated a `table:id`-shaped string as a plain string, so
+  `eq('document_id', 'document:abc')` emitted `document_id = 'document:abc'`
+  (a string) rather than a record link, and a `datetime` became a quoted string
+  that SurrealDB rejects against a `TYPE datetime` column. A `table:id` string
+  (bare or angle-bracketed) **and** a `RecordID` instance now both render as a
+  record link, and `datetime` renders as a `d'…'` literal. This makes the
+  builder usable for record- and datetime-filtered `WHERE` clauses, matching the
+  coercion the connection layer (`execute` params / `create` / `merge`) already
+  applied to data.
+
 ## [1.8.0] - 2026-06-17
 
 ### Added

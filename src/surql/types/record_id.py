@@ -273,3 +273,42 @@ class RecordID[T](BaseModel):
     return str(self)
 
   model_config = ConfigDict(frozen=True)
+
+
+# ---------------------------------------------------------------------------
+# Record-id string detection (shared by the SDK boundary + the query builder)
+# ---------------------------------------------------------------------------
+# A ``table:id`` string can stand in for a record link. The connection layer
+# (params / create / merge coercion) and the query builder (``_quote_value``)
+# both need to recognise that shape so a value like ``'document:abc'`` renders
+# as a record link rather than a quoted string. Two shapes are accepted:
+#
+#   * bare ``table:id`` -- the id has no extra colons, whitespace, or slashes,
+#     so prose (``'note: see x'``), URLs, and composite unbracketed ids
+#     (``'a:b:c'``) are excluded;
+#   * angle-bracketed ``table:<id>`` / ``table:⟨id⟩`` -- anything inside the
+#     brackets, the explicit "treat as a record id" signal.
+#
+# ``\Z`` (absolute end-of-string) is used instead of ``$`` so a trailing
+# newline can't slip past the anchor. Detection is best-effort by design; pass
+# an explicit :class:`RecordID` when a value would otherwise be missed.
+RECORD_ID_PATTERN = re.compile(r'^[a-zA-Z_][a-zA-Z0-9_]*:[^:\s/]+\Z')
+RECORD_ID_BRACKETED_PATTERN = re.compile(r'^[a-zA-Z_][a-zA-Z0-9_]*:(?:<[^>]+>|⟨[^⟩]+⟩)\Z')
+
+
+def is_record_id_string(value: str) -> bool:
+  """Return ``True`` if ``value`` looks like a single ``table:id`` record link.
+
+  Accepts the bare ``table:id`` form and the angle-bracketed
+  ``table:<id>`` / ``table:⟨id⟩`` form; rejects composite unbracketed ids
+  (``a:b:c``), URLs, and prose. Mirrors the heuristic used at the SDK boundary
+  so the query builder and the ``create`` / ``merge`` data path treat
+  record-id strings the same way.
+
+  Args:
+    value: The string to test.
+
+  Returns:
+    Whether the string should be treated as a record link.
+  """
+  return bool(RECORD_ID_PATTERN.match(value) or RECORD_ID_BRACKETED_PATTERN.match(value))

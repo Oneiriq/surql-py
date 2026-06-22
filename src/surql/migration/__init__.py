@@ -11,6 +11,7 @@ This module provides code-first migration capabilities including:
 # Models
 # Diff
 from surql.migration.diff import (
+  diff_buckets,
   diff_edges,
   diff_events,
   diff_fields,
@@ -162,6 +163,7 @@ __all__ = [
   'diff_events',
   'diff_permissions',
   'diff_edges',
+  'diff_buckets',
   # Versioning
   'SchemaSnapshot',
   'VersionNode',

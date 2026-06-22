@@ -160,6 +160,9 @@ class DiffOperation(Enum):
   ADD_EVENT = 'add_event'
   DROP_EVENT = 'drop_event'
   MODIFY_PERMISSIONS = 'modify_permissions'
+  ADD_BUCKET = 'add_bucket'
+  DROP_BUCKET = 'drop_bucket'
+  MODIFY_BUCKET = 'modify_bucket'
 
 
 class SchemaDiff(BaseModel):
@@ -176,10 +179,11 @@ class SchemaDiff(BaseModel):
   """
 
   operation: DiffOperation
-  table: str
+  table: str = ''
   field: str | None = None
   index: str | None = None
   event: str | None = None
+  bucket: str | None = None
   description: str
   forward_sql: str
   backward_sql: str

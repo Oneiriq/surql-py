@@ -4,6 +4,7 @@ This package provides type-safe wrappers and operators for building SurrealDB qu
 """
 
 from surql.types.coerce import coerce_datetime, coerce_record_datetimes
+from surql.types.file import FileRef
 from surql.types.operators import (
   # Logical operators
   And,
@@ -55,6 +56,8 @@ __all__ = [
   # RecordRef
   'RecordRef',
   'record_ref',
+  # FileRef
+  'FileRef',
   # SurrealFn
   'SurrealFn',
   'surql_fn',

@@ -7,6 +7,7 @@ directly from surql schema definitions without using the migration system.
 
 from surql.schema.access import AccessDefinition, AccessType
 from surql.schema.analyzer import AnalyzerDefinition
+from surql.schema.bucket import BucketDefinition
 from surql.schema.edge import EdgeDefinition, EdgeMode
 from surql.schema.fields import FieldDefinition, FieldType, _detect_target_table_from_value
 from surql.schema.table import (
@@ -341,6 +342,149 @@ def generate_access_sql(access: AccessDefinition) -> list[str]:
   return [sql]
 
 
+def _surql_string(value: str) -> str:
+  """Render ``value`` as a double-quoted SurrealQL string literal.
+
+  Escapes embedded backslashes and double quotes so a backend path or comment
+  containing them cannot break out of the literal. Mirrors how the sibling
+  ports quote ``BACKEND`` / ``COMMENT`` operands.
+  """
+  escaped = value.replace('\\', '\\\\').replace('"', '\\"')
+  return f'"{escaped}"'
+
+
+def generate_bucket_sql(
+  bucket: BucketDefinition,
+  *,
+  if_not_exists: bool = False,
+  overwrite: bool = False,
+) -> list[str]:
+  """Generate the ``DEFINE BUCKET`` statement for a bucket.
+
+  SurrealDB v3 grammar::
+
+    DEFINE BUCKET [OVERWRITE | IF NOT EXISTS] <name>
+      [BACKEND "<backend>"] [READONLY] [PERMISSIONS ...] [COMMENT "..."]
+
+  Args:
+    bucket: Bucket definition to generate SQL for
+    if_not_exists: When True, adds ``IF NOT EXISTS`` for idempotent re-apply
+    overwrite: When True, adds ``OVERWRITE`` (mutually exclusive with
+      ``if_not_exists``; ``if_not_exists`` wins if both are set)
+
+  Returns:
+    List containing the single DEFINE BUCKET statement
+
+  Examples:
+    >>> from surql.schema.bucket import memory_bucket
+    >>> generate_bucket_sql(memory_bucket('avatars'))[0]
+    'DEFINE BUCKET avatars BACKEND "memory";'
+  """
+  if if_not_exists:
+    prefix = ' IF NOT EXISTS'
+  elif overwrite:
+    prefix = ' OVERWRITE'
+  else:
+    prefix = ''
+
+  sql = f'DEFINE BUCKET{prefix} {bucket.name} BACKEND {_surql_string(bucket.backend)}'
+
+  if bucket.readonly:
+    sql += ' READONLY'
+
+  sql += _permissions_clause(bucket.permissions)
+
+  if bucket.comment:
+    sql += f' COMMENT {_surql_string(bucket.comment)}'
+
+  sql += ';'
+  return [sql]
+
+
+def generate_remove_bucket_sql(
+  bucket: BucketDefinition | str,
+  *,
+  if_exists: bool = False,
+) -> list[str]:
+  """Generate the ``REMOVE BUCKET`` statement for a bucket.
+
+  Args:
+    bucket: Bucket definition or bucket name
+    if_exists: When True, adds ``IF EXISTS`` so removing an absent bucket is a
+      no-op rather than an error
+
+  Returns:
+    List containing the single REMOVE BUCKET statement
+
+  Examples:
+    >>> generate_remove_bucket_sql('avatars')[0]
+    'REMOVE BUCKET avatars;'
+  """
+  name = bucket.name if isinstance(bucket, BucketDefinition) else bucket
+  ife = ' IF EXISTS' if if_exists else ''
+  return [f'REMOVE BUCKET{ife} {name};']
+
+
+def generate_alter_bucket_sql(
+  old: BucketDefinition,
+  new: BucketDefinition,
+  *,
+  if_exists: bool = False,
+) -> list[str]:
+  """Generate the ``ALTER BUCKET`` statement transforming ``old`` into ``new``.
+
+  SurrealDB v3 grammar::
+
+    ALTER BUCKET [IF EXISTS] <name>
+      [READONLY | DROP READONLY]
+      [BACKEND "<backend>" | DROP BACKEND]
+      [PERMISSIONS ...]
+      [COMMENT "..." | DROP COMMENT]
+
+  Only the clauses whose values actually changed between ``old`` and ``new`` are
+  emitted. When nothing changed, an empty list is returned.
+
+  Args:
+    old: Previous bucket definition
+    new: Desired bucket definition (must share ``old.name``)
+    if_exists: When True, adds ``IF EXISTS``
+
+  Returns:
+    List with a single ALTER BUCKET statement, or empty list if no change
+
+  Examples:
+    >>> from surql.schema.bucket import memory_bucket
+    >>> a = memory_bucket('b')
+    >>> b = memory_bucket('b', readonly=True)
+    >>> generate_alter_bucket_sql(a, b)[0]
+    'ALTER BUCKET b READONLY;'
+  """
+  ife = ' IF EXISTS' if if_exists else ''
+  clauses: list[str] = []
+
+  if old.readonly != new.readonly:
+    clauses.append('READONLY' if new.readonly else 'DROP READONLY')
+
+  if old.backend != new.backend:
+    clauses.append(f'BACKEND {_surql_string(new.backend)}')
+
+  if old.permissions != new.permissions:
+    # SurrealDB has no DROP PERMISSIONS on a bucket; re-stating an empty
+    # permissions clause is the closest analogue, but the common case is
+    # supplying a new clause. When new is None we emit nothing for permissions.
+    perm_clause = _permissions_clause(new.permissions)
+    if perm_clause:
+      clauses.append(perm_clause.lstrip())
+
+  if old.comment != new.comment:
+    clauses.append(f'COMMENT {_surql_string(new.comment)}' if new.comment else 'DROP COMMENT')
+
+  if not clauses:
+    return []
+
+  return [f'ALTER BUCKET{ife} {new.name} {" ".join(clauses)};']
+
+
 def generate_analyzer_sql(
   analyzer: AnalyzerDefinition,
   *,
@@ -391,19 +535,21 @@ def generate_schema_sql(
   tables: dict[str, TableDefinition] | None = None,
   edges: dict[str, EdgeDefinition] | None = None,
   analyzers: dict[str, AnalyzerDefinition] | None = None,
+  buckets: dict[str, BucketDefinition] | None = None,
   *,
   if_not_exists: bool = False,
 ) -> str:
-  """Generate complete SurrealQL schema from analyzer, table, and edge definitions.
+  """Generate complete SurrealQL schema from the supplied definitions.
 
-  Analyzers render first (a full-text index can only reference an analyzer that
-  already exists), then tables, then edges. Each definition block is separated
-  by a blank line for readability.
+  Buckets and analyzers render first (a ``file`` field or full-text index can
+  only reference one that already exists), then tables, then edges. Each
+  definition block is separated by a blank line for readability.
 
   Args:
     tables: Dict of table name to TableDefinition
     edges: Dict of edge name to EdgeDefinition
     analyzers: Dict of analyzer name to AnalyzerDefinition (emitted before tables)
+    buckets: Dict of bucket name to BucketDefinition (emitted before tables)
     if_not_exists: When True, adds IF NOT EXISTS to all DEFINE statements
 
   Returns:
@@ -413,6 +559,11 @@ def generate_schema_sql(
     >>> sql = generate_schema_sql(tables={'user': user_table}, edges={'likes': likes_edge})
   """
   all_statements: list[str] = []
+
+  if buckets:
+    for bucket in buckets.values():
+      all_statements.extend(generate_bucket_sql(bucket, if_not_exists=if_not_exists))
+      all_statements.append('')  # blank line between buckets
 
   if analyzers:
     for analyzer in analyzers.values():

@@ -52,6 +52,13 @@ class FieldType(Enum):
   ARRAY = 'array'
   RECORD = 'record'
   GEOMETRY = 'geometry'
+  FILE = 'file'
+  """SurrealDB v3 ``file`` type — a pointer (``f"<bucket>:/<key>"``) into a
+  bucket defined via :class:`~surql.schema.bucket.BucketDefinition`. Carried at
+  runtime by :class:`~surql.types.file.FileRef`."""
+  BYTES = 'bytes'
+  """SurrealDB ``bytes`` type — raw binary stored inline on the record (distinct
+  from ``file``, which references bucket-backed object storage)."""
   ANY = 'any'
 
 
@@ -497,6 +504,87 @@ def object_field(
     default=default,
     readonly=readonly,
     flexible=flexible,
+    permissions=permissions,
+  )
+
+
+def file_field(
+  name: str,
+  *,
+  assertion: str | None = None,
+  default: str | None = None,
+  readonly: bool = False,
+  nullable: bool = False,
+  permissions: dict[str, str] | None = None,
+) -> FieldDefinition:
+  """Create a file field definition (SurrealDB v3 ``TYPE file``).
+
+  A ``file`` field stores a pointer (``f"<bucket>:/<key>"``) into a bucket
+  defined via :func:`~surql.schema.bucket.bucket_schema`. Round-tripped at
+  runtime as a :class:`~surql.types.file.FileRef`.
+
+  Args:
+    name: Field name
+    assertion: Optional assertion to validate the file value
+    default: Optional default value expression
+    readonly: If True, field is read-only
+    nullable: If True, emits ``TYPE option<file>`` so the column accepts NONE
+    permissions: Optional permission rules
+
+  Returns:
+    FieldDefinition for a file field
+
+  Examples:
+    >>> file_field('avatar')
+    FieldDefinition(name='avatar', type=FieldType.FILE, ...)
+  """
+  return field(
+    name,
+    FieldType.FILE,
+    assertion=assertion,
+    default=default,
+    readonly=readonly,
+    nullable=nullable,
+    permissions=permissions,
+  )
+
+
+def bytes_field(
+  name: str,
+  *,
+  assertion: str | None = None,
+  default: str | None = None,
+  readonly: bool = False,
+  nullable: bool = False,
+  permissions: dict[str, str] | None = None,
+) -> FieldDefinition:
+  """Create a bytes field definition (SurrealDB ``TYPE bytes``).
+
+  A ``bytes`` field stores raw binary inline on the record (distinct from
+  ``file``, which references bucket-backed object storage).
+
+  Args:
+    name: Field name
+    assertion: Optional assertion to validate the bytes value
+    default: Optional default value expression
+    readonly: If True, field is read-only
+    nullable: If True, emits ``TYPE option<bytes>`` so the column accepts NONE
+    permissions: Optional permission rules
+
+  Returns:
+    FieldDefinition for a bytes field
+
+  Examples:
+    >>> bytes_field('thumbnail')
+    FieldDefinition(name='thumbnail', type=FieldType.BYTES, ...)
+  """
+  return field(
+    name,
+    FieldType.BYTES,
+    assertion=assertion,
+    default=default,
+    readonly=readonly,
+    nullable=nullable,
     permissions=permissions,
   )
 

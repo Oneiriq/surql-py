@@ -9,8 +9,9 @@ from pathlib import Path
 
 import structlog
 
-from surql.migration.diff import diff_edges, diff_tables
+from surql.migration.diff import diff_buckets, diff_edges, diff_tables
 from surql.migration.models import SchemaDiff
+from surql.schema.bucket import BucketDefinition
 from surql.schema.edge import EdgeDefinition
 from surql.schema.table import TableDefinition
 
@@ -31,6 +32,8 @@ def generate_migration(
   new_tables: dict[str, TableDefinition] | None = None,
   old_edges: dict[str, EdgeDefinition] | None = None,
   new_edges: dict[str, EdgeDefinition] | None = None,
+  old_buckets: dict[str, BucketDefinition] | None = None,
+  new_buckets: dict[str, BucketDefinition] | None = None,
   author: str = 'surql',
 ) -> Path:
   """Generate a migration file from schema changes.
@@ -42,6 +45,8 @@ def generate_migration(
     new_tables: New table definitions
     old_edges: Previous edge definitions
     new_edges: New edge definitions
+    old_buckets: Previous bucket definitions
+    new_buckets: New bucket definitions
     author: Migration author
 
   Returns:
@@ -72,6 +77,8 @@ def generate_migration(
       new_tables or {},
       old_edges or {},
       new_edges or {},
+      old_buckets or {},
+      new_buckets or {},
     )
 
     if not diffs:
@@ -112,6 +119,7 @@ def generate_initial_migration(
   edges: dict[str, EdgeDefinition] | None = None,
   description: str = 'Initial schema',
   author: str = 'surql',
+  buckets: dict[str, BucketDefinition] | None = None,
 ) -> Path:
   """Generate initial migration from schema definitions.
 
@@ -123,6 +131,7 @@ def generate_initial_migration(
     edges: Optional edge definitions
     description: Migration description
     author: Migration author
+    buckets: Optional bucket definitions
 
   Returns:
     Path to generated migration file
@@ -139,6 +148,7 @@ def generate_initial_migration(
     description,
     new_tables=tables,
     new_edges=edges,
+    new_buckets=buckets,
     author=author,
   )
 
@@ -148,19 +158,36 @@ def _calculate_schema_diffs(
   new_tables: dict[str, TableDefinition],
   old_edges: dict[str, EdgeDefinition],
   new_edges: dict[str, EdgeDefinition],
+  old_buckets: dict[str, BucketDefinition] | None = None,
+  new_buckets: dict[str, BucketDefinition] | None = None,
 ) -> list[SchemaDiff]:
   """Calculate differences between schema versions.
+
+  Buckets diff first so a ``DEFINE BUCKET`` lands before any table whose
+  ``file`` field references it (mirrors how :func:`generate_schema_sql` orders
+  bucket definitions before tables).
 
   Args:
     old_tables: Previous table definitions
     new_tables: New table definitions
     old_edges: Previous edge definitions
     new_edges: New edge definitions
+    old_buckets: Previous bucket definitions
+    new_buckets: New bucket definitions
 
   Returns:
     List of schema differences
   """
   diffs: list[SchemaDiff] = []
+  old_buckets = old_buckets or {}
+  new_buckets = new_buckets or {}
+
+  # Compare buckets (before tables — a file field may reference a bucket).
+  all_bucket_names = set(old_buckets.keys()) | set(new_buckets.keys())
+
+  for bucket_name in sorted(all_bucket_names):
+    bucket_diffs = diff_buckets(old_buckets.get(bucket_name), new_buckets.get(bucket_name))
+    diffs.extend(bucket_diffs)
 
   # Compare tables
   all_table_names = set(old_tables.keys()) | set(new_tables.keys())

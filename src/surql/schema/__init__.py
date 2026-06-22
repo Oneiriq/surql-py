@@ -27,6 +27,12 @@ from surql.schema.analyzer import (
   standard_analyzer,
   uppercase,
 )
+from surql.schema.bucket import (
+  BucketDefinition,
+  bucket_schema,
+  file_bucket,
+  memory_bucket,
+)
 from surql.schema.edge import (
   EdgeDefinition,
   EdgeMode,
@@ -45,9 +51,11 @@ from surql.schema.fields import (
   FieldType,
   array_field,
   bool_field,
+  bytes_field,
   computed_field,
   datetime_field,
   field,
+  file_field,
   float_field,
   int_field,
   object_field,
@@ -56,6 +64,8 @@ from surql.schema.fields import (
 )
 from surql.schema.parser import (
   SchemaParseError,
+  parse_bucket_info,
+  parse_db_buckets,
   parse_db_info,
   parse_edge_info,
   parse_table_info,
@@ -63,17 +73,22 @@ from surql.schema.parser import (
 from surql.schema.registry import (
   SchemaRegistry,
   clear_registry,
+  get_registered_buckets,
   get_registered_edges,
   get_registered_tables,
   get_registry,
+  register_bucket,
   register_edge,
   register_table,
 )
 from surql.schema.sql import (
   generate_access_sql,
+  generate_alter_bucket_sql,
   generate_analyzer_sql,
   generate_analyzer_sql_with_options,
+  generate_bucket_sql,
   generate_edge_sql,
+  generate_remove_bucket_sql,
   generate_schema_sql,
   generate_table_sql,
 )
@@ -127,6 +142,8 @@ __all__ = [
   'record_field',
   'array_field',
   'object_field',
+  'file_field',
+  'bytes_field',
   'computed_field',
   # Table schema
   'TableMode',
@@ -180,14 +197,18 @@ __all__ = [
   'get_registry',
   'register_table',
   'register_edge',
+  'register_bucket',
   'clear_registry',
   'get_registered_tables',
   'get_registered_edges',
+  'get_registered_buckets',
   # Parser
   'SchemaParseError',
   'parse_table_info',
   'parse_edge_info',
   'parse_db_info',
+  'parse_bucket_info',
+  'parse_db_buckets',
   # Themes
   'ColorScheme',
   'GraphVizTheme',
@@ -208,6 +229,11 @@ __all__ = [
   'access_schema',
   'jwt_access',
   'record_access',
+  # Bucket schema
+  'BucketDefinition',
+  'bucket_schema',
+  'memory_bucket',
+  'file_bucket',
   # SQL generation
   'generate_table_sql',
   'generate_edge_sql',
@@ -215,4 +241,7 @@ __all__ = [
   'generate_analyzer_sql',
   'generate_analyzer_sql_with_options',
   'generate_schema_sql',
+  'generate_bucket_sql',
+  'generate_remove_bucket_sql',
+  'generate_alter_bucket_sql',
 ]

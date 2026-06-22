@@ -9,6 +9,7 @@ import re
 import structlog
 
 from surql.migration.models import DiffOperation, SchemaDiff
+from surql.schema.bucket import BucketDefinition
 from surql.schema.edge import EdgeDefinition
 from surql.schema.fields import FieldDefinition, FieldType, _detect_target_table_from_value
 from surql.schema.table import (
@@ -355,6 +356,94 @@ def diff_edges(
     diffs.extend(diff_permissions(old_proxy, new_proxy))
 
   return diffs
+
+
+def diff_buckets(
+  old_bucket: BucketDefinition | None,
+  new_bucket: BucketDefinition | None,
+) -> list[SchemaDiff]:
+  """Compare two bucket definitions and generate diff operations.
+
+  Mirrors :func:`diff_tables` / :func:`diff_edges`:
+
+  - added (``old`` is None) -> ``ADD_BUCKET`` (forward ``DEFINE BUCKET``,
+    backward ``REMOVE BUCKET``).
+  - removed (``new`` is None) -> ``DROP_BUCKET`` (forward ``REMOVE BUCKET``,
+    backward ``DEFINE BUCKET`` to restore it).
+  - changed -> ``MODIFY_BUCKET`` (forward ``ALTER BUCKET`` to the new shape,
+    backward ``ALTER BUCKET`` back to the old shape). No diff is produced when
+    the two definitions are equal.
+
+  Args:
+    old_bucket: Previous bucket definition (None if the bucket is new)
+    new_bucket: New bucket definition (None if the bucket is removed)
+
+  Returns:
+    List of bucket-related SchemaDiff operations (possibly empty)
+  """
+  if old_bucket is None and new_bucket is not None:
+    return [_generate_add_bucket_diff(new_bucket)]
+
+  if old_bucket is not None and new_bucket is None:
+    return [_generate_drop_bucket_diff(old_bucket)]
+
+  if old_bucket is not None and new_bucket is not None and old_bucket != new_bucket:
+    return _generate_modify_bucket_diff(old_bucket, new_bucket)
+
+  return []
+
+
+def _generate_add_bucket_diff(bucket: BucketDefinition) -> SchemaDiff:
+  """Generate diff for adding a new bucket."""
+  from surql.schema.sql import generate_bucket_sql, generate_remove_bucket_sql
+
+  return SchemaDiff(
+    operation=DiffOperation.ADD_BUCKET,
+    bucket=bucket.name,
+    description=f'Add bucket {bucket.name}',
+    forward_sql=generate_bucket_sql(bucket)[0],
+    backward_sql=generate_remove_bucket_sql(bucket)[0],
+  )
+
+
+def _generate_drop_bucket_diff(bucket: BucketDefinition) -> SchemaDiff:
+  """Generate diff for dropping a bucket."""
+  from surql.schema.sql import generate_bucket_sql, generate_remove_bucket_sql
+
+  return SchemaDiff(
+    operation=DiffOperation.DROP_BUCKET,
+    bucket=bucket.name,
+    description=f'Drop bucket {bucket.name}',
+    forward_sql=generate_remove_bucket_sql(bucket)[0],
+    backward_sql=generate_bucket_sql(bucket)[0],
+  )
+
+
+def _generate_modify_bucket_diff(
+  old_bucket: BucketDefinition,
+  new_bucket: BucketDefinition,
+) -> list[SchemaDiff]:
+  """Generate diff for modifying a bucket via ALTER BUCKET.
+
+  Returns an empty list if the ALTER emitter found nothing to change (should
+  not happen when callers gate on ``old != new``, but stays defensive).
+  """
+  from surql.schema.sql import generate_alter_bucket_sql
+
+  forward = generate_alter_bucket_sql(old_bucket, new_bucket)
+  backward = generate_alter_bucket_sql(new_bucket, old_bucket)
+  if not forward:
+    return []
+
+  return [
+    SchemaDiff(
+      operation=DiffOperation.MODIFY_BUCKET,
+      bucket=new_bucket.name,
+      description=f'Modify bucket {new_bucket.name}',
+      forward_sql=forward[0],
+      backward_sql=backward[0] if backward else '',
+    )
+  ]
 
 
 # Helper functions to generate specific diff types

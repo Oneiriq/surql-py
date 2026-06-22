@@ -30,6 +30,7 @@ from typing import Any
 
 import structlog
 
+from surql.schema.bucket import BucketDefinition
 from surql.schema.edge import EdgeDefinition, EdgeMode
 from surql.schema.fields import FieldDefinition, FieldType
 from surql.schema.table import (
@@ -589,6 +590,8 @@ def _field_type_from_word(type_word: str) -> FieldType:
     'array': FieldType.ARRAY,
     'record': FieldType.RECORD,
     'geometry': FieldType.GEOMETRY,
+    'file': FieldType.FILE,
+    'bytes': FieldType.BYTES,
     'any': FieldType.ANY,
   }
   return type_mapping.get(type_word.lower(), FieldType.ANY)
@@ -1005,6 +1008,97 @@ def _extract_event_action(definition: str) -> str | None:
     return action.strip() if action else None
 
   return None
+
+
+# Pattern matching `BACKEND "<value>"` (double-quoted, escaped quotes allowed).
+_BUCKET_BACKEND_PATTERN = re.compile(r'\bBACKEND\s+"((?:[^"\\]|\\.)*)"', re.IGNORECASE)
+# Pattern matching `COMMENT "<value>"`.
+_BUCKET_COMMENT_PATTERN = re.compile(r'\bCOMMENT\s+"((?:[^"\\]|\\.)*)"', re.IGNORECASE)
+# Pattern matching a standalone `READONLY` keyword (word-boundary anchored).
+_BUCKET_READONLY_PATTERN = re.compile(r'\bREADONLY\b', re.IGNORECASE)
+
+
+def _unescape_surql_string(value: str) -> str:
+  """Reverse :func:`surql.schema.sql._surql_string` escaping (``\\"`` / ``\\\\``)."""
+  return value.replace('\\"', '"').replace('\\\\', '\\')
+
+
+def parse_bucket_info(bucket_name: str, definition: str) -> BucketDefinition:
+  """Parse a ``DEFINE BUCKET`` statement string into a BucketDefinition.
+
+  Inverse of :func:`surql.schema.sql.generate_bucket_sql`. Recognises the
+  ``BACKEND "<backend>"``, ``READONLY``, ``PERMISSIONS ...``, and
+  ``COMMENT "<comment>"`` clauses SurrealDB v3 stores in ``INFO FOR DB``'s
+  ``buckets`` map.
+
+  Args:
+    bucket_name: Bucket name
+    definition: ``DEFINE BUCKET <name> ...`` statement string
+
+  Returns:
+    Parsed BucketDefinition
+
+  Raises:
+    SchemaParseError: If parsing fails
+
+  Examples:
+    >>> parse_bucket_info('b', 'DEFINE BUCKET b BACKEND "memory" READONLY').backend
+    'memory'
+  """
+  try:
+    logger.debug('parsing_bucket_info', bucket=bucket_name)
+
+    backend_match = _BUCKET_BACKEND_PATTERN.search(definition)
+    backend = _unescape_surql_string(backend_match.group(1)) if backend_match else ''
+
+    readonly = bool(_BUCKET_READONLY_PATTERN.search(definition))
+
+    comment_match = _BUCKET_COMMENT_PATTERN.search(definition)
+    comment = _unescape_surql_string(comment_match.group(1)) if comment_match else None
+
+    # Reuse the table per-action PERMISSIONS extractor: the bucket emitter
+    # writes the same `FOR <action> WHERE <rule>` shape, and bare NONE/FULL
+    # normalises to None (the code-side default).
+    permissions = _parse_table_permissions(definition)
+
+    return BucketDefinition(
+      name=bucket_name,
+      backend=backend,
+      readonly=readonly,
+      permissions=permissions,
+      comment=comment,
+    )
+  except Exception as e:
+    logger.error('parse_bucket_info_failed', bucket=bucket_name, error=str(e))
+    raise SchemaParseError(f'Failed to parse bucket {bucket_name}: {e}') from e
+
+
+def parse_db_buckets(info: dict[str, Any]) -> dict[str, BucketDefinition]:
+  """Parse the ``buckets`` map of an ``INFO FOR DB`` response.
+
+  SurrealDB v3 exposes defined buckets under the ``buckets`` key (legacy ``bu``
+  is also accepted) as a ``{name: 'DEFINE BUCKET ...'}`` map.
+
+  Args:
+    info: Raw ``INFO FOR DB`` response dictionary
+
+  Returns:
+    Dictionary of bucket name to BucketDefinition (empty if none defined)
+
+  Examples:
+    >>> info = await client.execute('INFO FOR DB;')
+    >>> buckets = parse_db_buckets(info[0]['result'])
+  """
+  buckets: dict[str, BucketDefinition] = {}
+  bu_dict = info.get('buckets') or info.get('bu') or {}
+
+  for bucket_name, definition in bu_dict.items():
+    try:
+      buckets[bucket_name] = parse_bucket_info(bucket_name, definition)
+    except Exception as e:
+      logger.warning('bucket_parse_warning', bucket=bucket_name, error=str(e))
+
+  return buckets
 
 
 def parse_db_info(info: dict[str, Any]) -> dict[str, TableDefinition]:
