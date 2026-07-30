@@ -12,6 +12,7 @@ import structlog
 from surql.schema.table import TableDefinition
 
 if TYPE_CHECKING:
+  from surql.schema.bucket import BucketDefinition
   from surql.schema.edge import EdgeDefinition
 
 logger = structlog.get_logger(__name__)
@@ -35,6 +36,7 @@ class SchemaRegistry:
   _instance: 'SchemaRegistry | None' = None
   _tables: dict[str, TableDefinition]
   _edges: dict[str, 'EdgeDefinition']
+  _buckets: dict[str, 'BucketDefinition']
   _schema_files: list[Path]
 
   def __new__(cls) -> 'SchemaRegistry':
@@ -43,6 +45,7 @@ class SchemaRegistry:
       cls._instance = super().__new__(cls)
       cls._instance._tables = {}
       cls._instance._edges = {}
+      cls._instance._buckets = {}
       cls._instance._schema_files = []
     return cls._instance
 
@@ -70,6 +73,18 @@ class SchemaRegistry:
     logger.debug('registering_edge', edge=edge.name)
     self._edges[edge.name] = edge
 
+  def register_bucket(self, bucket: 'BucketDefinition') -> None:
+    """Register a bucket schema.
+
+    Args:
+      bucket: BucketDefinition to register
+
+    Examples:
+      >>> registry.register_bucket(avatars_bucket)
+    """
+    logger.debug('registering_bucket', bucket=bucket.name)
+    self._buckets[bucket.name] = bucket
+
   def get_table(self, name: str) -> TableDefinition | None:
     """Get a registered table by name.
 
@@ -92,6 +107,17 @@ class SchemaRegistry:
     """
     return self._edges.get(name)
 
+  def get_bucket(self, name: str) -> 'BucketDefinition | None':
+    """Get a registered bucket by name.
+
+    Args:
+      name: Bucket name
+
+    Returns:
+      BucketDefinition if found, None otherwise
+    """
+    return self._buckets.get(name)
+
   def get_tables(self) -> dict[str, TableDefinition]:
     """Get all registered table schemas.
 
@@ -107,6 +133,14 @@ class SchemaRegistry:
       Dictionary of edge name to EdgeDefinition
     """
     return dict(self._edges)
+
+  def get_buckets(self) -> dict[str, 'BucketDefinition']:
+    """Get all registered bucket schemas.
+
+    Returns:
+      Dictionary of bucket name to BucketDefinition
+    """
+    return dict(self._buckets)
 
   def get_table_names(self) -> list[str]:
     """Get names of all registered tables.
@@ -132,6 +166,7 @@ class SchemaRegistry:
     logger.debug('clearing_registry')
     self._tables.clear()
     self._edges.clear()
+    self._buckets.clear()
     self._schema_files.clear()
 
   def add_schema_file(self, path: Path) -> None:
@@ -160,6 +195,11 @@ class SchemaRegistry:
   def edge_count(self) -> int:
     """Get number of registered edges."""
     return len(self._edges)
+
+  @property
+  def bucket_count(self) -> int:
+    """Get number of registered buckets."""
+    return len(self._buckets)
 
 
 # Global singleton instance
@@ -217,6 +257,25 @@ def register_edge(edge: 'EdgeDefinition') -> 'EdgeDefinition':
   return edge
 
 
+def register_bucket(bucket: 'BucketDefinition') -> 'BucketDefinition':
+  """Register a bucket schema and return it.
+
+  This is a convenience function that also returns the bucket,
+  making it suitable for use as a decorator or inline registration.
+
+  Args:
+    bucket: BucketDefinition to register
+
+  Returns:
+    The same BucketDefinition (for chaining)
+
+  Examples:
+    >>> avatars = register_bucket(memory_bucket('avatars'))
+  """
+  get_registry().register_bucket(bucket)
+  return bucket
+
+
 def clear_registry() -> None:
   """Clear all registered schemas.
 
@@ -245,3 +304,14 @@ def get_registered_edges() -> dict[str, 'EdgeDefinition']:
     Dictionary of edge name to EdgeDefinition
   """
   return get_registry().get_edges()
+
+
+def get_registered_buckets() -> dict[str, 'BucketDefinition']:
+  """Get all registered bucket schemas.
+
+  Convenience function to get buckets from the global registry.
+
+  Returns:
+    Dictionary of bucket name to BucketDefinition
+  """
+  return get_registry().get_buckets()

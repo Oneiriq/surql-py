@@ -405,6 +405,56 @@ class TestQuoteValue:
     composite = RecordID(table='spec', id='BFS:community:1')
     assert _quote_value(composite) == 'spec:⟨BFS:community:1⟩'
 
+  def test_quote_datetime_emits_typed_literal(self) -> None:
+    """datetime values emit a SurrealDB `d'...'` literal, not a quoted string."""
+    from datetime import UTC, datetime
+
+    dt = datetime(2026, 1, 1, 12, 0, 0, tzinfo=UTC)
+    assert _quote_value(dt) == "d'2026-01-01T12:00:00+00:00'"
+
+  def test_quote_record_id_string_emits_record_link(self) -> None:
+    """A `table:id`-shaped string renders as a record link, not a quoted string."""
+    assert _quote_value('user:alice') == 'user:alice'
+    # Integer id round-trips bare.
+    assert _quote_value('post:123') == 'post:123'
+    # An id needing v3 escaping is bracketed.
+    assert _quote_value('outlet:alaska.com') == 'outlet:⟨alaska.com⟩'
+
+  def test_quote_record_id_bracketed_string_round_trips(self) -> None:
+    """Already-bracketed record-id strings (the v3 wire form) round-trip."""
+    assert _quote_value('outlet:⟨alaska.com⟩') == 'outlet:⟨alaska.com⟩'
+    # Composite (colon in id) stays bracketed.
+    assert _quote_value('spec:⟨BFS:community:1⟩') == 'spec:⟨BFS:community:1⟩'
+
+  def test_quote_non_record_id_strings_stay_quoted(self) -> None:
+    """Prose, URLs, and composite unbracketed strings are NOT treated as links."""
+    assert _quote_value('note: see foo') == "'note: see foo'"  # whitespace
+    assert _quote_value('https://example.com') == "'https://example.com'"  # slash
+    assert _quote_value('a:b:c') == "'a:b:c'"  # composite, unbracketed
+    assert _quote_value('plain') == "'plain'"  # no colon
+
+  def test_eq_with_record_id_string_renders_link(self) -> None:
+    """eq() against a `table:id` string produces a record comparison, not a string."""
+    from surql.types.record_id import RecordID
+
+    assert eq('document_id', 'document:abc').to_surql() == 'document_id = document:abc'
+    assert (
+      eq('document_id', RecordID(table='document', id='abc')).to_surql()
+      == 'document_id = document:abc'
+    )
+
+  def test_is_record_id_string_detection(self) -> None:
+    """is_record_id_string matches record-link shapes and rejects prose/URLs."""
+    from surql.types.record_id import is_record_id_string
+
+    assert is_record_id_string('user:alice')
+    assert is_record_id_string('outlet:⟨alaska.com⟩')
+    assert is_record_id_string('outlet:<legacy.com>')
+    assert not is_record_id_string('note: see foo')
+    assert not is_record_id_string('https://example.com')
+    assert not is_record_id_string('a:b:c')
+    assert not is_record_id_string('plain')
+
 
 class TestComparisonOperators:
   """Test suite for comparison operators."""

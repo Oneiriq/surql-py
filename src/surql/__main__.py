@@ -10,7 +10,7 @@ import structlog
 import typer
 from rich.console import Console
 
-from surql.cli import db_app, migrate_app, schema_app
+from surql.cli import bucket_app, db_app, migrate_app, schema_app
 from surql.cli.orchestrate import app as orchestrate_app
 from surql.settings import get_settings
 
@@ -30,6 +30,7 @@ app = typer.Typer(
 app.add_typer(migrate_app, name='migrate')
 app.add_typer(schema_app, name='schema')
 app.add_typer(db_app, name='db')
+app.add_typer(bucket_app, name='bucket')
 app.add_typer(orchestrate_app, name='orchestrate')
 
 

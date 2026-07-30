@@ -9,11 +9,13 @@ from typing import TYPE_CHECKING, Any
 import structlog
 
 if TYPE_CHECKING:
+  from surql.connection.session import Session
   from surql.connection.streaming import (
     EmbeddedPollingStreamingManager,
     LiveQuery,
     StreamingManager,
   )
+  from surql.files.bucket import Bucket
 from surrealdb import AsyncSurreal
 from surrealdb import RecordID as SdkRecordID
 from tenacity import (
@@ -123,8 +125,18 @@ def _denormalize_params(value: Any) -> Any:
     The value with record ID strings replaced by SDK RecordID objects
   """
   # Local import to avoid a top-level cycle (types -> connection -> types).
+  from surql.types.file import FileRef
   from surql.types.record_id import RecordID as SurqlRecordID
 
+  # Raw bytes pass straight through — the SDK's CBOR encoder serialises them as
+  # a byte string, which is what `TYPE bytes` columns and file `.put(<bytes>)`
+  # expect. Checked before the dict/list recursion so it is never reinterpreted.
+  if isinstance(value, bytes | bytearray):
+    return value
+  if isinstance(value, FileRef):
+    # The SDK has no dedicated file value; the SQON object form
+    # ({'bucket': ..., 'key': ...}) is what the server accepts as a file param.
+    return value.to_sqon()
   if isinstance(value, SurqlRecordID):
     return SdkRecordID(value.table, value.id)
   if isinstance(value, str) and _is_record_id_target(value):
@@ -153,8 +165,21 @@ def _normalize_sdk_value(value: Any) -> Any:
   Returns:
     The value with SDK types replaced by plain Python equivalents
   """
+  # Local import to avoid a top-level cycle (types -> connection -> types).
+  from surql.types.file import FileRef
+
   if isinstance(value, SdkRecordID):
     return str(value)
+  # Raw bytes (e.g. from `file.get()` or a `TYPE bytes` column) pass through
+  # untouched — checked before the dict/list recursion.
+  if isinstance(value, bytes | bytearray):
+    return value
+  # A file value materialised as its SQON object form ({'bucket', 'key'})
+  # becomes a FileRef so consumers get a typed pointer they can stringify or
+  # pass back. Guarded by an exact two-key check to avoid grabbing arbitrary
+  # dicts (see FileRef.is_file_object).
+  if FileRef.is_file_object(value):
+    return FileRef.from_sqon(value)
   if isinstance(value, dict):
     return {k: _normalize_sdk_value(v) for k, v in value.items()}
   if isinstance(value, list):
@@ -648,6 +673,94 @@ class DatabaseClient:
       except Exception as e:
         self._log.error('insert_relation_failed', error=str(e), table=table)
         raise QueryError(f'INSERT RELATION operation failed: {e}') from e
+
+  def bucket(self, name: str) -> 'Bucket':
+    """Return an async handle for file operations on a bucket.
+
+    The returned :class:`~surql.files.bucket.Bucket` exposes
+    put / get / get_text / exists / head / delete / copy / copy_if_not_exists /
+    rename / rename_if_not_exists / list. Every operation uses the parameterised
+    ``type::file($bucket, $key)`` constructor with bound params (never
+    f-string-interpolated) and shares this client's retry + concurrency
+    controls.
+
+    The bucket must already be defined on the server via ``DEFINE BUCKET``
+    (e.g. from a :class:`~surql.schema.bucket.BucketDefinition` applied through
+    a migration), and the server must be started with the experimental
+    ``files`` capability enabled.
+
+    Args:
+      name: Bucket name.
+
+    Returns:
+      A :class:`~surql.files.bucket.Bucket` handle (cheap — no I/O).
+
+    Example:
+      ```python
+      avatars = client.bucket('avatars')
+      await avatars.put('alice.png', image_bytes)
+      data = await avatars.get('alice.png')
+      ```
+    """
+    from surql.files.bucket import Bucket
+
+    return Bucket(self, name)
+
+  async def new_session(self) -> 'Session':
+    """Open a new isolated session multiplexed over this connection.
+
+    SurrealDB v3 supports multiple independent sessions over a single
+    connection — each with its own ``USE`` namespace/database and auth state,
+    but sharing the underlying socket. The returned :class:`Session` mirrors the
+    :class:`DatabaseClient` query surface (execute / select / create / update /
+    merge / delete) plus use / signin / invalidate, reusing this client's
+    normalize/denormalize and concurrency semaphore.
+
+    Returns:
+      A :class:`Session` bound to a freshly attached SDK session.
+
+    Raises:
+      ConnectionError: If the client is not connected, or if the transport does
+        not support sessions. In the installed ``surrealdb`` SDK, sessions are a
+        WebSocket-only feature — the HTTP and embedded engines raise
+        ``UnsupportedFeatureError`` (and a defensive ``None`` return is also
+        treated as unsupported). Use a ``ws://`` / ``wss://`` URL.
+
+    Example:
+      ```python
+      async with await client.new_session() as session:
+        await session.use('other_ns', 'other_db')
+        rows = await session.execute('SELECT * FROM user')
+      ```
+    """
+    if not self.is_connected or self._client is None:
+      raise ConnectionError('Client is not connected to database')
+
+    # The SDK's new_session() is a coroutine on every transport. On HTTP /
+    # embedded it raises UnsupportedFeatureError; on WebSocket it returns a
+    # session object. Some builds may instead return None for unsupported
+    # transports, so guard for that too.
+    from surrealdb.errors import UnsupportedFeatureError
+
+    try:
+      sdk_session = await self._client.new_session()
+    except UnsupportedFeatureError as e:
+      raise ConnectionError(
+        'Sessions are not supported on this connection. The installed surrealdb '
+        'SDK only supports new_session() over WebSocket (ws:// / wss://); the '
+        'HTTP and embedded engines do not. Connect with a WebSocket URL to use '
+        'sessions.'
+      ) from e
+
+    if sdk_session is None:
+      raise ConnectionError(
+        'Sessions are not supported on this connection. The transport returned '
+        'no session from new_session(); use a WebSocket (ws:// / wss://) URL.'
+      )
+
+    from surql.connection.session import Session
+
+    return Session(self, sdk_session)
 
   async def __aenter__(self) -> 'DatabaseClient':
     """Async context manager entry."""

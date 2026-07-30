@@ -37,6 +37,7 @@ from surql.connection.context import (
   set_db,
 )
 from surql.connection.registry import ConnectionRegistry, RegistryError, get_registry
+from surql.connection.session import Session
 from surql.connection.streaming import (
   EmbeddedPollingStreamingManager,
   LiveQuery,
@@ -58,6 +59,7 @@ __all__ = [
   # Client
   'DatabaseClient',
   'get_client',
+  'Session',
   # Exceptions
   'DatabaseError',
   'ConnectionError',

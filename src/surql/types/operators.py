@@ -5,6 +5,7 @@ This module provides immutable dataclasses for comparison, logical, and array op
 
 import re
 from dataclasses import dataclass
+from datetime import datetime
 from typing import Any
 
 
@@ -592,7 +593,7 @@ def _quote_value(value: Any) -> str:
     SurrealQL expression suitable for embedding in a query
   """
   from surql.query.expressions import Expression
-  from surql.types.record_id import RecordID
+  from surql.types.record_id import RecordID, is_record_id_string
   from surql.types.record_ref import RecordRef
   from surql.types.surreal_fn import SurrealFn
 
@@ -613,7 +614,19 @@ def _quote_value(value: Any) -> str:
     return 'true' if value else 'false'
   elif isinstance(value, (int, float)):
     return str(value)
+  elif isinstance(value, datetime):
+    # SurrealDB datetime literal (`d'...'`). A bare quoted string would be
+    # coerced to `string` and rejected against a `TYPE datetime` field, so emit
+    # the typed literal instead.
+    return f"d'{value.isoformat()}'"
   elif isinstance(value, str):
+    # A `table:id`-shaped string denotes a record link, not a string literal:
+    # render it as the record id so it matches a `record` column -- the same
+    # coercion `client.execute`/`create`/`merge` already apply to params and
+    # CONTENT. Pass an explicit `RecordID` to force an unusual shape; any other
+    # string is escaped and quoted normally.
+    if is_record_id_string(value):
+      return RecordID.parse(value).to_surql()
     # Escape backslashes first, then single quotes to prevent SQL injection
     # The order matters: \ must be escaped before ' to prevent \' escaping out
     escaped = value.replace('\\', '\\\\').replace("'", "\\'")

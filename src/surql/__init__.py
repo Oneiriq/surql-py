@@ -7,6 +7,7 @@ from surql.connection import (
   DatabaseClient,
   DatabaseError,
   QueryError,
+  Session,
   Transaction,
   TransactionError,
   TransactionState,
@@ -19,6 +20,7 @@ from surql.connection import (
   set_db,
   transaction,
 )
+from surql.files import Bucket
 from surql.query import (
   CountResult,
   ListResult,
@@ -87,6 +89,7 @@ from surql.query import (
   upsert_typed,
 )
 from surql.types import (
+  FileRef,
   Operator,
   RecordID,
   RecordRef,
@@ -107,7 +110,7 @@ from surql.types import (
   type_thing,
 )
 
-__version__ = '1.8.0'
+__version__ = '1.9.0'
 
 __all__ = [
   # Configuration
@@ -115,6 +118,8 @@ __all__ = [
   # Client
   'DatabaseClient',
   'get_client',
+  'Session',
+  'Bucket',
   # Exceptions
   'DatabaseError',
   'ConnectionError',
@@ -210,6 +215,7 @@ __all__ = [
   'RecordID',
   'RecordRef',
   'record_ref',
+  'FileRef',
   'SurrealFn',
   'surql_fn',
   'type_record',

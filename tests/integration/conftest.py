@@ -5,7 +5,8 @@ at the URL in ``SURREAL_URL`` (defaults to ``ws://localhost:8000/rpc``).
 Locally, run:
 
     docker run -d --name surrealdb -p 8000:8000 \
-      surrealdb/surrealdb:v3.0.5 start --user root --pass root memory
+      -e SURREAL_CAPS_ALLOW_EXPERIMENTAL=files \
+      surrealdb/surrealdb:v3.1.3 start --user root --pass root memory
     uv run pytest tests/integration/ -v
 
 CI boots the same image in the ``Integration`` workflow.
