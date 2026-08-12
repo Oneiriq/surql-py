@@ -612,7 +612,9 @@ hnsw_index(
 | `MINKOWSKI` | Generalized distance |
 | `PEARSON` | Correlation-based similarity |
 
-**Vector types** (`MTreeVectorType`): `F64`, `F32`, `I64`, `I32`, `I16`
+**Vector types** (`MTreeVectorType`): `F64`, `F32`, `F16`, `I64`, `I32`, `I16`,
+`I8`, `U8`. HNSW accepts all eight. `F16` halves the memory the graph holds at
+a modest cost in recall, which a reranking pass buys back.
 
 **Generated SQL**:
 
@@ -638,6 +640,68 @@ mtree_index(
 ```
 
 `MTreeDistanceType` supports: `COSINE`, `EUCLIDEAN`, `MANHATTAN`, `MINKOWSKI`.
+
+MTREE parses only `F64`, `F32`, `I64`, `I32`, and `I16` element types. The
+narrow three (`F16`, `I8`, `U8`) are a parse error on MTREE, and building one
+refuses before the statement is sent.
+
+### Vector Indexes (DISKANN)
+
+DISKANN keeps its graph on disk rather than in memory (SurrealDB 3.2+), which
+suits a corpus that outgrows the RAM an HNSW graph would need.
+
+```python
+from surql.schema.table import diskann_index, DiskAnnDistanceType, MTreeVectorType
+
+diskann_index(
+  'embedding_idx',
+  'embedding',
+  1536,
+  distance=DiskAnnDistanceType.COSINE,
+  vector_type=MTreeVectorType.F16,
+  degree=48,     # Graph out-degree (default: 64)
+  l_build=90,    # Build-time candidate list size (default: 100)
+  alpha=1.5,     # Pruning slack (default: 1.2)
+)
+```
+
+`DiskAnnDistanceType` supports: `COSINE`, `COSINE_NORMALIZED`, `EUCLIDEAN`,
+`INNER_PRODUCT`. It is a separate enum from `HnswDistanceType` because the
+engine's DISKANN set adds two metrics HNSW lacks and refuses every HNSW metric
+outside it. Element types are `F32`, `F16`, `I8`, and `U8`.
+
+**Generated SQL**:
+
+```sql
+DEFINE INDEX embedding_idx ON TABLE documents
+  COLUMNS embedding DISKANN DIMENSION 1536 DIST COSINE TYPE F16
+  DEGREE 48 L_BUILD 90 ALPHA 1.5;
+```
+
+The emitter always spells `DIST`, `TYPE`, `DEGREE`, `L_BUILD`, and `ALPHA`,
+because the engine fills those defaults in when it echoes the index back from
+`INFO FOR TABLE`. A definition that omitted one would never compare equal to
+its own echo, and a reconciler would re-apply the index on every boot.
+
+### Querying a vector index
+
+The second argument of the KNN operator decides the plan.
+
+```python
+# Reaches the index: KnnScan over the HNSW or DISKANN graph
+Query().select().from_table('documents').vector_search_indexed(
+  'embedding', query_vector, k=10, ef=40
+)
+
+# Exhaustive: KnnTopK over a table scan, no index involved
+Query().select().from_table('documents').vector_search(
+  'embedding', query_vector, k=10, distance='COSINE'
+)
+```
+
+An integer in the second position is the exploration factor and reaches the
+index; a metric keyword there asks the engine to compare every row. The metric
+belongs to the index, so `vector_search_indexed` takes none.
 
 ## Events and Triggers
 

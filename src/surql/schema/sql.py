@@ -11,9 +11,14 @@ from surql.schema.bucket import BucketDefinition
 from surql.schema.edge import EdgeDefinition, EdgeMode
 from surql.schema.fields import FieldDefinition, FieldType, _detect_target_table_from_value
 from surql.schema.table import (
+  DISKANN_DEFAULT_ALPHA,
+  DISKANN_DEFAULT_DEGREE,
+  DISKANN_DEFAULT_L_BUILD,
+  DiskAnnDistanceType,
   EventDefinition,
   IndexDefinition,
   IndexType,
+  MTreeVectorType,
   TableDefinition,
 )
 
@@ -106,6 +111,40 @@ def _resolve_type_clause(field_def: FieldDefinition) -> tuple[str, bool]:
   return field_def.type.value, False
 
 
+def _generate_diskann_sql(table_name: str, index_def: IndexDefinition, ine: str) -> str:
+  """Generate the DISKANN form of a DEFINE INDEX statement.
+
+  The engine always echoes DIST / TYPE / DEGREE / L_BUILD / ALPHA back with its
+  defaults filled in, even when the definition never stated them, so this
+  spells them all. A definition that omitted one would never compare equal to
+  its own echo, and a reconcile would re-apply the index on every boot.
+
+  Args:
+    table_name: Name of the table
+    index_def: Index definition
+    ine: Rendered IF NOT EXISTS clause
+
+  Returns:
+    SurrealQL DEFINE INDEX statement
+  """
+  field_name = index_def.columns[0] if index_def.columns else ''
+  distance = index_def.diskann_distance or DiskAnnDistanceType.EUCLIDEAN
+  vector_type = index_def.vector_type or MTreeVectorType.F32
+  degree = index_def.degree if index_def.degree is not None else DISKANN_DEFAULT_DEGREE
+  l_build = index_def.l_build if index_def.l_build is not None else DISKANN_DEFAULT_L_BUILD
+  alpha = index_def.alpha or DISKANN_DEFAULT_ALPHA
+
+  sql = (
+    f'DEFINE INDEX{ine} {index_def.name} ON TABLE {table_name}'
+    f' COLUMNS {field_name} DISKANN DIMENSION {index_def.dimension}'
+    f' DIST {distance.value} TYPE {vector_type.value}'
+    f' DEGREE {degree} L_BUILD {l_build} ALPHA {alpha}'
+  )
+  if index_def.hashed_vector:
+    sql += ' HASHED_VECTOR'
+  return sql + ';'
+
+
 def _generate_index_sql(
   table_name: str,
   index_def: IndexDefinition,
@@ -154,6 +193,9 @@ def _generate_index_sql(
       sql += f' M {index_def.m}'
     sql += ';'
     return sql
+
+  if index_def.type == IndexType.DISKANN:
+    return _generate_diskann_sql(table_name, index_def, ine)
 
   sql = f'DEFINE INDEX{ine} {index_def.name} ON TABLE {table_name} COLUMNS {columns}'
 

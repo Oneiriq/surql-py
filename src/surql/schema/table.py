@@ -6,7 +6,7 @@ permissions, and events.
 
 from enum import Enum
 
-from pydantic import BaseModel, ConfigDict
+from pydantic import BaseModel, ConfigDict, model_validator
 
 from surql.schema.fields import FieldDefinition
 
@@ -36,6 +36,23 @@ class IndexType(Enum):
   STANDARD = 'INDEX'
   MTREE = 'MTREE'
   HNSW = 'HNSW'
+  DISKANN = 'DISKANN'
+  """On-disk approximate-nearest-neighbour graph (SurrealDB 3.2+). The graph
+  lives on disk rather than in memory, so an index outgrows RAM without
+  outgrowing the box; build it with :func:`diskann_index`."""
+
+
+DISKANN_DEFAULT_DEGREE = 64
+"""Graph out-degree the engine assumes (and echoes) for a DISKANN index that
+never stated ``DEGREE``."""
+
+DISKANN_DEFAULT_L_BUILD = 100
+"""Build-time candidate list size the engine assumes (and echoes) for a DISKANN
+index that never stated ``L_BUILD``."""
+
+DISKANN_DEFAULT_ALPHA = '1.2'
+"""Pruning slack the engine assumes (and echoes) for a DISKANN index that never
+stated ``ALPHA``."""
 
 
 class MTreeDistanceType(Enum):
@@ -67,17 +84,53 @@ class HnswDistanceType(Enum):
   PEARSON = 'PEARSON'
 
 
-class MTreeVectorType(Enum):
-  """Vector data types for MTREE indexes.
+class DiskAnnDistanceType(Enum):
+  """Distance metric types for DISKANN vector indexes.
 
-  Defines the numeric type used for vector components.
+  Its own enum rather than a reuse of :class:`HnswDistanceType`: the engine's
+  DISKANN set both adds metrics HNSW lacks (``INNER_PRODUCT``,
+  ``COSINE_NORMALIZED``) and refuses every HNSW metric outside it, so an
+  out-of-set metric is unrepresentable here.
+  """
+
+  COSINE = 'COSINE'
+  COSINE_NORMALIZED = 'COSINE_NORMALIZED'
+  EUCLIDEAN = 'EUCLIDEAN'
+  INNER_PRODUCT = 'INNER_PRODUCT'
+
+
+class MTreeVectorType(Enum):
+  """Numeric type for vector components in MTREE, HNSW, and DISKANN indexes.
+
+  One shared vocabulary; each index kind accepts a subset. The engine takes
+  every member for HNSW, refuses ``F16`` / ``I8`` / ``U8`` for MTREE, and
+  refuses everything but ``F32`` / ``F16`` / ``I8`` / ``U8`` for DISKANN.
+  :func:`surql.schema.validator.validate_index` teaches those limits before a
+  statement is sent.
   """
 
   F64 = 'F64'
   F32 = 'F32'
+  F16 = 'F16'
   I64 = 'I64'
   I32 = 'I32'
   I16 = 'I16'
+  I8 = 'I8'
+  U8 = 'U8'
+
+
+_MTREE_REFUSED_TYPES = frozenset({MTreeVectorType.F16, MTreeVectorType.I8, MTreeVectorType.U8})
+"""Element types MTREE refuses; the engine answers with a bare parse error."""
+
+_DISKANN_ALLOWED_TYPES = frozenset(
+  {
+    MTreeVectorType.F32,
+    MTreeVectorType.F16,
+    MTreeVectorType.I8,
+    MTreeVectorType.U8,
+  }
+)
+"""The only element types DISKANN accepts."""
 
 
 class IndexDefinition(BaseModel):
@@ -111,6 +164,19 @@ class IndexDefinition(BaseModel):
   hnsw_distance: HnswDistanceType | None = None
   efc: int | None = None
   m: int | None = None
+  # DISKANN-specific parameters
+  diskann_distance: DiskAnnDistanceType | None = None
+  degree: int | None = None
+  """DISKANN graph out-degree (``DEGREE``, engine default 64)."""
+  l_build: int | None = None
+  """DISKANN build-time candidate list size (``L_BUILD``, engine default 100)."""
+  alpha: str | None = None
+  """DISKANN pruning slack (``ALPHA``, engine default 1.2), held as the decimal
+  literal the statement carries. The engine echoes a float literal with a
+  trailing ``f`` suffix (``ALPHA 1.2f``), which the parser strips so code and
+  echo compare equal."""
+  hashed_vector: bool = False
+  """Whether a DISKANN index stores hashed vectors (``HASHED_VECTOR``)."""
   # Full-text (FULLTEXT) parameters
   analyzer: str | None = None
   """Full-text analyzer name. ``None`` renders the historical default (``ascii``)."""
@@ -124,6 +190,40 @@ class IndexDefinition(BaseModel):
   ``search::highlight`` / ``search::offsets``)."""
 
   model_config = ConfigDict(frozen=True)
+
+  @model_validator(mode='after')
+  def _validate_vector_members(self) -> 'IndexDefinition':
+    """Refuse the vector member combinations the engine refuses.
+
+    Probed against SurrealDB 3.2.4:
+
+    - MTREE parses only ``F64`` / ``F32`` / ``I64`` / ``I32`` / ``I16``
+      element types; ``F16`` / ``I8`` / ``U8`` are a parse error.
+    - DISKANN accepts only ``F32`` / ``F16`` / ``I8`` / ``U8``.
+    - DISKANN takes its metric through ``diskann_distance``; an MTREE or HNSW
+      metric aimed at it would be dropped by the emitter, so that mistake is
+      refused here instead.
+
+    HNSW accepts every :class:`MTreeVectorType` member, so it needs no check.
+    """
+    if self.type == IndexType.MTREE and self.vector_type in _MTREE_REFUSED_TYPES:
+      raise ValueError(
+        f'MTREE index {self.name!r} cannot use TYPE {self.vector_type.value}: '
+        'the engine only accepts F64, F32, I64, I32, or I16 for MTREE'
+      )
+    if self.type == IndexType.DISKANN:
+      if self.vector_type is not None and self.vector_type not in _DISKANN_ALLOWED_TYPES:
+        raise ValueError(
+          f'DISKANN index {self.name!r} cannot use TYPE {self.vector_type.value}: '
+          'the engine only accepts F32, F16, I8, or U8 for DISKANN'
+        )
+      if self.distance is not None or self.hnsw_distance is not None:
+        raise ValueError(
+          f'DISKANN index {self.name!r} takes its metric through diskann_distance '
+          '(EUCLIDEAN, COSINE, INNER_PRODUCT, or COSINE_NORMALIZED); the engine '
+          'refuses every other MTREE/HNSW metric for DISKANN'
+        )
+    return self
 
 
 class EventDefinition(BaseModel):
@@ -444,6 +544,85 @@ def hnsw_index(
     hnsw_distance=distance,
     efc=efc,
     m=m,
+  )
+
+
+def canonical_alpha(alpha: float) -> str:
+  """Render a DISKANN ``ALPHA`` value the way the engine echoes it.
+
+  A whole number echoes bare (``ALPHA 2``) and a fractional one echoes as a
+  float literal with a trailing ``f`` the parser strips (``ALPHA 1.2f`` reads
+  back as ``1.2``). Producing that same shape here is what lets a definition
+  compare equal to its own echo instead of re-applying on every reconcile.
+
+  Args:
+    alpha: Pruning slack
+
+  Returns:
+    The canonical decimal literal
+
+  Examples:
+    >>> canonical_alpha(1.2)
+    '1.2'
+    >>> canonical_alpha(2.0)
+    '2'
+  """
+  if alpha == int(alpha):
+    return str(int(alpha))
+  return str(alpha)
+
+
+def diskann_index(
+  name: str,
+  column: str,
+  dimension: int,
+  *,
+  distance: DiskAnnDistanceType = DiskAnnDistanceType.EUCLIDEAN,
+  vector_type: MTreeVectorType = MTreeVectorType.F32,
+  degree: int = DISKANN_DEFAULT_DEGREE,
+  l_build: int = DISKANN_DEFAULT_L_BUILD,
+  alpha: float = 1.2,
+  hashed_vector: bool = False,
+) -> IndexDefinition:
+  """Create a DISKANN vector index definition.
+
+  DISKANN keeps its graph on disk, which suits a corpus that outgrows the
+  memory an HNSW graph would need. The engine echoes ``DEGREE`` / ``L_BUILD`` /
+  ``ALPHA`` back with defaults filled in even when the definition never stated
+  them, so this fills the same defaults up front.
+
+  Args:
+    name: Index name
+    column: Column name holding the vector data
+    dimension: Number of dimensions in the vector
+    distance: Distance metric (COSINE, COSINE_NORMALIZED, EUCLIDEAN, INNER_PRODUCT)
+    vector_type: Vector component type (F32, F16, I8, U8)
+    degree: Graph out-degree
+    l_build: Build-time candidate list size
+    alpha: Pruning slack
+    hashed_vector: Store hashed vectors
+
+  Returns:
+    Immutable IndexDefinition with DISKANN type
+
+  Examples:
+    Half-precision embeddings with cosine distance:
+    >>> diskann_index('embedding_idx', 'embedding', 1024, distance=DiskAnnDistanceType.COSINE, vector_type=MTreeVectorType.F16)
+
+    With a tuned graph:
+    >>> diskann_index('feature_idx', 'features', 128, degree=48, l_build=90, alpha=1.5)
+  """
+  return IndexDefinition(
+    name=name,
+    columns=[column],
+    type=IndexType.DISKANN,
+    dimension=dimension,
+    vector_type=vector_type,
+    diskann_distance=distance,
+    degree=degree,
+    l_build=l_build,
+    alpha=canonical_alpha(alpha),
+    hashed_vector=hashed_vector,
   )
 
 
