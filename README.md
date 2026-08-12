@@ -12,7 +12,7 @@ A code-first database toolkit for [SurrealDB](https://surrealdb.com/). Define sc
 - **Type-Safe Query Builder** - Composable queries with Pydantic model integration
 - **SurrealDB v3 Ready** - Emits v3-correct SurrealQL (datetime casts, `count() GROUP ALL`, `type::thing(table, id)` record-id construction, buffered transactions, idempotent DDL)
 - **Query UX Helpers** - First-class wrappers for `time::now`, `math::*`, `string::*`, `count_if`, `type_record`, and typed aggregations -- no raw SurrealQL required
-- **Vector Search** - HNSW and MTREE index support with 8 distance metrics and EFC/M tuning
+- **Vector Search** - HNSW, DISKANN, and MTREE index support with 8 distance metrics, EFC/M tuning, and F16 half-precision vectors
 - **Full-Text Search (BM25)** - `DEFINE ANALYZER` + BM25-scored `FULLTEXT` indexes and a `fulltext_search_query` helper -- the lexical leg of hybrid retrieval
 - **Graph Traversal** - Native SurrealDB graph features with edge relationships
 - **Query Caching** - Memory and Redis-backed caching with `@cache_query` decorator

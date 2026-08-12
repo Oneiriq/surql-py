@@ -5,6 +5,55 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+
+### Added
+
+- **DISKANN vector indexes and the F16 element type (SurrealDB 3.2).**
+  `IndexType.DISKANN` and `diskann_index(name, column, dimension, distance=,
+  vector_type=, degree=, l_build=, alpha=, hashed_vector=)` define the on-disk
+  ANN graph the 3.2 engine parses, with `DiskAnnDistanceType` for the metric
+  (`COSINE` / `COSINE_NORMALIZED` / `EUCLIDEAN` / `INNER_PRODUCT`). It is its
+  own enum because the engine's DISKANN metric set neither contains nor is
+  contained by the HNSW one, so an out-of-set metric is unrepresentable rather
+  than merely refused. `MTreeVectorType` gained `F16`, `I8`, and `U8`, which
+  HNSW also accepts. Both the schema emitter and the migration diff render the
+  new form, and the `INFO FOR TABLE` parser reads it back.
+
+  The engine echoes a DISKANN index with `DIST` / `TYPE` / `DEGREE` / `L_BUILD`
+  / `ALPHA` always spelled, defaults `EUCLIDEAN` / `F32` / 64 / 100 / 1.2
+  filled in even when the definition never stated them, and a float `ALPHA`
+  carrying a trailing `f` suffix (`ALPHA 1.2f`). The emitter spells the
+  defaults, `canonical_alpha` renders a whole number bare (`ALPHA 2`), and the
+  parser excludes the `f` from its capture, so a definition compares equal to
+  its own echo instead of re-applying on every reconcile.
+
+  `IndexDefinition` refuses at construction what the engine refuses, by name: a
+  DISKANN element type outside `F32` / `F16` / `I8` / `U8`, an MTREE element
+  type among the new `F16` / `I8` / `U8` (MTREE still parses only its
+  historical five), and an MTREE/HNSW metric aimed at a DISKANN index, which
+  only `diskann_distance` can carry. Every new `IndexDefinition` member
+  defaults off, so stored definitions deserialise unchanged. New exports:
+  `DiskAnnDistanceType`, `diskann_index`.
+
+- **`Query.vector_search_indexed(field, vector, k, ef)` reaches a vector
+  index.** The second argument of the KNN operator decides the plan: an integer
+  is the exploration factor and the engine answers with a `KnnScan` over the
+  field's HNSW or DISKANN index, while a metric keyword there asks for an
+  exhaustive `KnnTopK` over a table scan. Only the metric form existed, so a
+  query against an indexed column scanned the table and the index it was paying
+  to build served nothing. `vector_search` keeps its meaning for a deliberate
+  exhaustive comparison; reach for the new method whenever the column carries
+  an index. The metric belongs to the index, so the new method takes none.
+
+### Changed
+
+- **Index parsing moved to `surql.schema.parser_index`.** `parser.py` had grown
+  past the repository's 1000-line budget, and the vector work would have pushed
+  it further. `_parse_indexes`, `_parse_index_definition`, and the clause
+  extractors now live in their own module and are imported back into
+  `surql.schema.parser`, so existing import paths keep resolving.
+
 ## [1.9.0] - 2026-07-29
 
 ### Added

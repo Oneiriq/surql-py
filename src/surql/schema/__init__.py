@@ -93,6 +93,7 @@ from surql.schema.sql import (
   generate_table_sql,
 )
 from surql.schema.table import (
+  DiskAnnDistanceType,
   EventDefinition,
   HnswDistanceType,
   IndexDefinition,
@@ -102,6 +103,7 @@ from surql.schema.table import (
   TableDefinition,
   TableMode,
   bm25_index,
+  diskann_index,
   event,
   hnsw_index,
   index,
@@ -151,6 +153,7 @@ __all__ = [
   'MTreeDistanceType',
   'MTreeVectorType',
   'HnswDistanceType',
+  'DiskAnnDistanceType',
   'IndexDefinition',
   'EventDefinition',
   'TableDefinition',
@@ -161,6 +164,7 @@ __all__ = [
   'bm25_index',
   'mtree_index',
   'hnsw_index',
+  'diskann_index',
   'event',
   'with_fields',
   'with_indexes',

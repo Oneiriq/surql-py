@@ -10,11 +10,17 @@ import structlog
 
 from surql.migration.models import DiffOperation, SchemaDiff
 from surql.schema.bucket import BucketDefinition
-from surql.schema.edge import EdgeDefinition
+from surql.schema.edge import EdgeDefinition, EdgeMode
 from surql.schema.fields import FieldDefinition, FieldType, _detect_target_table_from_value
 from surql.schema.table import (
+  DISKANN_DEFAULT_ALPHA,
+  DISKANN_DEFAULT_DEGREE,
+  DISKANN_DEFAULT_L_BUILD,
+  DiskAnnDistanceType,
   EventDefinition,
   IndexDefinition,
+  IndexType,
+  MTreeVectorType,
   TableDefinition,
 )
 
@@ -579,13 +585,14 @@ def _generate_modify_field_diff(
 
 def _generate_add_index_diff(table_name: str, index: IndexDefinition) -> SchemaDiff:
   """Generate diff for adding an index."""
-  from surql.schema.table import IndexType
 
   # MTREE/HNSW indexes use different syntax
   if index.type == IndexType.MTREE:
     forward_sql = _mtree_index_to_sql(table_name, index)
   elif index.type == IndexType.HNSW:
     forward_sql = _hnsw_index_to_sql(table_name, index)
+  elif index.type == IndexType.DISKANN:
+    forward_sql = _diskann_index_to_sql(table_name, index)
   else:
     forward_sql = _index_to_sql(table_name, index)
 
@@ -603,7 +610,6 @@ def _generate_add_index_diff(table_name: str, index: IndexDefinition) -> SchemaD
 
 def _generate_drop_index_diff(table_name: str, index: IndexDefinition) -> SchemaDiff:
   """Generate diff for dropping an index."""
-  from surql.schema.table import IndexType
 
   forward_sql = f'REMOVE INDEX {index.name} ON TABLE {table_name};'
 
@@ -612,6 +618,8 @@ def _generate_drop_index_diff(table_name: str, index: IndexDefinition) -> Schema
     backward_sql = _mtree_index_to_sql(table_name, index)
   elif index.type == IndexType.HNSW:
     backward_sql = _hnsw_index_to_sql(table_name, index)
+  elif index.type == IndexType.DISKANN:
+    backward_sql = _diskann_index_to_sql(table_name, index)
   else:
     backward_sql = _index_to_sql(table_name, index)
 
@@ -710,7 +718,6 @@ def _generate_modify_permissions_diff(
 
 def _generate_add_edge_diffs(edge: EdgeDefinition) -> list[SchemaDiff]:
   """Generate diffs for adding a new edge."""
-  from surql.schema.edge import EdgeMode
 
   diffs: list[SchemaDiff] = []
 
@@ -891,7 +898,6 @@ def _index_to_sql(table_name: str, index: IndexDefinition) -> str:
   Returns:
     SQL statement string ending in a semicolon
   """
-  from surql.schema.table import IndexType
 
   columns_str = ', '.join(index.columns)
   sql = f'DEFINE INDEX {index.name} ON TABLE {table_name} COLUMNS {columns_str}'
@@ -940,6 +946,51 @@ def _mtree_index_to_sql(table_name: str, index: IndexDefinition) -> str:
   # Add optional vector type
   if index.vector_type:
     sql += f' TYPE {index.vector_type.value}'
+
+  sql += ';'
+
+  return sql
+
+
+def _diskann_index_to_sql(table_name: str, index: IndexDefinition) -> str:
+  """Convert a DISKANN index definition to SQL statement.
+
+  The engine echoes DIST / TYPE / DEGREE / L_BUILD / ALPHA back with its
+  defaults filled in even when the definition never stated them, so this spells
+  them all. A migration that omitted one would render a statement the next
+  reconcile reads back as different, and re-apply the index on every boot.
+
+  Args:
+    table_name: Name of the table
+    index: DISKANN index definition
+
+  Returns:
+    SQL statement string for DISKANN index
+
+  Examples:
+    >>> _diskann_index_to_sql('documents', diskann_index('emb_idx', 'embedding', 1536))
+    'DEFINE INDEX emb_idx ON TABLE documents COLUMNS embedding DISKANN DIMENSION 1536 DIST EUCLIDEAN TYPE F32 DEGREE 64 L_BUILD 100 ALPHA 1.2;'
+  """
+  if not index.dimension:
+    msg = f'DISKANN index {index.name} must have dimension specified'
+    raise ValueError(msg)
+
+  # DISKANN indexes only support single column
+  field_name = index.columns[0] if index.columns else ''
+  distance = index.diskann_distance or DiskAnnDistanceType.EUCLIDEAN
+  vector_type = index.vector_type or MTreeVectorType.F32
+  degree = index.degree if index.degree is not None else DISKANN_DEFAULT_DEGREE
+  l_build = index.l_build if index.l_build is not None else DISKANN_DEFAULT_L_BUILD
+  alpha = index.alpha or DISKANN_DEFAULT_ALPHA
+
+  sql = (
+    f'DEFINE INDEX {index.name} ON TABLE {table_name} COLUMNS {field_name}'
+    f' DISKANN DIMENSION {index.dimension} DIST {distance.value}'
+    f' TYPE {vector_type.value} DEGREE {degree} L_BUILD {l_build} ALPHA {alpha}'
+  )
+
+  if index.hashed_vector:
+    sql += ' HASHED_VECTOR'
 
   sql += ';'
 

@@ -106,6 +106,7 @@ class Query[T: BaseModel](BaseModel):
   vector_k: int | None = None
   vector_distance: VectorDistanceType | None = None
   vector_threshold: float | None = None
+  vector_ef: int | None = None
   # Full-text (BM25) search fields
   fulltext_field: str | None = None
   fulltext_reference: int | None = None
@@ -575,6 +576,67 @@ class Query[T: BaseModel](BaseModel):
       }
     )
 
+  def vector_search_indexed(
+    self,
+    field: str,
+    vector: list[float],
+    k: int = 10,
+    ef: int = 40,
+  ) -> Query[T]:
+    """Add an index-backed KNN clause, rendering the integer exploration form.
+
+    The second argument of the KNN operator decides the plan. An integer is the
+    exploration factor and the engine answers with a KnnScan over the field's
+    HNSW or DISKANN index; a metric keyword there asks for an exhaustive
+    KnnTopK over a table scan instead. Use this method whenever the field
+    carries a vector index, and :meth:`vector_search` only when an exhaustive
+    comparison is what you want.
+
+    The metric belongs to the index, so this method takes none. The bare
+    ``<|k|>`` form of the KTree era is a parse error on SurrealDB 3.x.
+
+    Args:
+      field: The field carrying the vector index
+      vector: The query vector to compare against
+      k: Number of nearest neighbors to return (default: 10)
+      ef: Exploration factor at query time; higher trades speed for recall
+        (default: 40)
+
+    Returns:
+      New Query instance with index-backed vector search configured
+
+    Raises:
+      ValueError: If k or ef is less than 1, or vector is empty
+
+    Examples:
+      >>> query = Query().select().from_table('documents').vector_search_indexed(
+      ...     field='embedding',
+      ...     vector=[0.1, 0.2, 0.3],
+      ...     k=10,
+      ...     ef=40,
+      ... )
+      >>> # Generates: SELECT * FROM documents WHERE embedding <|10,40|> [0.1, 0.2, 0.3]
+    """
+    if k < 1:
+      raise ValueError(f'k must be at least 1, got {k}')
+
+    if ef < 1:
+      raise ValueError(f'ef must be at least 1, got {ef}')
+
+    if not vector:
+      raise ValueError('Vector cannot be empty')
+
+    return self.model_copy(
+      update={
+        'vector_field': field,
+        'vector_value': vector,
+        'vector_k': k,
+        'vector_ef': ef,
+        'vector_distance': None,
+        'vector_threshold': None,
+      }
+    )
+
   def similarity_score(
     self,
     field: str,
@@ -974,15 +1036,21 @@ class Query[T: BaseModel](BaseModel):
     # Build all WHERE conditions including vector search
     where_conditions: list[str] = []
 
-    # Add vector search condition if present
-    if self.vector_field and self.vector_value and self.vector_k and self.vector_distance:
+    # Add vector search condition if present. An integer second argument is the
+    # exploration factor and reaches the index through a KnnScan plan; a metric
+    # keyword there asks the engine for an exhaustive KnnTopK instead.
+    if self.vector_field and self.vector_value and self.vector_k:
       vector_str = '[' + ', '.join(str(v) for v in self.vector_value) + ']'
-      if self.vector_threshold is not None:
+      if self.vector_ef is not None:
+        operator = f'<|{self.vector_k},{self.vector_ef}|>'
+      elif self.vector_threshold is not None:
         operator = f'<|{self.vector_k},{self.vector_distance},{self.vector_threshold}|>'
-      else:
+      elif self.vector_distance:
         operator = f'<|{self.vector_k},{self.vector_distance}|>'
-      vector_condition = f'{self.vector_field} {operator} {vector_str}'
-      where_conditions.append(vector_condition)
+      else:
+        operator = None
+      if operator:
+        where_conditions.append(f'{self.vector_field} {operator} {vector_str}')
 
     # Add full-text (BM25) search condition if present
     if (
