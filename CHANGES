@@ -5,7 +5,7 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [Unreleased]
+## [1.10.0] - 2026-08-12
 
 ### Added
 
@@ -53,6 +53,28 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   it further. `_parse_indexes`, `_parse_index_definition`, and the clause
   extractors now live in their own module and are imported back into
   `surql.schema.parser`, so existing import paths keep resolving.
+
+### Security
+
+- **`pymdown-extensions` bumped to 11.0.1**, clearing three advisories on the
+  docs dependency: CVE-2026-67422 (high, `<= 11.0.0`), CVE-2026-61632
+  (`<= 10.21.3`), and CVE-2026-46338 (`<= 10.21.2`). It is transitive through
+  `mkdocs-material` in the `docs` extra, so nothing the library ships at
+  runtime was affected.
+- **`idna` bumped to 3.18** for CVE-2026-45409, a denial of service in
+  `idna.encode()`. The nightly Security Audit also moved off the shared
+  self-hosted runner, where a job failing every night accumulated state and
+  degraded it for other consumers.
+
+### Changed
+
+- **`structlog` ceiling raised to `<27`.** structlog 26.1.0 is current and the
+  suite passes against it; the previous `<26` bound excluded it.
+- **CI actions updated**: `codecov/codecov-action` v6 to v7,
+  `lewagon/wait-on-check-action` to v1.9.1, `python-ulid` to `<5.0.0`.
+- **`uv.lock` resynchronised with `pyproject.toml`.** The `python-ulid`
+  requirement had been widened in the manifest without a re-lock, so the lock
+  still recorded the superseded specifier.
 
 ## [1.9.0] - 2026-07-29
 
