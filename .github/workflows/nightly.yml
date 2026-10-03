@@ -27,7 +27,7 @@ jobs:
         os: [ubuntu-latest]
         python-version: ['3.12', '3.13']
     steps:
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@v7
         with:
           ref: main
 
@@ -65,7 +65,7 @@ jobs:
         python-version: ['3.12', '3.13']
         surreal-tag: ['v3.0.5', 'latest']
     steps:
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@v7
         with:
           ref: main
 
