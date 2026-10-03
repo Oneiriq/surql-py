@@ -118,7 +118,7 @@ class TestQuery:
 
   def test_group_by(self) -> None:
     """Test GROUP BY clause."""
-    query = Query[User]().select(['status', 'COUNT(*)']).from_table('user').group_by('status')
+    query = Query[User]().select(['status', 'count()']).from_table('user').group_by('status')
 
     assert query.group_fields == ['status']
 

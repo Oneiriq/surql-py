@@ -691,7 +691,7 @@ async def process_event_logs(start_date: str):
   """Process millions of event logs efficiently."""
   query = (
     Query()
-      .select(['event_type', 'count() as total', 'avg(duration) as avg_duration'])
+      .select(['event_type', 'count() as total', 'math::mean(duration) as avg_duration'])
       .from_table('events')
       .where('created_at >= $start_date')
       .group_by(['event_type'])

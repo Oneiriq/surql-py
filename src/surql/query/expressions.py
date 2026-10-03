@@ -61,8 +61,8 @@ class FunctionExpression(Expression):
   """Function call expression.
 
   Examples:
-    >>> FunctionExpression(sql='COUNT(*)')
-    >>> FunctionExpression(sql='AVG(age)')
+    >>> FunctionExpression(sql='count()')
+    >>> FunctionExpression(sql='math::mean(age)')
   """
 
   pass
@@ -119,7 +119,7 @@ def func(name: str, *args: str | Expression) -> FunctionExpression:
     FunctionExpression instance
 
   Examples:
-    >>> func('COUNT', '*')
+    >>> func('count')
     >>> func('UPPER', field('name'))
     >>> func('CONCAT', field('first_name'), value(' '), field('last_name'))
   """
@@ -138,24 +138,34 @@ def func(name: str, *args: str | Expression) -> FunctionExpression:
 
 
 def count(field_name: str | None = None) -> FunctionExpression:
-  """Create COUNT aggregate function.
+  """Create the SurrealQL ``count`` aggregate function.
+
+  SurrealQL has no ``count(*)`` form; SurrealDB rejects the ``*`` at parse
+  time. Bare ``count()`` counts every record in the group, and
+  ``count(<field>)`` counts the records whose field (or condition) is truthy.
 
   Args:
-    field_name: Optional field name. If None, counts all records.
+    field_name: Optional field name or condition. If None (or ``'*'``),
+      counts all records.
 
   Returns:
     FunctionExpression instance
 
   Examples:
-    >>> count()  # COUNT(*)
-    >>> count('id')  # COUNT(id)
+    >>> count()  # count()
+    >>> count('email')  # count(email)
+    >>> count("status = 'active'")  # count(status = 'active')
   """
-  arg = field_name if field_name else '*'
-  return FunctionExpression(sql=f'COUNT({arg})')
+  if not field_name or field_name == '*':
+    return FunctionExpression(sql='count()')
+  return FunctionExpression(sql=f'count({field_name})')
 
 
 def sum_(field_name: str) -> FunctionExpression:
-  """Create SUM aggregate function.
+  """Create the sum aggregate, rendered as SurrealQL ``math::sum``.
+
+  SurrealQL has no ``SUM`` function; the sum aggregate is ``math::sum``.
+  Equivalent to :func:`math_sum`.
 
   Args:
     field_name: Field name to sum
@@ -164,14 +174,17 @@ def sum_(field_name: str) -> FunctionExpression:
     FunctionExpression instance
 
   Examples:
-    >>> sum_('price')
-    >>> sum_('quantity')
+    >>> sum_('price')  # math::sum(price)
+    >>> sum_('quantity')  # math::sum(quantity)
   """
-  return FunctionExpression(sql=f'SUM({field_name})')
+  return FunctionExpression(sql=f'math::sum({field_name})')
 
 
 def avg(field_name: str) -> FunctionExpression:
-  """Create AVG aggregate function.
+  """Create the average aggregate, rendered as SurrealQL ``math::mean``.
+
+  SurrealQL has no ``AVG`` function; the average aggregate is ``math::mean``.
+  Equivalent to :func:`math_mean`.
 
   Args:
     field_name: Field name to average
@@ -180,14 +193,17 @@ def avg(field_name: str) -> FunctionExpression:
     FunctionExpression instance
 
   Examples:
-    >>> avg('age')
-    >>> avg('score')
+    >>> avg('age')  # math::mean(age)
+    >>> avg('score')  # math::mean(score)
   """
-  return FunctionExpression(sql=f'AVG({field_name})')
+  return FunctionExpression(sql=f'math::mean({field_name})')
 
 
 def min_(field_name: str) -> FunctionExpression:
-  """Create MIN aggregate function.
+  """Create the minimum aggregate, rendered as SurrealQL ``math::min``.
+
+  SurrealQL has no ``MIN`` function; the minimum aggregate is ``math::min``.
+  Equivalent to :func:`math_min`.
 
   Args:
     field_name: Field name to find minimum
@@ -196,14 +212,17 @@ def min_(field_name: str) -> FunctionExpression:
     FunctionExpression instance
 
   Examples:
-    >>> min_('price')
-    >>> min_('created_at')
+    >>> min_('price')  # math::min(price)
+    >>> min_('created_at')  # math::min(created_at)
   """
-  return FunctionExpression(sql=f'MIN({field_name})')
+  return FunctionExpression(sql=f'math::min({field_name})')
 
 
 def max_(field_name: str) -> FunctionExpression:
-  """Create MAX aggregate function.
+  """Create the maximum aggregate, rendered as SurrealQL ``math::max``.
+
+  SurrealQL has no ``MAX`` function; the maximum aggregate is ``math::max``.
+  Equivalent to :func:`math_max`.
 
   Args:
     field_name: Field name to find maximum
@@ -212,10 +231,10 @@ def max_(field_name: str) -> FunctionExpression:
     FunctionExpression instance
 
   Examples:
-    >>> max_('price')
-    >>> max_('updated_at')
+    >>> max_('price')  # math::max(price)
+    >>> max_('updated_at')  # math::max(updated_at)
   """
-  return FunctionExpression(sql=f'MAX({field_name})')
+  return FunctionExpression(sql=f'math::max({field_name})')
 
 
 # String functions

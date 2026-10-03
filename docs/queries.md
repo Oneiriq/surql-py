@@ -317,7 +317,7 @@ Query().select(['count()']).from_table('user')
 Query().select([
   'category',
   'count() AS total',
-  'avg(price) AS avg_price'
+  'math::mean(price) AS avg_price'
 ]).from_table('product').group_by(['category'])
 ```
 
@@ -639,9 +639,9 @@ async def get_stats():
     result = await client.execute('''
       SELECT
         count() as total,
-        avg(age) as avg_age,
-        min(age) as min_age,
-        max(age) as max_age
+        math::mean(age) as avg_age,
+        math::min(age) as min_age,
+        math::max(age) as max_age
       FROM user
       GROUP ALL
     ''')
@@ -971,9 +971,9 @@ async def count_by_category():
       SELECT
         category,
         count() AS total,
-        avg(price) AS avg_price,
-        min(price) AS min_price,
-        max(price) AS max_price
+        math::mean(price) AS avg_price,
+        math::min(price) AS min_price,
+        math::max(price) AS max_price
       FROM product
       GROUP BY category
       ORDER BY total DESC

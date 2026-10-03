@@ -5,6 +5,23 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+
+### Fixed
+
+- **The `surql.query.expressions` aggregates now render SurrealQL that
+  SurrealDB parses.** `count()` rendered `COUNT(*)`, which SurrealDB rejects
+  (`Unexpected token '*'`), and `sum_` / `avg` / `min_` / `max_` rendered
+  `SUM(...)` / `AVG(...)` / `MIN(...)` / `MAX(...)`, which SurrealQL does not
+  define (`Invalid function/constant path`), so any query projecting one of
+  them failed at parse time. `count()` (and `count('*')`) now renders bare
+  `count()`, `count(field)` renders `count(field)` (counting the records whose
+  field or condition is truthy), and the others render `math::sum`,
+  `math::mean`, `math::min`, and `math::max`, the same SurrealQL as
+  `math_sum` / `math_mean` / `math_min` / `math_max`. The `group_by`
+  docstring, the query docs, and `LLM.txt` showed the same SQL-style forms
+  and now show the SurrealQL ones.
+
 ## [1.10.0] - 2026-08-12
 
 ### Added

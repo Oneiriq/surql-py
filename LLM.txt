@@ -394,11 +394,13 @@
 ### Aggregate Functions
 - Import: `from surql.query.expressions import count, sum_, avg, min_, max_`
 - Count all: `count()` → `count()`
-- Count field: `count('id')` → `count(id)`
-- Sum: `sum_('price')` → `sum(price)`
-- Average: `avg('rating')` → `avg(rating)`
-- Minimum: `min_('age')` → `min(age)`
-- Maximum: `max_('score')` → `max(score)`
+- Count truthy field: `count('email')` → `count(email)`
+- Count matching condition: `count("status = 'active'")` → `count(status = 'active')`
+- Sum: `sum_('price')` → `math::sum(price)`
+- Average: `avg('rating')` → `math::mean(rating)`
+- Minimum: `min_('age')` → `math::min(age)`
+- Maximum: `max_('score')` → `math::max(score)`
+- SurrealQL has no `count(*)`, `SUM`, `AVG`, `MIN`, or `MAX`; SurrealDB rejects them at parse time
 
 ### String Functions
 - Import: `from surql.query.expressions import concat, string_`
@@ -444,7 +446,7 @@
 - Page calculation: `page = 3; page_size = 10; query.limit(page_size).offset((page - 1) * page_size)`
 
 ### Grouping
-- Single field: `query.select(['status', 'COUNT(*)']).from_table('user').group_by('status')`
+- Single field: `query.select(['status', 'count()']).from_table('user').group_by('status')`
 - Multiple fields: `query.group_by('status', 'role')`
 
 ### Vector Similarity Search
@@ -2721,7 +2723,7 @@ def downgrade():
 
 ### Order and Group Efficiently
 - Order by indexed fields when possible
-- Use GROUP BY for aggregations: `select(['status', 'COUNT(*)']).group_by('status')`
+- Use GROUP BY for aggregations: `select(['status', 'count()']).group_by('status')`
 - Combine with HAVING for filtered aggregations
 
 ### Use Caching
