@@ -21,6 +21,10 @@ from surql.query.expressions import (
   floor,
   func,
   lower,
+  math_max,
+  math_mean,
+  math_min,
+  math_sum,
   max_,
   min_,
   raw,
@@ -97,14 +101,14 @@ class TestFunctionExpression:
 
   def test_create_function_expression(self):
     """Test creating function expression."""
-    expr = FunctionExpression(sql='COUNT(*)')
+    expr = FunctionExpression(sql='count()')
     assert isinstance(expr, Expression)
-    assert expr.sql == 'COUNT(*)'
+    assert expr.sql == 'count()'
 
   def test_function_expression_to_surql(self):
     """Test function expression to SurrealQL."""
-    expr = FunctionExpression(sql='AVG(age)')
-    assert expr.to_surql() == 'AVG(age)'
+    expr = FunctionExpression(sql='math::mean(age)')
+    assert expr.to_surql() == 'math::mean(age)'
 
 
 class TestFieldBuilder:
@@ -168,8 +172,8 @@ class TestFunctionBuilder:
 
   def test_func_string_arg(self):
     """Test function with string argument."""
-    expr = func('COUNT', '*')
-    assert expr.to_surql() == 'COUNT(*)'
+    expr = func('math::sum', 'price')
+    assert expr.to_surql() == 'math::sum(price)'
 
   def test_func_expression_arg(self):
     """Test function with expression argument."""
@@ -197,34 +201,83 @@ class TestAggregates:
   """Test aggregate function builders."""
 
   def test_count_all(self):
-    """Test COUNT(*) aggregate."""
+    """Test bare count() aggregate (SurrealDB rejects count(*))."""
     expr = count()
-    assert expr.to_surql() == 'COUNT(*)'
+    assert isinstance(expr, FunctionExpression)
+    assert expr.to_surql() == 'count()'
+
+  def test_count_none(self):
+    """Test count(None) renders bare count()."""
+    expr = count(None)
+    assert expr.to_surql() == 'count()'
+
+  def test_count_star_is_bare_count(self):
+    """Test count('*') normalizes to count() instead of emitting count(*)."""
+    expr = count('*')
+    assert expr.to_surql() == 'count()'
+
+  def test_count_empty_string_is_bare_count(self):
+    """Test count('') renders bare count()."""
+    expr = count('')
+    assert expr.to_surql() == 'count()'
 
   def test_count_field(self):
-    """Test COUNT(field) aggregate."""
+    """Test count(field) aggregate."""
     expr = count('id')
-    assert expr.to_surql() == 'COUNT(id)'
+    assert expr.to_surql() == 'count(id)'
+
+  def test_count_condition(self):
+    """Test count(<condition>) aggregate."""
+    expr = count("status = 'active'")
+    assert expr.to_surql() == "count(status = 'active')"
 
   def test_sum(self):
-    """Test SUM aggregate."""
+    """Test sum aggregate renders math::sum."""
     expr = sum_('price')
-    assert expr.to_surql() == 'SUM(price)'
+    assert isinstance(expr, FunctionExpression)
+    assert expr.to_surql() == 'math::sum(price)'
 
   def test_avg(self):
-    """Test AVG aggregate."""
+    """Test average aggregate renders math::mean."""
     expr = avg('age')
-    assert expr.to_surql() == 'AVG(age)'
+    assert isinstance(expr, FunctionExpression)
+    assert expr.to_surql() == 'math::mean(age)'
 
   def test_min(self):
-    """Test MIN aggregate."""
+    """Test minimum aggregate renders math::min."""
     expr = min_('price')
-    assert expr.to_surql() == 'MIN(price)'
+    assert isinstance(expr, FunctionExpression)
+    assert expr.to_surql() == 'math::min(price)'
 
   def test_max(self):
-    """Test MAX aggregate."""
+    """Test maximum aggregate renders math::max."""
     expr = max_('updated_at')
-    assert expr.to_surql() == 'MAX(updated_at)'
+    assert isinstance(expr, FunctionExpression)
+    assert expr.to_surql() == 'math::max(updated_at)'
+
+  @pytest.mark.parametrize(
+    ('helper', 'native'),
+    [
+      (sum_, math_sum),
+      (avg, math_mean),
+      (min_, math_min),
+      (max_, math_max),
+    ],
+  )
+  def test_aggregate_matches_math_helper(self, helper, native):
+    """Test each aggregate renders the same SurrealQL as its math_* helper."""
+    assert helper('score').to_surql() == native('score').to_surql()
+
+  @pytest.mark.parametrize(
+    'expr',
+    [count(), count('id'), sum_('price'), avg('age'), min_('price'), max_('price')],
+  )
+  def test_aggregate_has_no_sql_style_form(self, expr):
+    """Test no aggregate emits a SQL-style form SurrealDB rejects at parse time."""
+    rendered = expr.to_surql()
+    assert '*' not in rendered
+    for sql_style in ('COUNT(', 'SUM(', 'AVG(', 'MIN(', 'MAX('):
+      assert not rendered.startswith(sql_style)
 
 
 class TestStringFunctions:
@@ -389,12 +442,12 @@ class TestCompositionHelpers:
   def test_as_with_function(self):
     """Test aliasing a function expression."""
     expr = as_(count(), 'total')
-    assert expr.to_surql() == 'COUNT(*) AS total'
+    assert expr.to_surql() == 'count() AS total'
 
   def test_as_with_aggregate(self):
     """Test aliasing an aggregate expression."""
     expr = as_(avg('age'), 'average_age')
-    assert expr.to_surql() == 'AVG(age) AS average_age'
+    assert expr.to_surql() == 'math::mean(age) AS average_age'
 
   def test_as_with_concat(self):
     """Test aliasing a concat expression."""
@@ -448,7 +501,7 @@ class TestExpressionComposition:
     """Test aliased aggregate function."""
     expr = as_(sum_('total_sales'), 'revenue')
     result = expr.to_surql()
-    assert 'SUM(total_sales)' in result
+    assert 'math::sum(total_sales)' in result
     assert 'AS revenue' in result
 
   def test_function_in_function(self):

@@ -227,7 +227,7 @@ class Query[T: BaseModel](BaseModel):
       New Query instance with grouping added
 
     Examples:
-      >>> Query().select(['status', 'COUNT(*)']).from_table('user').group_by('status')
+      >>> Query().select(['status', 'count()']).from_table('user').group_by('status')
     """
     return self.model_copy(update={'group_fields': [*self.group_fields, *fields]})
 

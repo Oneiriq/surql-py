@@ -171,7 +171,7 @@ class TestGroupByWithAggregation:
       Query[User]().select([cnt.to_surql(), mean.to_surql()]).from_table('user').group_by('status')
     )
     sql = query.to_surql()
-    assert 'COUNT(*) AS cnt' in sql
+    assert 'count() AS cnt' in sql
     assert 'math::mean(score) AS avg' in sql
     assert 'GROUP BY status' in sql
 
@@ -205,7 +205,7 @@ class TestAggregationExpressionComposition:
   def test_as_with_count(self) -> None:
     """Test aliasing count() expression."""
     expr = as_(count(), 'total_count')
-    assert expr.to_surql() == 'COUNT(*) AS total_count'
+    assert expr.to_surql() == 'count() AS total_count'
 
   def test_as_with_math_mean(self) -> None:
     """Test aliasing math::mean() expression."""
@@ -630,7 +630,7 @@ class TestIntegrationAggregationQueries:
     """Test COUNT with GROUP BY generates correct SurrealQL."""
     cnt = as_(count(), 'cnt')
     query = Query().select(['status', cnt.to_surql()]).from_table('user').group_by('status')
-    assert query.to_surql() == 'SELECT status, COUNT(*) AS cnt FROM user GROUP BY status'
+    assert query.to_surql() == 'SELECT status, count() AS cnt FROM user GROUP BY status'
 
   def test_math_mean_group_all(self) -> None:
     """Test math::mean with GROUP ALL generates correct SurrealQL."""
@@ -651,7 +651,7 @@ class TestIntegrationAggregationQueries:
     )
     sql = query.to_surql()
     assert 'department' in sql
-    assert 'COUNT(*) AS cnt' in sql
+    assert 'count() AS cnt' in sql
     assert 'math::sum(amount) AS total' in sql
     assert 'math::max(amount) AS highest' in sql
     assert 'GROUP BY department' in sql
